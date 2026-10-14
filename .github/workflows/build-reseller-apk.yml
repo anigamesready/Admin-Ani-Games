@@ -129,6 +129,24 @@ jobs:
           if not dashboard.is_file():
               raise SystemExit("Reseller dashboard admin-control.html is missing from WebView assets")
 
+          # Guarantee the reseller dashboard uses the packaged brand logo without replacing its logic.
+          logo = web_dir / "icon/logo.png"
+          if not logo.is_file():
+              raise SystemExit("Expected reseller logo asset icon/logo.png is missing")
+          dashboard_text = dashboard.read_text(errors="replace")
+          if "icon/logo.png" not in dashboard_text:
+              body = re.search(r"<body\\b[^>]*>", dashboard_text, re.I)
+              if not body:
+                  raise SystemExit("Cannot add reseller branding: dashboard has no body element")
+              brand = ('<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
+                       'margin:0 0 12px;border-bottom:1px solid #263449;font-weight:700">'
+                       '<img src="icon/logo.png" alt="Ani-Games Reseller" '
+                       'style="width:44px;height:44px;object-fit:contain;border-radius:10px">'
+                       '<span>Ani-Games Reseller</span></div>')
+              dashboard_text = dashboard_text[:body.end()] + brand + dashboard_text[body.end():]
+              dashboard.write_text(dashboard_text)
+              print("Added reseller logo header to dashboard.")
+
           # Remove unused legacy entry points only; retain the reseller login and dashboard.
           for name in ("admin.html", "billing.html", "v11-cloud.js"):
               target = web_dir / name
