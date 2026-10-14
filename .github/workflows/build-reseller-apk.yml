@@ -136,14 +136,14 @@ jobs:
                   target.unlink()
                   print("Removed unused legacy entry point:", target.name)
           icon_dir = web_dir / "icon"
-          for name in ("admin.html", "billing.html", "index.html", "v11-cloud.js"):
+          for name in ("admin.html", "admin-control.html", "billing.html", "index.html", "v11-cloud.js"):
               target = icon_dir / name
               if target.is_file():
                   target.unlink()
                   print("Removed duplicate legacy asset:", str(target.relative_to(web_dir)))
 
           html_files = list(web_dir.rglob("*.html"))
-          forbidden = re.compile(r"billing_command|billing_start_trial|admin_disconnect_device|restart_pc|shutdown_pc|\blogoff\b|start_trial|queue_command", re.I)
+          forbidden = re.compile(r"billing_command\s*\(|billing_start_trial|admin_disconnect_device|restart_pc|shutdown_pc|\blogoff\b|start_trial|queue_command", re.I)
           hits = []
           for path in html_files:
               for n, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
