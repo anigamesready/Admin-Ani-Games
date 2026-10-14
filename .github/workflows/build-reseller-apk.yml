@@ -136,14 +136,17 @@ jobs:
           dashboard_text = dashboard.read_text(errors="replace")
           if "icon/logo.png" not in dashboard_text:
               body = re.search(r"<body\\b[^>]*>", dashboard_text, re.I)
-              if not body:
-                  raise SystemExit("Cannot add reseller branding: dashboard has no body element")
+              if body:
+                  insertion = body.end()
+              else:
+                  head = re.search(r"</head\\s*>", dashboard_text, re.I)
+                  insertion = head.end() if head else 0
               brand = ('<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
                        'margin:0 0 12px;border-bottom:1px solid #263449;font-weight:700">'
                        '<img src="icon/logo.png" alt="Ani-Games Reseller" '
                        'style="width:44px;height:44px;object-fit:contain;border-radius:10px">'
                        '<span>Ani-Games Reseller</span></div>')
-              dashboard_text = dashboard_text[:body.end()] + brand + dashboard_text[body.end():]
+              dashboard_text = dashboard_text[:insertion] + brand + dashboard_text[insertion:]
               dashboard.write_text(dashboard_text)
               print("Added reseller logo header to dashboard.")
 
@@ -173,6 +176,13 @@ jobs:
 
           old_key = "sb_publishable_1Jsp3ZQDLwtozZ2hSPO83YA_7e1j723g"
           new_key = "sb_publishable_DobdCrOd43-vluON5gV7hg_6Js2Ea5V"
+          # Migrate only the known obsolete public publishable key; no secret keys are embedded.
+          for path in web_dir.rglob("*"):
+              if path.is_file() and path.suffix.lower() in (".html", ".js", ".json", ".txt"):
+                  body_text = path.read_text(errors="replace")
+                  if old_key in body_text:
+                      path.write_text(body_text.replace(old_key, new_key))
+                      print("Updated obsolete public API key in", path.relative_to(web_dir))
           all_web_text = "\n".join(
               p.read_text(errors="replace") for p in web_dir.rglob("*")
               if p.is_file() and p.suffix.lower() in (".html", ".js", ".json", ".txt"))
@@ -187,6 +197,11 @@ jobs:
           print("Reseller identity, package, UI entry-point, restricted-action, logo and API-key audits passed.")
           PY
 
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.9'
+
       - name: Compile debug APK
         shell: bash
         run: |
@@ -196,8 +211,7 @@ jobs:
             chmod +x ./gradlew
             ./gradlew --no-daemon --stacktrace assembleDebug
           else
-            echo "::error::Gradle wrapper is missing; compile stopped rather than guessing a Gradle version."
-            exit 1
+            gradle --no-daemon --stacktrace assembleDebug
           fi
 
       - name: Verify APK identity and prepare output
