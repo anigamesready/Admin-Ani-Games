@@ -135,11 +135,11 @@ jobs:
               raise SystemExit("Expected reseller logo asset icon/logo.png is missing")
           dashboard_text = dashboard.read_text(errors="replace")
           if "icon/logo.png" not in dashboard_text:
-              body = re.search(r"<body\\b[^>]*>", dashboard_text, re.I)
+              body = re.search(r"<body\b[^>]*>", dashboard_text, re.I)
               if body:
                   insertion = body.end()
               else:
-                  head = re.search(r"</head\\s*>", dashboard_text, re.I)
+                  head = re.search(r"</head\s*>", dashboard_text, re.I)
                   insertion = head.end() if head else 0
               brand = ('<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
                        'margin:0 0 12px;border-bottom:1px solid #263449;font-weight:700">'
