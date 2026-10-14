@@ -150,6 +150,91 @@ jobs:
               dashboard.write_text(dashboard_text)
               print("Added reseller logo header to dashboard.")
 
+          # Add a manual refresh control and expiry sound notifier to the reseller UI.
+          msg_anchor = '<div id="msg" class="msg hidden"></div>'
+          if msg_anchor not in dashboard_text:
+              raise SystemExit("Cannot add reseller refresh controls: message container not found")
+          toolbar = """
+          <div id="resellerRefreshSoundBar" class="section card" style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+            <button id="resellerRefreshButton" class="primary" onclick="manualResellerRefresh()">⟳ Refresh Status &amp; Sync</button>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px"><input id="resellerSoundToggle" type="checkbox" checked onchange="toggleResellerSound()" style="width:18px;height:18px"> Suara notifikasi rental habis</label>
+            <button onclick="testResellerSound()">▶ Tes Suara</button>
+          </div>
+          """
+          if 'id="resellerRefreshSoundBar"' not in dashboard_text:
+              dashboard_text = dashboard_text.replace(msg_anchor, msg_anchor + toolbar, 1)
+          js_anchor = "async function refreshAll()"
+          if js_anchor not in dashboard_text:
+              raise SystemExit("Cannot add reseller refresh controls: refreshAll() was not found")
+          if "function monitorResellerRentalExpiry" not in dashboard_text:
+              reseller_script = r"""
+          let resellerSoundEnabled = sessionStorage.getItem("ani_games_reseller_sound") !== "off";
+          let resellerAudioContext = null;
+          const resellerPreviousRentalStates = new Map();
+          const resellerAlertedExpiryKeys = new Set();
+          const resellerSoundControl = document.getElementById("resellerSoundToggle");
+          if (resellerSoundControl) resellerSoundControl.checked = resellerSoundEnabled;
+          function toggleResellerSound() {
+            resellerSoundEnabled = !!document.getElementById("resellerSoundToggle")?.checked;
+            sessionStorage.setItem("ani_games_reseller_sound", resellerSoundEnabled ? "on" : "off");
+            if (resellerSoundEnabled) testResellerSound();
+          }
+          function beepResellerExpiry() {
+            if (!resellerSoundEnabled) return;
+            try {
+              const AudioCtx = window.AudioContext || window.webkitAudioContext;
+              if (!AudioCtx) return;
+              if (!resellerAudioContext) resellerAudioContext = new AudioCtx();
+              if (resellerAudioContext.state === "suspended") resellerAudioContext.resume().catch(() => {});
+              [0, 0.22, 0.44].forEach((delay, i) => {
+                const start = resellerAudioContext.currentTime + delay;
+                const osc = resellerAudioContext.createOscillator();
+                const gain = resellerAudioContext.createGain();
+                osc.type = "sine"; osc.frequency.value = [880, 660, 880][i];
+                gain.gain.setValueAtTime(0.0001, start);
+                gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.17);
+                osc.connect(gain); gain.connect(resellerAudioContext.destination);
+                osc.start(start); osc.stop(start + 0.18);
+              });
+            } catch (_) {}
+          }
+          function testResellerSound() {
+            beepResellerExpiry();
+            if (typeof msg === "function") msg("Tes suara notifikasi rental.", false);
+          }
+          async function manualResellerRefresh() {
+            const button = document.getElementById("resellerRefreshButton");
+            if (button) { button.disabled = true; button.textContent = "⟳ Memperbarui status..."; }
+            try { await refreshAll(); }
+            finally { if (button) { button.disabled = false; button.innerHTML = "⟳ Refresh Status &amp; Sync"; } }
+          }
+          function monitorResellerRentalExpiry(rows) {
+            for (const row of (rows || [])) {
+              const code = String(row.code || row.id || "Rental");
+              const key = String(row.id || (code + "|" + String(row.expiry_at || "")));
+              const status = String(row.status || "").toLowerCase();
+              const remaining = Number(row.remaining_seconds);
+              const expired = ["expired", "ended", "finished"].includes(status) || (Number.isFinite(remaining) && remaining <= 0);
+              const previous = resellerPreviousRentalStates.get(key);
+              if (previous && !previous.expired && expired && !resellerAlertedExpiryKeys.has(key)) {
+                resellerAlertedExpiryKeys.add(key);
+                beepResellerExpiry();
+                if (typeof msg === "function") msg("⏰ Sesi rental " + code + " terdeteksi habis.", true);
+              }
+              resellerPreviousRentalStates.set(key, { expired: expired, remaining: Number.isFinite(remaining) ? remaining : null, status: status });
+            }
+          }
+          """
+              dashboard_text = dashboard_text.replace(js_anchor, reseller_script + js_anchor, 1)
+          load_anchor = "const rows=await rpc('billing_rental_accounts',{p_session_token:token,p_org_id:org.id,p_device_id:d.id});$('rentalRows').innerHTML="
+          if load_anchor not in dashboard_text:
+              raise SystemExit("Cannot add rental-expiry sound: billing_rental_accounts render point not found")
+          if "monitorResellerRentalExpiry(rows)" not in dashboard_text:
+              dashboard_text = dashboard_text.replace(load_anchor, load_anchor.replace(";$(", ";monitorResellerRentalExpiry(rows);$("), 1)
+          dashboard.write_text(dashboard_text)
+          print("Added manual refresh/sync and rental-expiry sound notifier.")
+
           # Remove unused legacy entry points only; retain the reseller login and dashboard.
           for name in ("admin.html", "billing.html", "v11-cloud.js"):
               target = web_dir / name
