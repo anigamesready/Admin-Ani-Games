@@ -54,7 +54,7 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-34" "platforms;android-35" "build-tools;34.0.0" "build-tools;35.0.0"
 
-      - name: Audit reseller configuration and trim unused entry points
+      - name: Configure isolated reseller identity and audit web assets
         shell: bash
         run: |
           set -euo pipefail
@@ -63,37 +63,78 @@ jobs:
           from pathlib import Path
 
           root = Path(os.environ["ANDROID_DIR"])
-          gradle_files = [root / "app/build.gradle", root / "app/build.gradle.kts"]
-          gradle = next((p for p in gradle_files if p.is_file()), None)
+          gradle_candidates = [root / "app/build.gradle", root / "app/build.gradle.kts"]
+          gradle = next((p for p in gradle_candidates if p.is_file()), None)
           if gradle is None:
               raise SystemExit("app/build.gradle or app/build.gradle.kts not found")
           text = gradle.read_text(errors="replace")
-          ids = re.findall(r"applicationId\s*(?:=\s*)?['\"]([^'\"]+)['\"]", text)
-          print("Detected applicationId:", ids[-1] if ids else "(not declared in app gradle file)")
-          if not ids or "reseller" not in ids[-1].lower():
-              raise SystemExit("Source ZIP is not configured with a reseller-specific applicationId; refusing to publish a wrongly identified APK")
+
+          def set_gradle_value(key, value):
+              nonlocal_text = None
+              pattern = re.compile(r'(' + re.escape(key) + r'\s*=?\s*["\'])[^"\']+(["\'])')
+              updated, count = pattern.subn(lambda m: m.group(1) + value + m.group(2), text, count=1)
+              return updated, count
+
+          text, ns_count = re.subn(
+              r'(\bnamespace\s*=?\s*["\'])[^"\']+(["\'])',
+              lambda m: m.group(1) + "com.anigames.reseller" + m.group(2), text, count=1)
+          text, app_count = re.subn(
+              r'(\bapplicationId\s*=?\s*["\'])[^"\']+(["\'])',
+              lambda m: m.group(1) + "com.anigames.reseller" + m.group(2), text, count=1)
+          if not ns_count:
+              raise SystemExit("Cannot isolate Android namespace: Gradle namespace setting not found")
+          if not app_count:
+              raise SystemExit("Cannot isolate app install ID: applicationId setting not found")
+          text, _ = re.subn(r'\bversionCode\s+\d+', 'versionCode 130', text, count=1)
+          text, _ = re.subn(r'(\bversionName\s*=?\s*["\'])[^"\']+(["\'])',
+                            lambda m: m.group(1) + "1.0.0" + m.group(2), text, count=1)
+          gradle.write_text(text)
+          print("Configured namespace and applicationId as com.anigames.reseller")
+
+          # Re-home Java/Kotlin package declarations so generated R references use the reseller namespace.
+          src = root / "app/src/main"
+          if src.exists():
+              for path in list(src.rglob("*.java")) + list(src.rglob("*.kt")):
+                  body = path.read_text(errors="replace")
+                  updated = body.replace("com.anigames.billingadmin", "com.anigames.reseller")
+                  if updated != body:
+                      path.write_text(updated)
 
           manifests = list(root.glob("app/src/main/AndroidManifest.xml"))
           if not manifests:
               raise SystemExit("AndroidManifest.xml not found")
-          manifest = manifests[0].read_text(errors="replace")
-          print("Manifest label:", re.search(r'android:label\s*=\s*["\']([^"\']+)', manifest).group(1)
-                if re.search(r'android:label\s*=\s*["\']([^"\']+)', manifest) else "(resource-based or unspecified)")
+          manifest_path = manifests[0]
+          manifest = manifest_path.read_text(errors="replace")
+          if re.search(r'android:label\s*=\s*"[^"]+"', manifest):
+              manifest = re.sub(r'android:label\s*=\s*"[^"]+"',
+                                'android:label="Ani-Games Reseller"', manifest, count=1)
+          else:
+              raise SystemExit("Manifest has no explicit android:label to isolate")
+          manifest_path.write_text(manifest)
+          for strings in root.glob("app/src/main/res/values*/strings.xml"):
+              body = strings.read_text(errors="replace")
+              body = re.sub(r'(<string\s+name="app_name"[^>]*>).*?(</string>)',
+                            r'\1Ani-Games Reseller\2', body, count=1, flags=re.S)
+              strings.write_text(body)
 
-          web_dirs = [p for p in root.glob("app/src/main/assets/**") if p.is_dir() and (p / "index.html").is_file()]
-          web_dir = next((p for p in web_dirs if p.name == "web"), web_dirs[0] if web_dirs else None)
+          web_dirs = [p for p in root.glob("app/src/main/assets/**")
+                      if p.is_dir() and (p / "index.html").is_file()]
+          web_dir = next((p for p in web_dirs if p.name == "web"),
+                         web_dirs[0] if web_dirs else None)
           if web_dir is None:
               raise SystemExit("WebView assets/index.html not found")
-          print("Web assets:", web_dir)
+          print("Resolved WebView assets:", web_dir)
+          print("HTML assets before audit:", [str(p.relative_to(web_dir)) for p in web_dir.rglob("*.html")])
           dashboard = web_dir / "admin-control.html"
           if not dashboard.is_file():
               raise SystemExit("Reseller dashboard admin-control.html is missing from WebView assets")
-          # Remove unused legacy pages from the packaged app; keep the reseller login/dashboard.
+
+          # Remove unused legacy entry points only; retain the reseller login and dashboard.
           for name in ("admin.html", "billing.html", "v11-cloud.js"):
               target = web_dir / name
               if target.is_file():
                   target.unlink()
-                  print("Removed unused page/script:", target.name)
+                  print("Removed unused legacy entry point:", target.name)
           icon_dir = web_dir / "icon"
           for name in ("admin.html", "billing.html", "index.html", "v11-cloud.js"):
               target = icon_dir / name
@@ -110,11 +151,13 @@ jobs:
                       hits.append(f"{path.relative_to(web_dir)}:{n}:{line.strip()[:180]}")
           if hits:
               print("\n".join(hits[:50]))
-              raise SystemExit("Restricted Windows/pairing command capability strings found in reseller HTML; build halted for safety")
+              raise SystemExit("Restricted Windows/pairing command strings found in reseller HTML; refusing to compile this UI")
 
           old_key = "sb_publishable_1Jsp3ZQDLwtozZ2hSPO83YA_7e1j723g"
           new_key = "sb_publishable_DobdCrOd43-vluON5gV7hg_6Js2Ea5V"
-          all_web_text = "\n".join(p.read_text(errors="replace") for p in web_dir.rglob("*") if p.is_file() and p.suffix.lower() in (".html", ".js", ".json", ".txt"))
+          all_web_text = "\n".join(
+              p.read_text(errors="replace") for p in web_dir.rglob("*")
+              if p.is_file() and p.suffix.lower() in (".html", ".js", ".json", ".txt"))
           if old_key in all_web_text:
               raise SystemExit("Rejected legacy publishable key found in reseller assets")
           if new_key not in all_web_text:
@@ -123,7 +166,7 @@ jobs:
               raise SystemExit("Reseller login does not reference icon/logo.png")
           if "icon/logo.png" not in dashboard.read_text(errors="replace"):
               raise SystemExit("Reseller dashboard does not reference icon/logo.png")
-          print("Reseller UI, package ID, legacy-page, restricted-action and API-key audits passed.")
+          print("Reseller identity, package, UI entry-point, restricted-action, logo and API-key audits passed.")
           PY
 
       - name: Compile debug APK
