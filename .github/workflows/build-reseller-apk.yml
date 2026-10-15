@@ -334,7 +334,7 @@ jobs:
               page_text = page.read_text(errors="replace")
               page_text = re.sub(r'<style id="anigames-reseller-neon-theme">.*?</style>', '', page_text,
                                  count=1, flags=re.I | re.S)
-              head_end = re.search(r'</head\\s*>', page_text, re.I)
+              head_end = re.search(r'</head\s*>', page_text, re.I)
               if not head_end:
                   raise SystemExit(f"Cannot apply reseller UI theme: </head> missing in {page.name}")
               page_text = page_text[:head_end.start()] + theme_css + page_text[head_end.start():]
