@@ -38,6 +38,48 @@ jobs:
           echo "Files near project root:"
           find "$ANDROID_DIR" -maxdepth 2 -type f | sort | head -100
 
+      - name: Validate and extract exact HTML Review template
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, hashlib, io, tarfile
+          from pathlib import Path
+
+          part_dir = Path("reseller/ui-review-parts")
+          parts = sorted(part_dir.glob("*.b64"))
+          expected_parts = ["01.b64", "02.b64", "03.b64", "04.b64"]
+          if [p.name for p in parts] != expected_parts:
+              raise SystemExit("The four HTML Review archive parts are missing")
+          encoded = "".join(p.read_text().strip() for p in parts)
+          if len(encoded) != 17764:
+              raise SystemExit(f"HTML Review archive encoded length mismatch: {len(encoded)}")
+          archive = base64.b64decode(encoded, validate=True)
+          digest = hashlib.sha256(archive).hexdigest()
+          if digest != "c90fc770c78687748caafb21b83a421bb61d65eb4ea2ef00f9280d76562993ed":
+              raise SystemExit(f"HTML Review archive SHA-256 mismatch: {digest}")
+          with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tf:
+              members = {Path(m.name).name: m for m in tf.getmembers() if m.isfile()}
+              expected_hashes = {
+                  "index.html": ("8df0434644b1d2d1ce46371453ebd3c15d8b53f82a54b623232d8a2674090f56", 5258),
+                  "admin-control.html": ("3504dbc2b91143627c191f18ddeabb246907467bb7348d690f42246ecbfd720e", 39028),
+              }
+              out = Path("review-ui")
+              out.mkdir(exist_ok=True)
+              for name, (expected_hash, expected_size) in expected_hashes.items():
+                  if name not in members:
+                      raise SystemExit(f"Supplied HTML Review archive lacks {name}")
+                  stream = tf.extractfile(members[name])
+                  if stream is None:
+                      raise SystemExit(f"Cannot read {name} from HTML Review archive")
+                  raw = stream.read()
+                  actual_hash = hashlib.sha256(raw).hexdigest()
+                  if len(raw) != expected_size or actual_hash != expected_hash:
+                      raise SystemExit(f"Supplied {name} failed integrity check")
+                  (out / name).write_bytes(raw)
+          print("Verified exact index.html and admin-control.html from the supplied HTML Review ZIP.")
+          PY
+
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
@@ -125,115 +167,22 @@ jobs:
               raise SystemExit("WebView assets/index.html not found")
           print("Resolved WebView assets:", web_dir)
           print("HTML assets before audit:", [str(p.relative_to(web_dir)) for p in web_dir.rglob("*.html")])
+          # Overlay the exact UI files supplied in Ani-Games-Reseller-HTML-Review-v1.0.0.zip.
+          for name in ("index.html", "admin-control.html"):
+              source_ui = Path("review-ui") / name
+              if not source_ui.is_file():
+                  raise SystemExit("Verified HTML Review UI file is missing: " + name)
+              (web_dir / name).write_bytes(source_ui.read_bytes())
+          print("Applied the exact supplied HTML Review login and dashboard.")
           dashboard = web_dir / "admin-control.html"
           if not dashboard.is_file():
               raise SystemExit("Reseller dashboard admin-control.html is missing from WebView assets")
 
-          # Guarantee the reseller dashboard uses the packaged brand logo without replacing its logic.
+          # Keep the review template's own dashboard markup and controls unchanged.
+          # The logo remains on its designed login screen; do not inject a new header or toolbar.
           logo = web_dir / "icon/logo.png"
           if not logo.is_file():
               raise SystemExit("Expected reseller logo asset icon/logo.png is missing")
-          dashboard_text = dashboard.read_text(errors="replace")
-          if "icon/logo.png" not in dashboard_text:
-              body = re.search(r"<body\b[^>]*>", dashboard_text, re.I)
-              if body:
-                  insertion = body.end()
-              else:
-                  head = re.search(r"</head\s*>", dashboard_text, re.I)
-                  insertion = head.end() if head else 0
-              brand = ('<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;'
-                       'margin:0 0 12px;border-bottom:1px solid #263449;font-weight:700">'
-                       '<img src="icon/logo.png" alt="Ani-Games Reseller" '
-                       'style="width:44px;height:44px;object-fit:contain;border-radius:10px">'
-                       '<span>Ani-Games Reseller</span></div>')
-              dashboard_text = dashboard_text[:insertion] + brand + dashboard_text[insertion:]
-              dashboard.write_text(dashboard_text)
-              print("Added reseller logo header to dashboard.")
-
-          # Add a manual refresh control and expiry sound notifier to the reseller UI.
-          msg_anchor = '<div id="msg" class="msg hidden"></div>'
-          if msg_anchor not in dashboard_text:
-              raise SystemExit("Cannot add reseller refresh controls: message container not found")
-          toolbar = """
-          <div id="resellerRefreshSoundBar" class="section card" style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
-            <button id="resellerRefreshButton" class="primary" onclick="manualResellerRefresh()">⟳ Refresh Status &amp; Sync</button>
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px"><input id="resellerSoundToggle" type="checkbox" checked onchange="toggleResellerSound()" style="width:18px;height:18px"> Suara notifikasi rental habis</label>
-            <button onclick="testResellerSound()">▶ Tes Suara</button>
-          </div>
-          """
-          if 'id="resellerRefreshSoundBar"' not in dashboard_text:
-              dashboard_text = dashboard_text.replace(msg_anchor, msg_anchor + toolbar, 1)
-          js_anchor = "async function refreshAll()"
-          if js_anchor not in dashboard_text:
-              raise SystemExit("Cannot add reseller refresh controls: refreshAll() was not found")
-          if "function monitorResellerRentalExpiry" not in dashboard_text:
-              reseller_script = r"""
-          let resellerSoundEnabled = sessionStorage.getItem("ani_games_reseller_sound") !== "off";
-          let resellerAudioContext = null;
-          const resellerPreviousRentalStates = new Map();
-          const resellerAlertedExpiryKeys = new Set();
-          const resellerSoundControl = document.getElementById("resellerSoundToggle");
-          if (resellerSoundControl) resellerSoundControl.checked = resellerSoundEnabled;
-          function toggleResellerSound() {
-            resellerSoundEnabled = !!document.getElementById("resellerSoundToggle")?.checked;
-            sessionStorage.setItem("ani_games_reseller_sound", resellerSoundEnabled ? "on" : "off");
-            if (resellerSoundEnabled) testResellerSound();
-          }
-          function beepResellerExpiry() {
-            if (!resellerSoundEnabled) return;
-            try {
-              const AudioCtx = window.AudioContext || window.webkitAudioContext;
-              if (!AudioCtx) return;
-              if (!resellerAudioContext) resellerAudioContext = new AudioCtx();
-              if (resellerAudioContext.state === "suspended") resellerAudioContext.resume().catch(() => {});
-              [0, 0.22, 0.44].forEach((delay, i) => {
-                const start = resellerAudioContext.currentTime + delay;
-                const osc = resellerAudioContext.createOscillator();
-                const gain = resellerAudioContext.createGain();
-                osc.type = "sine"; osc.frequency.value = [880, 660, 880][i];
-                gain.gain.setValueAtTime(0.0001, start);
-                gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
-                gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.17);
-                osc.connect(gain); gain.connect(resellerAudioContext.destination);
-                osc.start(start); osc.stop(start + 0.18);
-              });
-            } catch (_) {}
-          }
-          function testResellerSound() {
-            beepResellerExpiry();
-            if (typeof msg === "function") msg("Tes suara notifikasi rental.", false);
-          }
-          async function manualResellerRefresh() {
-            const button = document.getElementById("resellerRefreshButton");
-            if (button) { button.disabled = true; button.textContent = "⟳ Memperbarui status..."; }
-            try { await refreshAll(); }
-            finally { if (button) { button.disabled = false; button.innerHTML = "⟳ Refresh Status &amp; Sync"; } }
-          }
-          function monitorResellerRentalExpiry(rows) {
-            for (const row of (rows || [])) {
-              const code = String(row.code || row.id || "Rental");
-              const key = String(row.id || (code + "|" + String(row.expiry_at || "")));
-              const status = String(row.status || "").toLowerCase();
-              const remaining = Number(row.remaining_seconds);
-              const expired = ["expired", "ended", "finished"].includes(status) || (Number.isFinite(remaining) && remaining <= 0);
-              const previous = resellerPreviousRentalStates.get(key);
-              if (previous && !previous.expired && expired && !resellerAlertedExpiryKeys.has(key)) {
-                resellerAlertedExpiryKeys.add(key);
-                beepResellerExpiry();
-                if (typeof msg === "function") msg("⏰ Sesi rental " + code + " terdeteksi habis.", true);
-              }
-              resellerPreviousRentalStates.set(key, { expired: expired, remaining: Number.isFinite(remaining) ? remaining : null, status: status });
-            }
-          }
-          """
-              dashboard_text = dashboard_text.replace(js_anchor, reseller_script + js_anchor, 1)
-          load_anchor = "const rows=await rpc('billing_rental_accounts',{p_session_token:token,p_org_id:org.id,p_device_id:d.id});$('rentalRows').innerHTML="
-          if load_anchor not in dashboard_text:
-              raise SystemExit("Cannot add rental-expiry sound: billing_rental_accounts render point not found")
-          if "monitorResellerRentalExpiry(rows)" not in dashboard_text:
-              dashboard_text = dashboard_text.replace(load_anchor, load_anchor.replace(";$(", ";monitorResellerRentalExpiry(rows);$("), 1)
-          dashboard.write_text(dashboard_text)
-          print("Added manual refresh/sync and rental-expiry sound notifier.")
 
           # Remove unused legacy entry points only; retain the reseller login and dashboard.
           for name in ("admin.html", "billing.html", "v11-cloud.js"):
@@ -277,8 +226,6 @@ jobs:
               raise SystemExit("Expected current Supabase publishable key not found in reseller assets")
           if "icon/logo.png" not in (web_dir / "index.html").read_text(errors="replace"):
               raise SystemExit("Reseller login does not reference icon/logo.png")
-          if "icon/logo.png" not in dashboard.read_text(errors="replace"):
-              raise SystemExit("Reseller dashboard does not reference icon/logo.png")
           # Remove explanatory/disclaimer text at the bottom of the reseller login and dashboard,
           # while keeping the actual form, app behavior, and navigation untouched.
           login = web_dir / "index.html"
