@@ -279,6 +279,23 @@ jobs:
               raise SystemExit("Reseller login does not reference icon/logo.png")
           if "icon/logo.png" not in dashboard.read_text(errors="replace"):
               raise SystemExit("Reseller dashboard does not reference icon/logo.png")
+          # Remove explanatory/disclaimer text at the bottom of the reseller login and dashboard,
+          # while keeping the actual form, app behavior, and navigation untouched.
+          login = web_dir / "index.html"
+          login_text = login.read_text(errors="replace")
+          login_text, login_removed = re.subn(
+              r'\s*<div\s+class=["\']hint["\'][^>]*>.*?</div\s*>', '', login_text,
+              count=1, flags=re.I | re.S)
+          if login_removed:
+              login.write_text(login_text)
+              print("Removed bottom explanatory hint from reseller login.")
+          dashboard_text = dashboard.read_text(errors="replace")
+          dashboard_text, footer_removed = re.subn(
+              r'\s*<div\s+class=["\']footer["\'][^>]*>.*?</div\s*>', '', dashboard_text,
+              count=1, flags=re.I | re.S)
+          if footer_removed:
+              dashboard.write_text(dashboard_text)
+              print("Removed bottom draft/disclaimer footer from reseller dashboard.")
           print("Reseller identity, package, UI entry-point, restricted-action, logo and API-key audits passed.")
           PY
 
