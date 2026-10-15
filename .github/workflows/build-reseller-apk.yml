@@ -47,11 +47,11 @@ jobs:
           from pathlib import Path
 
           part_dir = Path("reseller/ui-review-parts")
-          parts = sorted(part_dir.glob("*.b64"))
-          expected_parts = ["01.b64", "02.b64", "03.b64", "04.b64"]
-          if [p.name for p in parts] != expected_parts:
-              raise SystemExit("The four HTML Review archive parts are missing")
-          encoded = "".join(p.read_text().strip() for p in parts)
+          expected_parts = ["01.b64", "02.b64", "03a.b64", "03b.b64", "03c.b64",
+                            "03d.b64", "03e.b64", "04.b64"]
+          if any(not (part_dir / name).is_file() for name in expected_parts):
+              raise SystemExit("One or more verified HTML Review archive parts are missing")
+          encoded = "".join((part_dir / name).read_text().strip() for name in expected_parts)
           if len(encoded) != 17764:
               raise SystemExit(f"HTML Review archive encoded length mismatch: {len(encoded)}")
           archive = base64.b64decode(encoded, validate=True)
