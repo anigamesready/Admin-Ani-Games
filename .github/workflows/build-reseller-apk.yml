@@ -296,50 +296,8 @@ jobs:
           if footer_removed:
               dashboard.write_text(dashboard_text)
               print("Removed bottom draft/disclaimer footer from reseller dashboard.")
-          # Apply the requested black / purple neon reseller visual refresh as CSS only.
-          # This intentionally leaves all Supabase calls, rental logic, navigation and event handlers unchanged.
-          theme_css = r"""
-          <style id="anigames-reseller-neon-theme">
-          :root{--bg:#07060d;--panel:#100d1b;--panel2:#171127;--line:#35234f;--text:#f7f2ff;--muted:#b7a9cc;--blue:#a855f7;--cyan:#d946ef;--red:#fb5478;--green:#39e6a5;--yellow:#f7c95c}
-          html{background:#07060d}
-          body{background:radial-gradient(ellipse at 12% -8%,#32104d 0,transparent 38%),radial-gradient(ellipse at 100% 12%,#1c1040 0,transparent 35%),#07060d!important;color:var(--text)!important}
-          .card,.pc-main,.stat,.modal-box{background:linear-gradient(155deg,rgba(25,17,40,.98),rgba(12,9,20,.98))!important;border-color:#392653!important;box-shadow:0 12px 34px rgba(0,0,0,.28),inset 0 1px 0 rgba(216,180,254,.04)}
-          .brand span,.brandlockup .brand span,h1 span{color:#d946ef!important}
-          .brand,.brandlockup .brand{letter-spacing:.2px}
-          .topbar{border-color:#35234f!important}
-          .btn.primary,.primary,.btn:not(.secondary):not(.light){background:linear-gradient(135deg,#9333ea,#c026d3)!important;border:1px solid #c084fc!important;color:#fff!important;box-shadow:0 5px 18px rgba(168,85,247,.22)}
-          .btn.primary:active,.primary:active,.btn:not(.secondary):not(.light):active{transform:translateY(1px)}
-          .btn.secondary,.secondary{background:#1b1428!important;border:1px solid #48305f!important;color:#e9d5ff!important}
-          .btn.light{background:#24172f!important;color:#f5d0fe!important;border:1px solid #53356c!important}
-          input,select,textarea{background:#0b0912!important;border-color:#403052!important;color:#f7f2ff!important}
-          input:focus,select:focus,textarea:focus{outline:2px solid rgba(192,132,252,.35)!important;border-color:#c084fc!important}
-          .pill{border-color:#49345f!important;background:#20152e!important;color:#e9d5ff!important}
-          .pill.online,.status.active{background:rgba(16,185,129,.12)!important;border-color:#187f62!important;color:#5ee8b5!important}
-          .pill.offline,.status.expired{background:rgba(244,63,94,.12)!important;border-color:#87334a!important;color:#ff8aa0!important}
-          .stat-value,.stat-value.blue{color:#d8b4fe!important}
-          .stat-value.green{color:#5ee8b5!important}.stat-value.red{color:#ff8aa0!important}
-          .nav{gap:8px!important}
-          .nav .btn.active{background:linear-gradient(135deg,#7e22ce,#a21caf)!important;border-color:#c084fc!important;color:#fff!important}
-          .section-title{color:#f3e8ff!important}
-          .muted,.help,.pc-detail-line,.stat-label{color:#b7a9cc!important}
-          .inner-box,.pc-item,.soundbox{background:#100c19!important;border-color:#35234f!important}
-          table{border-color:#35234f!important}th{background:#1a1226!important;color:#d8b4fe!important}td{border-color:#2d203d!important}
-          tr:hover td{background:rgba(168,85,247,.055)!important}
-          .logo,.brand-logo{filter:drop-shadow(0 0 12px rgba(217,70,239,.2))}
-          .modal{backdrop-filter:blur(8px)}
-          @media(max-width:600px){.wrap{padding:12px!important}.card{border-radius:18px!important}.topbar{gap:10px!important}.nav{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))}.nav .btn{width:100%;min-height:42px}.stats{gap:8px!important}.stat{border-radius:15px!important}.pcbar{gap:10px!important}.refresh{width:100%}}
-          </style>
-          """
-          for page in (login, dashboard):
-              page_text = page.read_text(errors="replace")
-              page_text = re.sub(r'<style id="anigames-reseller-neon-theme">.*?</style>', '', page_text,
-                                 count=1, flags=re.I | re.S)
-              head_end = re.search(r'</head\s*>', page_text, re.I)
-              if not head_end:
-                  raise SystemExit(f"Cannot apply reseller UI theme: </head> missing in {page.name}")
-              page_text = page_text[:head_end.start()] + theme_css + page_text[head_end.start():]
-              page.write_text(page_text)
-          print("Applied black/purple neon reseller UI theme (CSS only; app logic preserved).")
+          # Keep the exact dark navy/blue/cyan UI from the supplied HTML Review template.
+          # Do not override its colors with a separate theme; only layout/functions are retained.
 
           print("Reseller identity, package, UI entry-point, restricted-action, logo and API-key audits passed.")
           PY
