@@ -1,0 +1,64 @@
+name: Audit admin APK requested features
+
+on:
+  push:
+    branches:
+      - audit/feature-check-20261018
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan embedded Android source bundle for requested features
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re, zipfile
+          from pathlib import Path
+
+          archive = Path("AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip")
+          if not archive.is_file():
+              raise SystemExit("SOURCE ZIP MISSING")
+          with zipfile.ZipFile(archive) as z:
+              infos = [i for i in z.infolist() if not i.is_dir()]
+              print("SOURCE ZIP:", archive.name)
+              print("ENTRIES:", len(infos))
+              for i in infos:
+                  print(f"FILE: {i.filename} ({i.file_size} bytes)")
+              textual = {}
+              suffixes = {".java", ".kt", ".js", ".mjs", ".html", ".htm", ".xml", ".json", ".gradle", ".properties", ".txt", ".md", ".kts"}
+              for i in infos:
+                  if Path(i.filename).suffix.lower() in suffixes and i.file_size < 5_000_000:
+                      try:
+                          textual[i.filename] = z.read(i).decode("utf-8", "ignore").splitlines()
+                      except Exception:
+                          pass
+
+          groups = {
+            "DB1/DB2 pairing fallback": r"DB1|DB2|fallback|pairing|pair.?code|usage_exceeded|device.?pair",
+            "Android native notifications": r"NotificationChannel|NotificationManager|NotificationCompat|POST_NOTIFICATIONS|FirebaseMessagingService|notify\s*\(",
+            "Rental expiry/stop events": r"expired|expiry|rental.*(stop|end|finish)|session.*(stop|end|finish)|stopp?ed|ended|finish(ed)?",
+            "Sound/vibration": r"AudioManager|MediaPlayer|ToneGenerator|SoundPool|Ringtone|playSound|beep|notification.*sound|Vibrator|vibrate|USAGE_ALARM",
+            "Background/boot/service support": r"ForegroundService|startForeground|WorkManager|BroadcastReceiver|onTaskRemoved|BOOT_COMPLETED"
+          }
+
+          for title, pattern in groups.items():
+              rx = re.compile(pattern, re.I)
+              found = 0
+              print("\n=== " + title + " ===")
+              for name, lines in textual.items():
+                  for n, line in enumerate(lines, 1):
+                      if rx.search(line):
+                          print(f"{name}:{n}: {line.strip()[:300]}")
+                          found += 1
+                          if found >= 80:
+                              print("... output capped ...")
+                              break
+                  if found >= 80:
+                      break
+              print("MATCHED_LINES:", found)
+          PY
