@@ -1,3 +1,4 @@
+# v12.1.9 build artifact also carries this deterministic patch source for audit/reproduction.
 from pathlib import Path
 
 html_path = Path("android/app/src/main/assets/web/admin.html")
