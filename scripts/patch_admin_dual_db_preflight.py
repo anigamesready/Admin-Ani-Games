@@ -7,6 +7,9 @@ gradle_path = ROOT / 'android/app/build.gradle'
 html = html_path.read_text(encoding='utf-8')
 gradle = gradle_path.read_text(encoding='utf-8')
 
+# Remove the previous one-line API-only checker so it cannot override this route-aware preflight.
+html = re.sub(r"async function checkBothDbApis\\(\\)\\{[^\\n]*\\}", "", html)
+
 # Read-only, dual-project readiness panel. This is deliberately not a DB switch button.
 panel_heading = 'Sinkronisasi DB1 ↔ DB2'
 panel_index = html.find(panel_heading)
