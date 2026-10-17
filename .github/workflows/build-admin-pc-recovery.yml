@@ -123,6 +123,6 @@ jobs:
           name: AniGames-Admin-V12.1.6-DB2-ENROLLMENT-ALERTS
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
-            AniGames-Admin-V12.1.5-PC-RECOVERY-SOURCE.zip
+            AniGames-Admin-V12.1.6-DB2-ENROLLMENT-ALERTS-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
