@@ -33,7 +33,7 @@ marker = 'function adminNotify(message,kind){
  const urgent=kind==='error'||/berakhir|rental.*(stop|end|habis)|enrollment gagal|pairing gagal|usage_exceeded|offline/i.test(text);
  feed.classList.remove('hidden');feed.style.borderLeftColor=urgent?'#ff4d6d':'var(--a)';
  feed.innerHTML='<strong>'+(urgent?'⚠️ PERINGATAN':'🔔 NOTIFIKASI')+'</strong><div style="margin-top:5px;white-space:pre-wrap">'+esc(text)+'</div><div class="muted" style="margin-top:5px">'+new Date().toLocaleTimeString('id-ID')+'</div>';
- if(urgent)playAdminAlertSound();
+ if(urgent){const now=Date.now();if(text!==window.__lastAdminAlertText||now-(window.__lastAdminAlertAt||0)>2500)playAdminAlertSound();window.__lastAdminAlertText=text;window.__lastAdminAlertAt=now;}
 }
 let adminAlertAudioContext=null,adminAlertSoundReady=false;
 function playAdminAlertSound(){
@@ -109,7 +109,7 @@ gradle_path = Path('android/app/build.gradle')
 gradle = gradle_path.read_text(encoding='utf-8')
 if "versionCode 32" not in gradle or "versionName '12.1.0'" not in gradle:
     raise SystemExit('Unexpected baseline Android version; refusing to bump blindly')
-gradle = gradle.replace('versionCode 32', 'versionCode 33', 1).replace("versionName '12.1.0'", "versionName '12.1.5'", 1)
+gradle = gradle.replace('versionCode 32', 'versionCode 34', 1).replace("versionName '12.1.0'", "versionName '12.1.6'", 1)
 gradle_path.write_text(gradle, encoding='utf-8')
 Path('VERSION.txt').write_text('v12.1.5-admin-pc-recovery-targeted-enrollment\n', encoding='utf-8')
 html_path.write_text(html, encoding='utf-8')
