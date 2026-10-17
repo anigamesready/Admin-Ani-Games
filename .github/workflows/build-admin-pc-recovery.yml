@@ -49,6 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cd "$ANDROID_PROJECT_DIR"
           python3 - <<'PY'
           from pathlib import Path
           import re, subprocess
