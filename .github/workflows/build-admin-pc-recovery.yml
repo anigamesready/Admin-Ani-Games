@@ -137,6 +137,6 @@ jobs:
           name: AniGames-Admin-V12.1.8-DUAL-DB-READINESS-PREFLIGHT
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
-            AniGames-Admin-V12.1.7-ANDROID-SYSTEM-NOTIFICATIONS-SOURCE.zip
+            AniGames-Admin-V12.1.8-DUAL-DB-READINESS-PREFLIGHT-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
