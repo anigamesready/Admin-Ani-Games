@@ -20,6 +20,22 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Extract Android source bundle
+        run: |
+          set -euo pipefail
+          test -f "Ani-Games-Billing-Android-V12.1.zip"
+          mkdir -p source-bundle
+          unzip -q "Ani-Games-Billing-Android-V12.1.zip" -d source-bundle
+          PROJECT_DIR="$(find source-bundle -type f -path '*/android/app/build.gradle' -print -quit | sed 's#/android/app/build.gradle##')"
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android app/build.gradle not found in ZIP contents"
+            find source-bundle -maxdepth 4 -type f | head -100
+            exit 1
+          fi
+          test -f "$PROJECT_DIR/android/app/src/main/AndroidManifest.xml"
+          echo "ANDROID_PROJECT_DIR=$PROJECT_DIR/android" >> "$GITHUB_ENV"
+          echo "Detected Android project: $PROJECT_DIR/android"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -40,16 +56,13 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Verify source project
-        run: test -f Ani-Games-Billing-Android-V12.1.0/android/app/build.gradle && test -f Ani-Games-Billing-Android-V12.1.0/android/app/src/main/AndroidManifest.xml
-
       - name: Build debug APK
-        run: gradle --no-daemon --stacktrace -p Ani-Games-Billing-Android-V12.1.0/android assembleDebug
+        run: gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Admin-Android-v12.1.0-debug-apk
-          path: Ani-Games-Billing-Android-V12.1.0/android/app/build/outputs/apk/debug/app-debug.apk
+          name: AniGames-Admin-Android-v12.1.0-debug-apk
+          path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
