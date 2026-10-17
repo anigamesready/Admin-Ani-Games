@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.5 PC Recovery APK
+name: Build AniGames Admin V12.1.6 DB2 Enrollment + Alerts APK
 
 on:
   push:
@@ -66,12 +66,12 @@ jobs:
           duplicates = sorted({x for x in ids if ids.count(x) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
-          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment"]
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge"]
           missing = [x for x in required if x not in html]
           if missing:
               raise SystemExit("Recovery UI missing: " + ", ".join(missing))
           gradle = (root / "android/app/build.gradle").read_text()
-          if "versionCode 33" not in gradle or "versionName '12.1.5'" not in gradle:
+          if "versionCode 34" not in gradle or "versionName '12.1.6'" not in gradle:
               raise SystemExit("Version bump check failed")
           print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, recovery UI present")
           PY
@@ -115,12 +115,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zip -qr AniGames-Admin-V12.1.5-PC-RECOVERY-SOURCE.zip "$ANDROID_PROJECT_DIR"
+          zip -qr AniGames-Admin-V12.1.6-DB2-ENROLLMENT-ALERTS-SOURCE.zip "$ANDROID_PROJECT_DIR"
 
       - name: Upload APK and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-V12.1.5-PC-RECOVERY-BUILD
+          name: AniGames-Admin-V12.1.6-DB2-ENROLLMENT-ALERTS
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
             AniGames-Admin-V12.1.5-PC-RECOVERY-SOURCE.zip
