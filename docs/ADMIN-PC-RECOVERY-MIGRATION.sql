@@ -1,5 +1,9 @@
--- Ani Games Ready Admin V12.1.5: targeted recovery enrollment
--- Apply to each Supabase project used by the Admin app only after reviewing its schema.
+-- Ani Games Ready Admin V12.1.6: DB-aware targeted PC recovery enrollment.
+-- IMPORTANT: apply this migration separately to BOTH Supabase projects: DB1 AND DB2.
+-- The Admin dashboard sends RPC calls through its currently selected database client;
+-- this SQL does not cross-write to another Supabase project or silently fall back to DB1.
+-- Run in DB1 SQL Editor, then repeat in DB2 SQL Editor. Verify api.create_device_recovery_enrollment
+-- and the updated api.redeem_device exist in both projects before using recovery enrollment.
 -- This migration does not move, delete, or rewrite rental/session/transaction rows.
 
 CREATE OR REPLACE FUNCTION api.create_device_recovery_enrollment(
