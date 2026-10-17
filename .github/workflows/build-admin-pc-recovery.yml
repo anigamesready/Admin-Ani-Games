@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.7 Android System Notifications APK
+name: Build AniGames Admin V12.1.8 Dual DB Readiness Preflight APK
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
       - 'AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip'
       - 'scripts/patch_admin_pc_recovery.py'
       - 'scripts/patch_admin_android_notifications.py'
+      - 'scripts/patch_admin_dual_db_preflight.py'
       - 'docs/ADMIN-PC-RECOVERY-MIGRATION.sql'
       - 'docs/ADMIN-ALERT-NOTIFICATIONS-MIGRATION.sql'
       - '.github/workflows/build-admin-pc-recovery.yml'
@@ -38,6 +39,7 @@ jobs:
           test -f "$PROJECT_DIR/android/app/src/main/assets/web/admin.html"
           cp scripts/patch_admin_pc_recovery.py "$PROJECT_DIR/patch_admin_pc_recovery.py"
           cp scripts/patch_admin_android_notifications.py "$PROJECT_DIR/patch_admin_android_notifications.py"
+          cp scripts/patch_admin_dual_db_preflight.py "$PROJECT_DIR/patch_admin_dual_db_preflight.py"
           echo "ANDROID_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Detected source: $PROJECT_DIR"
 
@@ -48,6 +50,7 @@ jobs:
           cd "$ANDROID_PROJECT_DIR"
           python3 patch_admin_pc_recovery.py
           python3 patch_admin_android_notifications.py
+          python3 patch_admin_dual_db_preflight.py
 
       - name: Regression and static checks
         shell: bash
@@ -70,7 +73,7 @@ jobs:
           duplicates = sorted({x for x in ids if ids.count(x) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
-          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android"]
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2"]
           activity = (root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
           manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           for token in ["NotificationChannel", "AdminNotificationBridge", "POST_NOTIFICATIONS", "openNotificationSettings"]:
@@ -82,11 +85,11 @@ jobs:
           if missing:
               raise SystemExit("Recovery UI missing: " + ", ".join(missing))
           gradle = (root / "android/app/build.gradle").read_text()
-          if "versionCode 35" not in gradle or "versionName '12.1.7'" not in gradle:
+          if "versionCode 36" not in gradle or "versionName '12.1.8'" not in gradle:
               raise SystemExit("Version bump check failed")
           print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, recovery UI + Android system notification bridge present")
           PY
-          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py
+          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py
           unzip -t "$GITHUB_WORKSPACE/AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip"
 
       - name: Set up JDK 17
@@ -126,12 +129,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zip -qr AniGames-Admin-V12.1.7-ANDROID-SYSTEM-NOTIFICATIONS-SOURCE.zip "$ANDROID_PROJECT_DIR"
+          zip -qr AniGames-Admin-V12.1.8-DUAL-DB-READINESS-PREFLIGHT-SOURCE.zip "$ANDROID_PROJECT_DIR"
 
       - name: Upload APK and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-V12.1.7-ANDROID-SYSTEM-NOTIFICATIONS
+          name: AniGames-Admin-V12.1.8-DUAL-DB-READINESS-PREFLIGHT
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
             AniGames-Admin-V12.1.7-ANDROID-SYSTEM-NOTIFICATIONS-SOURCE.zip
