@@ -84,7 +84,7 @@ jobs:
           duplicates = sorted({x for x in ids if ids.count(x) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
-          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "BLYNK_DEVICE_MAPPING_REQUIRED", "BLYNK_DEVICE_MAPPING_CONFLICT"]
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif"]
           activity = (root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
           manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           for token in ["NotificationChannel", "AdminNotificationBridge", "POST_NOTIFICATIONS", "openNotificationSettings"]:
@@ -92,6 +92,12 @@ jobs:
                   raise SystemExit("Native Android notification bridge missing: " + token)
           if "android.permission.POST_NOTIFICATIONS" not in manifest:
               raise SystemExit("POST_NOTIFICATIONS manifest permission missing")
+          edge = (root / "supabase/functions/ani-games-api/index.ts").read_text(encoding="utf-8")
+          for token in ["validateIoTTarget", "BLYNK_DEVICE_MAPPING_REQUIRED", "BLYNK_DEVICE_MAPPING_CONFLICT", "blynkPowerTarget", "pairingDuplicateArchivedAt"]:
+              if token not in edge:
+                  raise SystemExit("IoT mapping regression check missing: " + token)
+          if "configured!==deviceId" in edge:
+              raise SystemExit("Unsafe cross-domain BLYNK_DEVICE_ID vs Supabase UUID comparison remains")
           missing = [x for x in required if x not in html]
           if missing:
               raise SystemExit("Recovery UI missing: " + ", ".join(missing))
