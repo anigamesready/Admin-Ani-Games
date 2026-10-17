@@ -27,7 +27,7 @@ if html.count(load_anchor) != 1:
     raise SystemExit('loadDevices anchor did not match exactly once; refusing to patch')
 html = html.replace(load_anchor, 'devicesCache=rows;renderRecoveryDeviceOptions();$(\'kPC\').textContent=rows.length;', 1)
 
-anchor = re.search(r'async\\s+function\\s+createEnrollment\\s*\\(', html)
+anchor = re.search(r'async\s+function\s+createEnrollment\s*\(', html)
 if not anchor:
     raise SystemExit('createEnrollment function anchor not found; refusing to patch')
 functions = '''function adminNotify(message,kind){
