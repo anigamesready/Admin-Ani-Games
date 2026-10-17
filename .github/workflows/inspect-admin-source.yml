@@ -1,0 +1,41 @@
+name: Inspect Admin V12 source bundle (temporary)
+
+on:
+  push:
+    branches:
+      - feature/admin-v12-pc-enrollment
+    paths:
+      - '.github/workflows/inspect-admin-source.yml'
+      - 'AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract source and create inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP='AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip'
+          test -f "$ZIP"
+          mkdir -p source-bundle
+          unzip -q "$ZIP" -d source-bundle
+          find source-bundle -type f -printf '%P\t%s bytes\n' | sort > source-inventory.txt
+          printf '\n--- Android build files ---\n' >> source-inventory.txt
+          find source-bundle -type f \( -name 'build.gradle' -o -name 'settings.gradle' -o -name 'AndroidManifest.xml' -o -name 'package.json' -o -name '*.html' -o -name '*.js' \) -printf '%p\n' | sort >> source-inventory.txt
+          zip -qr inspected-source-bundle.zip source-bundle source-inventory.txt
+      - name: Upload inspected source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: inspected-admin-v12-source
+          path: |
+            inspected-source-bundle.zip
+            source-inventory.txt
+          if-no-files-found: error
+          retention-days: 3
