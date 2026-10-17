@@ -27,7 +27,7 @@ if html.count(load_anchor) != 1:
     raise SystemExit('loadDevices anchor did not match exactly once; refusing to patch')
 html = html.replace(load_anchor, 'devicesCache=rows;renderRecoveryDeviceOptions();$(\'kPC\').textContent=rows.length;', 1)
 
-marker = 'function adminNotify(message,kind){
+marker = """function adminNotify(message,kind){
  const feed=$('adminAlertFeed');if(!feed)return;
  const text=String(message||'Notifikasi admin').replace(/<[^>]*>/g,'').slice(0,500);
  const urgent=kind==='error'||/berakhir|rental.*(stop|end|habis)|enrollment gagal|pairing gagal|usage_exceeded|offline/i.test(text);
@@ -68,7 +68,7 @@ function installAdminNotificationBridge(){
 }
 
 installAdminNotificationBridge();
-async function createEnrollment(){'
+async function createEnrollment(){"""
 if html.count(marker) != 1:
     raise SystemExit('createEnrollment function marker did not match exactly once; refusing to patch')
 functions = '''function renderRecoveryDeviceOptions(){
