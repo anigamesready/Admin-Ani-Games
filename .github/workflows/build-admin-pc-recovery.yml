@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.9 DB1 Rental RPC Hardening APK
+name: Build AniGames Admin V12.1.10 Notification Reliability + DB1 IoT Mapping Fix
 
 on:
   push:
@@ -10,6 +10,9 @@ on:
       - 'scripts/patch_admin_android_notifications.py'
       - 'scripts/patch_admin_dual_db_preflight.py'
       - 'scripts/patch_admin_rental_identity_rpc.py'
+      - 'scripts/patch_admin_notification_reliability.py'
+      - 'supabase/functions/ani-games-api/index.ts'
+      - 'supabase/functions/ani-games-api/deno.json'
       - 'docs/ADMIN-PC-RECOVERY-MIGRATION.sql'
       - 'docs/ADMIN-ALERT-NOTIFICATIONS-MIGRATION.sql'
       - '.github/workflows/build-admin-pc-recovery.yml'
@@ -42,6 +45,10 @@ jobs:
           cp scripts/patch_admin_android_notifications.py "$PROJECT_DIR/patch_admin_android_notifications.py"
           cp scripts/patch_admin_dual_db_preflight.py "$PROJECT_DIR/patch_admin_dual_db_preflight.py"
           cp scripts/patch_admin_rental_identity_rpc.py "$PROJECT_DIR/patch_admin_rental_identity_rpc.py"
+          cp scripts/patch_admin_notification_reliability.py "$PROJECT_DIR/patch_admin_notification_reliability.py"
+          mkdir -p "$PROJECT_DIR/supabase/functions/ani-games-api"
+          cp supabase/functions/ani-games-api/index.ts "$PROJECT_DIR/supabase/functions/ani-games-api/index.ts"
+          cp supabase/functions/ani-games-api/deno.json "$PROJECT_DIR/supabase/functions/ani-games-api/deno.json"
           echo "ANDROID_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Detected source: $PROJECT_DIR"
 
@@ -54,6 +61,7 @@ jobs:
           python3 patch_admin_android_notifications.py
           python3 patch_admin_dual_db_preflight.py
           python3 patch_admin_rental_identity_rpc.py
+          python3 patch_admin_notification_reliability.py
 
       - name: Regression and static checks
         shell: bash
@@ -76,7 +84,7 @@ jobs:
           duplicates = sorted({x for x in ids if ids.count(x) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
-          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity"]
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "BLYNK_DEVICE_MAPPING_REQUIRED", "BLYNK_DEVICE_MAPPING_CONFLICT"]
           activity = (root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
           manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           for token in ["NotificationChannel", "AdminNotificationBridge", "POST_NOTIFICATIONS", "openNotificationSettings"]:
@@ -92,11 +100,11 @@ jobs:
           if html.count("rpc('admin_update_rental_identity'") != 1:
               raise SystemExit("Audited rental identity RPC call missing or duplicated")
           gradle = (root / "android/app/build.gradle").read_text()
-          if "versionCode 37" not in gradle or "versionName '12.1.9'" not in gradle:
+          if "versionCode 38" not in gradle or "versionName '12.1.10'" not in gradle:
               raise SystemExit("Version bump check failed")
           print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, recovery UI + Android system notification bridge present")
           PY
-          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py patch_admin_rental_identity_rpc.py
+          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py patch_admin_rental_identity_rpc.py patch_admin_notification_reliability.py
           unzip -t "$GITHUB_WORKSPACE/AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip"
 
       - name: Set up JDK 17
@@ -136,12 +144,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zip -qr AniGames-Admin-V12.1.9-DB1-RENTAL-RPC-SOURCE.zip "$ANDROID_PROJECT_DIR"
+          zip -qr AniGames-Admin-V12.1.10-NOTIFICATION-RELIABILITY-SOURCE.zip "$ANDROID_PROJECT_DIR"
 
       - name: Upload APK and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-V12.1.9-DB1-RENTAL-RPC-HARDENING
+          name: AniGames-Admin-V12.1.10-NOTIFICATION-RELIABILITY-DB1-IOT-FIX
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
             AniGames-Admin-V12.1.9-DB1-RENTAL-RPC-SOURCE.zip
