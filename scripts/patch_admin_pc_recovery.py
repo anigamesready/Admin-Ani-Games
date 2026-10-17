@@ -27,51 +27,49 @@ if html.count(load_anchor) != 1:
     raise SystemExit('loadDevices anchor did not match exactly once; refusing to patch')
 html = html.replace(load_anchor, 'devicesCache=rows;renderRecoveryDeviceOptions();$(\'kPC\').textContent=rows.length;', 1)
 
-marker = """function adminNotify(message,kind){
+anchor = re.search(r'async\\s+function\\s+createEnrollment\\s*\\(', html)
+if not anchor:
+    raise SystemExit('createEnrollment function anchor not found; refusing to patch')
+functions = '''function adminNotify(message,kind){
  const feed=$('adminAlertFeed');if(!feed)return;
- const text=String(message||'Notifikasi admin').replace(/<[^>]*>/g,'').slice(0,500);
- const urgent=kind==='error'||/berakhir|rental.*(stop|end|habis)|enrollment gagal|pairing gagal|usage_exceeded|offline/i.test(text);
+ const safe=String(message||'Notifikasi admin').replace(/<[^>]*>/g,'').slice(0,500);
+ const urgent=kind==='error'||/berakhir|rental.*(stop|end|habis)|enrollment gagal|pairing gagal|usage_exceeded|offline/i.test(safe);
  feed.classList.remove('hidden');feed.style.borderLeftColor=urgent?'#ff4d6d':'var(--a)';
- feed.innerHTML='<strong>'+(urgent?'⚠️ PERINGATAN':'🔔 NOTIFIKASI')+'</strong><div style="margin-top:5px;white-space:pre-wrap">'+esc(text)+'</div><div class="muted" style="margin-top:5px">'+new Date().toLocaleTimeString('id-ID')+'</div>';
- if(urgent){const now=Date.now();if(text!==window.__lastAdminAlertText||now-(window.__lastAdminAlertAt||0)>2500)playAdminAlertSound();window.__lastAdminAlertText=text;window.__lastAdminAlertAt=now;}
+ feed.textContent=(urgent?'⚠️ PERINGATAN: ':'🔔 NOTIFIKASI: ')+safe+' • '+new Date().toLocaleTimeString('id-ID');
+ if(urgent)playAdminAlertSound();
 }
-let adminAlertAudioContext=null,adminAlertSoundReady=false;
 function playAdminAlertSound(){
- if(!adminAlertSoundReady||!adminAlertAudioContext)return;
+ if(!window.__aniAdminAlertSoundReady)return;
  try{
-  const ctx=adminAlertAudioContext;
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+  const ctx=window.__aniAdminAlertAudio||(window.__aniAdminAlertAudio=new AC());
   if(ctx.state==='suspended')ctx.resume();
   const now=ctx.currentTime;
-  [880,1174,880,1174,1568].forEach(function(freq,i){
-   const start=now+i*0.19,osc=ctx.createOscillator(),gain=ctx.createGain();
+  [880,1174,880,1568].forEach(function(freq,i){
+   const start=now+i*0.2,osc=ctx.createOscillator(),gain=ctx.createGain();
    osc.type='sawtooth';osc.frequency.setValueAtTime(freq,start);
-   gain.gain.setValueAtTime(0.0001,start);gain.gain.exponentialRampToValueAtTime(0.75,start+0.025);
-   gain.gain.setValueAtTime(0.75,start+0.11);gain.gain.exponentialRampToValueAtTime(0.0001,start+0.17);
-   osc.connect(gain);gain.connect(ctx.destination);osc.start(start);osc.stop(start+0.18);
+   gain.gain.setValueAtTime(0.0001,start);gain.gain.exponentialRampToValueAtTime(0.55,start+0.025);
+   gain.gain.setValueAtTime(0.55,start+0.1);gain.gain.exponentialRampToValueAtTime(0.0001,start+0.18);
+   osc.connect(gain);gain.connect(ctx.destination);osc.start(start);osc.stop(start+0.19);
   });
  }catch(e){console.warn('Admin alert sound unavailable',e)}
 }
 function enableAdminAlertSound(){
  try{
-  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw new Error('Browser tidak mendukung audio alert.');
-  if(!adminAlertAudioContext)adminAlertAudioContext=new AC();
-  adminAlertAudioContext.resume().then(function(){adminAlertSoundReady=true;$('adminSoundState').textContent='Suara aktif';$('adminSoundState').style.background='#14532d';playAdminAlertSound();});
+  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw new Error('Perangkat tidak mendukung audio alert.');
+  const ctx=window.__aniAdminAlertAudio||(window.__aniAdminAlertAudio=new AC());
+  ctx.resume().then(function(){window.__aniAdminAlertSoundReady=true;const state=$('adminSoundState');if(state)state.textContent='Suara aktif';playAdminAlertSound();});
  }catch(e){msg(e.message||'Gagal mengaktifkan suara notifikasi.',true)}
 }
-function dismissAdminAlert(){const feed=$('adminAlertFeed');if(feed){feed.innerHTML='Tidak ada pesan baru.';feed.style.borderLeftColor='var(--a)';}}
+function dismissAdminAlert(){const feed=$('adminAlertFeed');if(feed){feed.textContent='Tidak ada pesan baru.';feed.style.borderLeftColor='var(--a)';}}
 function installAdminNotificationBridge(){
  if(typeof msg==='function'&&!msg.__adminAlertWrapped){
-  const original=msg;
-  const wrapped=function(message,error){original.apply(this,arguments);adminNotify(message,error?'error':'info');};
+  const original=msg;const wrapped=function(message,error){original.apply(this,arguments);adminNotify(message,error?'error':'info');};
   wrapped.__adminAlertWrapped=true;msg=wrapped;
  }
 }
-
 installAdminNotificationBridge();
-async function createEnrollment(){"""
-if html.count(marker) != 1:
-    raise SystemExit('createEnrollment function marker did not match exactly once; refusing to patch')
-functions = '''function renderRecoveryDeviceOptions(){
+function renderRecoveryDeviceOptions(){
  const select=$('recoverDeviceSelect');if(!select)return;
  const eligible=(devicesCache||[]).filter(function(d){return !d.metadata?.pairingDuplicateArchivedAt;});
  const prior=select.value;
@@ -103,7 +101,7 @@ async function createRecoveryEnrollment(){
 async function copyRecoveryCode(){const code=$('recoverCode').value;if(!code)return;try{await navigator.clipboard.writeText(code);msg('Kode pemulihan berhasil disalin.')}catch(e){$('recoverCode').select();document.execCommand('copy');msg('Kode pemulihan disalin.')}}
 function clearRecoveryEnrollment(){$('recoverEnrollmentResult').classList.add('hidden');$('recoverEnrollmentResult').innerHTML='';$('recoverCode').value='';$('recoverCodeBox').classList.add('hidden')}
 '''
-html = html.replace(marker, functions + marker, 1)
+html = html[:anchor.start()] + functions + html[anchor.start():]
 
 gradle_path = Path('android/app/build.gradle')
 gradle = gradle_path.read_text(encoding='utf-8')
