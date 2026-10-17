@@ -78,7 +78,12 @@ function enableAdminAlertSound(){
 function dismissAdminAlert(){const feed=$('adminAlertFeed');if(feed){feed.textContent='Tidak ada pesan baru.';feed.style.borderLeftColor='var(--a)';}}
 function installAdminNotificationBridge(){
  if(typeof msg==='function'&&!msg.__adminAlertWrapped){
-  const original=msg;const wrapped=function(message,error){original.apply(this,arguments);adminNotify(message,error?'error':'info');};
+  const original=msg;const wrapped=function(message,error){
+   original.apply(this,arguments);
+   const text=String(message||'');
+   const important=!!error||/usage_exceeded|pairing gagal|enrollment gagal|offline|berakhir|rental.*(stop|end|habis)|ditolak|koneksi.*gagal/i.test(text);
+   if(important)adminNotify(message,error?'error':'info');
+  };
   wrapped.__adminAlertWrapped=true;msg=wrapped;
  }
 }
@@ -110,7 +115,7 @@ async function createRecoveryEnrollment(){
    $('recoverEnrollmentResult').classList.remove('hidden');
    $('recoverEnrollmentResult').innerHTML='<div><b>Kode pemulihan berhasil dibuat.</b></div><div class="muted">Target: '+esc(target.device_name||'PC')+' ('+esc(target.client_id||'-')+')<br>Berlaku sampai: '+new Date(d.expires_at).toLocaleString('id-ID')+'<br>Server akan menolak PC yang tidak cocok; kode ini tidak boleh membuat PC baru.</div>';
    $('recoverCode').value=d.code;$('recoverCodeBox').classList.remove('hidden');msg('Kode pemulihan dibuat untuk PC yang dipilih pada database aktif.');adminNotify('Enrollment pemulihan berhasil dibuat pada database yang sedang dipilih. Pastikan DB2 sudah menerima migrasi SQL pemulihan jika DB2 digunakan.','success');
- }catch(e){const message=e?.message||'Gagal membuat kode pemulihan.';if(/create_device_recovery_enrollment|schema cache|Could not find the function/i.test(message))return msg('Fitur pemulihan belum aktif pada database yang sedang dipilih. Terapkan ADMIN-PC-RECOVERY-MIGRATION.sql pada proyek Supabase DB tersebut terlebih dahulu. Tidak ada data yang berubah.',true);adminNotify('Enrollment tidak tersedia pada database aktif: '+message,'error');msg(message,true);}
+ }catch(e){const message=e?.message||'Gagal membuat kode pemulihan.';if(/create_device_recovery_enrollment|schema cache|Could not find the function/i.test(message))return msg('Fitur pemulihan belum aktif pada database yang sedang dipilih. Terapkan ADMIN-PC-RECOVERY-MIGRATION.sql pada proyek Supabase DB tersebut terlebih dahulu. Tidak ada data yang berubah.',true);msg(message,true);}
 }
 async function copyRecoveryCode(){const code=$('recoverCode').value;if(!code)return;try{await navigator.clipboard.writeText(code);msg('Kode pemulihan berhasil disalin.')}catch(e){$('recoverCode').select();document.execCommand('copy');msg('Kode pemulihan disalin.')}}
 function clearRecoveryEnrollment(){$('recoverEnrollmentResult').classList.add('hidden');$('recoverEnrollmentResult').innerHTML='';$('recoverCode').value='';$('recoverCodeBox').classList.add('hidden')}
