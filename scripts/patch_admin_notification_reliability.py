@@ -107,7 +107,8 @@ new_permission = """    private boolean hasPostNotificationPermission() {
     private boolean areAdminNotificationsEnabled() {
         if (!hasPostNotificationPermission()) return false;
         NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager == null || !manager.areNotificationsEnabled()) return false;
+        if (manager == null) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !manager.areNotificationsEnabled()) return false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = manager.getNotificationChannel(NOTIFICATION_CHANNEL_ID);
             if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) return false;
