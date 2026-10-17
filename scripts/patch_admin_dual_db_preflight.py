@@ -33,7 +33,8 @@ html = html.replace('Periksa Koneksi DB1 & DB2', 'Periksa Kesiapan DB1 & DB2', 1
 
 # Explicit route checks against the read-only edge function deployed on each project.
 health_anchor = "async function checkOneDbHealth(url,key){const response=await fetch(url+'/auth/v1/health',{method:'GET',headers:{apikey:key},cache:'no-store'});if(!response.ok)throw new Error('HTTP '+response.status);return true}"
-route_helpers = r'''async function checkOneDbHealth(url,key){const response=await fetch(url+'/auth/v1/health',{method:'GET',headers:{apikey:key},cache:'no-store'});if(!response.ok)throw new Error('HTTP '+response.status);return true}\nasync function fetchDbRouteStatus(url,key,expectedRef){
+route_helpers = r'''async function checkOneDbHealth(url,key){const response=await fetch(url+'/auth/v1/health',{method:'GET',headers:{apikey:key},cache:'no-store'});if(!response.ok)throw new Error('HTTP '+response.status);return true}
+async function fetchDbRouteStatus(url,key,expectedRef){
  const response=await fetch(url+'/functions/v1/db-route-status',{method:'GET',headers:{apikey:key},cache:'no-store'});
  const data=await response.json().catch(()=>({}));
  if(!response.ok||data?.ok!==true||!data?.route)throw new Error(String(data?.error||('route HTTP '+response.status)));
