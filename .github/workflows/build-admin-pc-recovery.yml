@@ -144,6 +144,6 @@ jobs:
           name: AniGames-Admin-V12.1.9-DB1-RENTAL-RPC-HARDENING
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
-            AniGames-Admin-V12.1.8-DUAL-DB-READINESS-PREFLIGHT-SOURCE.zip
+            AniGames-Admin-V12.1.9-DB1-RENTAL-RPC-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
