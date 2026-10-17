@@ -36,9 +36,13 @@ functions = '''function adminNotify(message,kind){
  const urgent=kind==='error'||/berakhir|rental.*(stop|end|habis)|enrollment gagal|pairing gagal|usage_exceeded|offline|gagal|ditolak/i.test(safe);
  const now=Date.now(),fingerprint=(urgent?'urgent':'info')+'|'+safe.toLocaleLowerCase();
  const state=window.__aniAdminAlertDedupe||(window.__aniAdminAlertDedupe={});
+ if(Object.keys(state).length>80){
+   Object.keys(state).forEach(function(key){if(now-state[key].at>10*60000)delete state[key];});
+   const keys=Object.keys(state);if(keys.length>80)keys.slice(0,keys.length-80).forEach(function(key){delete state[key];});
+ }
  const prior=state[fingerprint],windowMs=urgent?60000:20000;
  if(prior&&now-prior.at<windowMs){
-   prior.count=(prior.count||1)+1;prior.at=now;
+   prior.count=(prior.count||1)+1;
    feed.classList.remove('hidden');feed.style.borderLeftColor=urgent?'#ff4d6d':'var(--a)';
    feed.textContent=(urgent?'⚠️ PERINGATAN: ':'🔔 NOTIFIKASI: ')+safe+' • '+new Date(now).toLocaleTimeString('id-ID')+' • berulang '+prior.count+'x (digabung)';
    return;
