@@ -210,8 +210,10 @@ native_methods = r'''
         PendingIntent pending = PendingIntent.getActivity(
             this, 7402, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
-        Notification.Builder builder = new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+            ? new Notification.Builder(this, NOTIFICATION_CHANNEL_ID)
+            : new Notification.Builder(this);
+        builder.setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle(safeTitle)
             .setContentText(safeMessage)
             .setStyle(new Notification.BigTextStyle().bigText(safeMessage))
@@ -220,6 +222,10 @@ native_methods = r'''
             .setCategory(urgent ? Notification.CATEGORY_ALARM : Notification.CATEGORY_STATUS)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setPriority(Notification.PRIORITY_HIGH);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            builder.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION));
+            builder.setVibrate(new long[]{0, 250, 160, 250});
+        }
         manager.notify((int)(System.currentTimeMillis() & 0x7fffffff), builder.build());
     }
 
