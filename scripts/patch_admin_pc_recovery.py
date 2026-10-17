@@ -111,6 +111,6 @@ if "versionCode 32" not in gradle or "versionName '12.1.0'" not in gradle:
     raise SystemExit('Unexpected baseline Android version; refusing to bump blindly')
 gradle = gradle.replace('versionCode 32', 'versionCode 34', 1).replace("versionName '12.1.0'", "versionName '12.1.6'", 1)
 gradle_path.write_text(gradle, encoding='utf-8')
-Path('VERSION.txt').write_text('v12.1.5-admin-pc-recovery-targeted-enrollment\n', encoding='utf-8')
+Path('VERSION.txt').write_text('v12.1.6-admin-pc-enrollment-db2-alerts\n', encoding='utf-8')
 html_path.write_text(html, encoding='utf-8')
-print('Patched Admin PC recovery UI; Android version 12.1.5 / versionCode 33')
+print('Patched Admin PC enrollment + DB-aware recovery + alerts; Android version 12.1.6 / versionCode 34')
