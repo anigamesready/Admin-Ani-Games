@@ -347,7 +347,7 @@ html = replace_once(
 html = replace_once(
     html,
     "if(system){system.textContent='RUTE GLOBAL TERVERIFIKASI';system.style.color='var(--ok)';system.style.borderColor='var(--ok)'}",
-    "if(system){system.textContent=DB_TARGET==='backup'?'SISTEM GLOBAL: DB2 AKTIF':'SISTEM GLOBAL: DB1 AKTIF';system.style.color='var(--ok)';system.style.borderColor='var(--ok')}",
+    "if(system){system.textContent=DB_TARGET==='backup'?'SISTEM GLOBAL: DB2 AKTIF':'SISTEM GLOBAL: DB1 AKTIF';system.style.color='var(--ok)';system.style.borderColor='var(--ok)'}",
     "Global status badge"
 )
 
