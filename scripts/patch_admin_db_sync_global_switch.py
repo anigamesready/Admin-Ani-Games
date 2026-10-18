@@ -42,12 +42,13 @@ html = replace_once(
 
 # Keep the DB sync panel direction in sync with the globally active database.
 # Prominent system-wide active database badge and global switch selector.
-html = replace_once(
-    html,
-    '<b>DB yang sedang diakses Admin:</b><span id="dbActiveBadge" class="pill">DB1 • Utama</span>',
-    '<b>Database aktif seluruh sistem:</b><span id="dbActiveBadge" class="pill">DB1 • Utama</span>',
-    "Active DB badge heading"
-)
+old_badge_heading = '<b>DB yang sedang diakses Admin:</b><span id="dbActiveBadge" class="pill">DB1 • Utama</span>'
+new_badge_heading = '<b>Database aktif seluruh sistem:</b><span id="dbActiveBadge" class="pill">DB1 • Utama</span>'
+if old_badge_heading in html:
+    # The source HTML has this heading in both DB tools and the route-status panel; update one occurrence per patch run.
+    html = html.replace(old_badge_heading, new_badge_heading, 1)
+elif new_badge_heading not in html:
+    raise SystemExit("Active database badge heading anchor missing")
 html = replace_once(
     html,
     '<span id="dbRouteStatusHint" class="muted">Memeriksa route-control DB1/DB2…</span></div><div class="muted" style="margin-top:5px">',
