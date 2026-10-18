@@ -84,7 +84,7 @@ jobs:
           duplicates = sorted({x for x in ids if ids.count(x) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
-          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif"]
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "NETWORK_FETCH_FAILED • ", "adminAlertPollRetryAt", "retry_ms=", "window.__aniAdminFetchNoticeAt"]
           activity = (root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
           manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           for token in ["NotificationChannel", "AdminNotificationBridge", "POST_NOTIFICATIONS", "openNotificationSettings"]:
@@ -106,7 +106,7 @@ jobs:
           if html.count("rpc('admin_update_rental_identity'") != 1:
               raise SystemExit("Audited rental identity RPC call missing or duplicated")
           gradle = (root / "android/app/build.gradle").read_text()
-          if "versionCode 38" not in gradle or "versionName '12.1.10'" not in gradle:
+          if "versionCode 39" not in gradle or "versionName '12.1.11'" not in gradle:
               raise SystemExit("Version bump check failed")
           print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, recovery UI + Android system notification bridge present")
           PY
@@ -150,14 +150,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zip -qr AniGames-Admin-V12.1.10-NOTIFICATION-RELIABILITY-SOURCE.zip "$ANDROID_PROJECT_DIR"
+          zip -qr AniGames-Admin-V12.1.11-ALERT-DELIVERY-RELIABILITY-SOURCE.zip "$ANDROID_PROJECT_DIR"
 
       - name: Upload APK and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-V12.1.10-NOTIFICATION-RELIABILITY-DB1-IOT-FIX
+          name: AniGames-Admin-V12.1.11-ALERT-DELIVERY-RELIABILITY-DB1-IOT-FIX
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
-            AniGames-Admin-V12.1.10-NOTIFICATION-RELIABILITY-SOURCE.zip
+            AniGames-Admin-V12.1.11-ALERT-DELIVERY-RELIABILITY-SOURCE.zip
           if-no-files-found: error
           retention-days: 14

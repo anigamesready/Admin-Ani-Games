@@ -164,16 +164,119 @@ if new_result not in activity:
         raise SystemExit("MainActivity permission-result flow mismatch; refusing to patch")
     activity = activity.replace(old_result, new_result, 1)
 
+
+# Make fetch failures identify the operation/project, and use bounded backoff for alert polling.
+old_rpc = "async function rpc(name,args={}){const r=await sb.schema('api').rpc(name,args);if(r.error)throw r.error;return r.data}"
+new_rpc = """async function rpc(name,args={}){
+ try{
+  const r=await sb.schema('api').rpc(name,args);
+  if(r.error)throw r.error;
+  return r.data;
+ }catch(e){
+  if(e instanceof TypeError && /failed to fetch/i.test(String(e.message||''))){
+   const dbLabel=DB_TARGET==='backup'?'DB2':'DB1';
+   const diagnostic=new Error('NETWORK_FETCH_FAILED • '+dbLabel+' • RPC '+String(name||'unknown')+' • Permintaan tidak mendapat respons jaringan. Cek internet, URL/proyek Supabase, lalu coba lagi.');
+   diagnostic.name='NetworkFetchError';diagnostic.cause=e;throw diagnostic;
+  }
+  throw e;
+ }
+}"""
+if 'NETWORK_FETCH_FAILED • ' not in html:
+    if html.count(old_rpc) != 1:
+        raise SystemExit("RPC wrapper anchor mismatch; refusing to patch.")
+    html=html.replace(old_rpc,new_rpc,1)
+
+poll_old = """let adminAlertsPolling=false;
+async function pollPcAdminAlerts(){
+ if(adminAlertsPolling||!session||!currentOrg)return;"""
+poll_new = """let adminAlertsPolling=false,adminAlertPollFailureCount=0,adminAlertPollRetryAt=0,adminAlertPollLastNoticeAt=0;
+async function pollPcAdminAlerts(){
+ if(adminAlertsPolling||!session||!currentOrg||Date.now()<adminAlertPollRetryAt)return;"""
+if 'adminAlertPollRetryAt' not in html:
+    if html.count(poll_old) != 1:
+        raise SystemExit("Alert poller start anchor mismatch; refusing to patch.")
+    html=html.replace(poll_old,poll_new,1)
+
+success_anchor = """  const rows=await rpc('admin_recent_alerts',{p_org_id:currentOrg.id,p_since:since});
+  if(!Array.isArray(rows))return;"""
+success_new = """  const rows=await rpc('admin_recent_alerts',{p_org_id:currentOrg.id,p_since:since});
+  adminAlertPollFailureCount=0;adminAlertPollRetryAt=0;
+  if(!Array.isArray(rows))return;"""
+if 'adminAlertPollFailureCount=0;adminAlertPollRetryAt=0;' not in html:
+    if html.count(success_anchor) != 1:
+        raise SystemExit("Alert poller success anchor mismatch; refusing to patch.")
+    html=html.replace(success_anchor,success_new,1)
+
+catch_pattern=re.compile(r" \}catch\(e\)\{\n  const now=Date\.now\(\);[\s\S]*?\n \}finally\{adminAlertsPolling=false\}\n\}")
+catch_new = """ }catch(e){
+  const now=Date.now();
+  adminAlertPollFailureCount=Math.min(8,adminAlertPollFailureCount+1);
+  const retryMs=Math.min(120000,15000*Math.pow(2,Math.min(adminAlertPollFailureCount-1,3)));
+  adminAlertPollRetryAt=now+retryMs;
+  if(!adminAlertPollLastNoticeAt||now-adminAlertPollLastNoticeAt>60000){
+   adminAlertPollLastNoticeAt=now;
+   const detail=String(e?.message||e||'unknown_error').slice(0,260);
+   console.warn('Gagal sinkron notifikasi rental:',detail,'retry_ms=',retryMs);
+   const feed=$('adminAlertFeed');
+   if(feed){feed.classList.remove('hidden');feed.style.borderLeftColor='#ff4d6d';feed.textContent='Sinkronisasi alert rental gagal • '+detail+' • coba ulang dalam '+Math.round(retryMs/1000)+' detik. Event yang belum terkirim tidak dianggap sudah diterima.';}
+   const state=$('adminSoundState');if(state)state.textContent='Sinkronisasi alert rental bermasalah • '+(DB_TARGET==='backup'?'DB2':'DB1');
+  }
+ }finally{adminAlertsPolling=false}
+}"""
+if 'Event yang belum terkirim tidak dianggap sudah diterima.' not in html:
+    html, n = catch_pattern.subn(catch_new, html, count=1)
+    if n != 1: raise SystemExit("Alert poller catch anchor mismatch; refusing to patch.")
+
+old_wrapper = """function installAdminNotificationBridge(){
+ if(typeof msg==='function'&&!msg.__adminAlertWrapped){
+  const original=msg;const wrapped=function(message,error){
+   original.apply(this,arguments);
+   const text=String(message||'');
+   const important=!!error||/usage_exceeded|pairing gagal|enrollment gagal|offline|berakhir|rental.*(stop|end|habis)|ditolak|koneksi.*gagal/i.test(text);
+   if(important)adminNotify(message,error?'error':'info');
+  };
+  wrapped.__adminAlertWrapped=true;msg=wrapped;
+ }
+}"""
+new_wrapper = """function installAdminNotificationBridge(){
+ if(typeof msg==='function'&&!msg.__adminAlertWrapped){
+  const original=msg;const wrapped=function(message,error){
+   const text=String(message||'');
+   const networkFailure=/Failed to fetch|NETWORK_FETCH_FAILED|NetworkFetchError/i.test(text);
+   if(networkFailure){
+    const now=Date.now();
+    window.__aniAdminFetchFailureCount=(window.__aniAdminFetchFailureCount||0)+1;
+    const last=window.__aniAdminFetchNoticeAt||0;
+    if(last&&now-last<60000){
+     const state=$('adminSoundState');if(state)state.textContent='Koneksi Supabase gagal • '+(DB_TARGET==='backup'?'DB2':'DB1')+' • percobaan berulang dibatasi';
+     original.apply(this,arguments);return;
+    }
+    window.__aniAdminFetchNoticeAt=now;
+    original.apply(this,[text+' • notifikasi jaringan dibatasi 1x/menit',error]);
+    adminNotify(text+' • '+(DB_TARGET==='backup'?'DB2':'DB1')+' • cek koneksi/proyek Supabase','error');
+    return;
+   }
+   original.apply(this,arguments);
+   const important=!!error||/usage_exceeded|pairing gagal|enrollment gagal|offline|berakhir|rental.*(stop|end|habis)|ditolak|koneksi.*gagal/i.test(text);
+   if(important)adminNotify(message,error?'error':'info');
+  };
+  wrapped.__adminAlertWrapped=true;msg=wrapped;
+ }
+}"""
+if 'window.__aniAdminFetchNoticeAt' not in html:
+    if html.count(old_wrapper) != 1: raise SystemExit("Global alert bridge anchor mismatch; refusing to patch.")
+    html=html.replace(old_wrapper,new_wrapper,1)
+
 # Final APK patch version after the existing v12.1.9 hardening passes.
 if "versionCode 37" in gradle and "versionName '12.1.9'" in gradle:
-    gradle = gradle.replace("versionCode 37", "versionCode 38", 1).replace("versionName '12.1.9'", "versionName '12.1.10'", 1)
-elif "versionCode 38" not in gradle or "versionName '12.1.10'" not in gradle:
+    gradle = gradle.replace("versionCode 37", "versionCode 39", 1).replace("versionName '12.1.9'", "versionName '12.1.11'", 1)
+elif "versionCode 39" not in gradle or "versionName '12.1.11'" not in gradle:
     raise SystemExit("Unexpected Android baseline version; refusing to bump blindly")
 
 html_path.write_text(html, encoding="utf-8")
 activity_path.write_text(activity, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
-(ROOT / "VERSION.txt").write_text("v12.1.10-notification-permission-and-poll-reliability\n", encoding="utf-8")
+(ROOT / "VERSION.txt").write_text("v12.1.11-alert-delivery-diagnostics-backoff\n", encoding="utf-8")
 
 for token in ("ensureNativeNotificationPermission()", "admin_recent_alerts", "pollPcAdminAlerts"):
     if token not in html:
@@ -181,4 +284,4 @@ for token in ("ensureNativeNotificationPermission()", "admin_recent_alerts", "po
 for token in ("areAdminNotificationsEnabled", "hasPostNotificationPermission", "POST_NOTIFICATIONS"):
     if token not in activity:
         raise SystemExit("Final native notification regression check missing: " + token)
-print("Patched Android permission/status detection, owner-login permission flow, background poll guard and visible poll diagnostics. Version 12.1.10 / versionCode 38.")
+print("Patched Android permission/status detection, owner-login permission flow, background poll guard and visible poll diagnostics. Version 12.1.11 / versionCode 39.")
