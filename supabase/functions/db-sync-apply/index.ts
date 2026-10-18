@@ -3,22 +3,29 @@ const DB1_URL="https://wzkjpycjizexxcxrfdvr.supabase.co";
 const DB1_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6a2pweWNqaXpleHhjeHJmZHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzc0OTUsImV4cCI6MjEwNjYxMzQ5NX0.lxjSt7CqWDJhKItPi1ckVRIcc-kM7etMzxTu3txANaI";
 const DB2_URL="https://xcdbipgsvohesxhxydep.supabase.co";
 const DB2_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhjZGJpcGdzdm9oZXN4aHh5ZGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNjI5ODUsImV4cCI6MjEwNzYzODk4NX0.kHymS-T8a_PcKk-oQBYMGhHy3SSW1kAKStOBJVzMoSI";
+const SELF_URL=Deno.env.get("SUPABASE_URL")||DB2_URL;
+const SELF_REF=new URL(SELF_URL).hostname.split(".")[0];
+const SELF_KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||(SELF_REF==="wzkjpycjizexxcxrfdvr"?DB1_KEY:DB2_KEY);
+const PEER_URL=SELF_REF==="wzkjpycjizexxcxrfdvr"?DB2_URL:DB1_URL;
+const PEER_REF=SELF_REF==="wzkjpycjizexxcxrfdvr"?"xcdbipgsvohesxhxydep":"wzkjpycjizexxcxrfdvr";
+const PEER_KEY=SELF_REF==="wzkjpycjizexxcxrfdvr"?DB2_KEY:DB1_KEY;
+const NON_BLOCKING_TABLES=new Set(["device_heartbeats","device_command_logs","audit_logs","usage_events"]);
 const TABLES:Record<string,string>={"themes":"id","organizations":"id","org_members":"id","devices":"id","device_tokens":"id","device_enrollments":"id","rental_accounts":"id","billing_control_accounts":"id","rental_sessions":"id","billing_control_sessions":"id","device_commands":"id","device_command_logs":"id","device_heartbeats":"id","device_trial_requests":"id","billing_transactions":"id","admin_accounts":"id","admin_pc_access":"id","admin_alert_events":"id","audit_logs":"id","usage_events":"id","superadmin_access_codes":"user_id","superadmin_audit":"id"};
 const H={"access-control-allow-origin":"*","access-control-allow-methods":"POST,OPTIONS","access-control-allow-headers":"authorization,content-type,apikey,x-client-info","content-type":"application/json; charset=utf-8"};
 const out=(s:number,d:unknown)=>new Response(JSON.stringify(d),{status:s,headers:{...H,"cache-control":"no-store"}});
 const serviceKey=()=>Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||Deno.env.get("SUPABASE_SECRET_KEY")||"";
-function db(){const k=serviceKey();if(!k)throw new Error("SYNC_BACKEND_NOT_CONFIGURED");return createClient(DB2_URL,k,{auth:{persistSession:false,autoRefreshToken:false}})}
+function db(){const k=serviceKey();if(!k)throw new Error("SYNC_BACKEND_NOT_CONFIGURED");return createClient(SELF_URL,k,{auth:{persistSession:false,autoRefreshToken:false}})}
 function stable(v:any):string{if(v===null||typeof v!=="object")return JSON.stringify(v);if(Array.isArray(v))return "["+v.map(stable).join(",")+"]";return "{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stable(v[k])).join(",")+"}";}
 async function sha(v:string){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return Array.from(new Uint8Array(d),b=>b.toString(16).padStart(2,"0")).join("");}
 async function sourceCall(token:string,action:string,payload:Record<string,unknown>={}){
- const response=await fetch(DB1_URL+"/functions/v1/db-sync-export",{method:"POST",headers:{apikey:DB1_KEY,"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({action,...payload}),cache:"no-store"});
+ const response=await fetch(PEER_URL+"/functions/v1/db-sync-export",{method:"POST",headers:{apikey:PEER_KEY,"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({action,...payload}),cache:"no-store"});
  const data:any=await response.json().catch(()=>({}));
  if(!response.ok||data?.ok!==true)throw new Error(String(data?.error||("SOURCE_SYNC_HTTP_"+response.status)));
  return data;
 }
 async function authorize(token:string,admin:any){
  if(!token)throw new Error("OWNER_TOKEN_REQUIRED");
- const response=await fetch(DB1_URL+"/auth/v1/user",{headers:{apikey:DB1_KEY,authorization:"Bearer "+token},cache:"no-store"});
+ const response=await fetch(PEER_URL+"/auth/v1/user",{headers:{apikey:PEER_KEY,authorization:"Bearer "+token},cache:"no-store"});
  if(!response.ok)throw new Error("OWNER_SESSION_INVALID");
  const user=await response.json();
  const source=await sourceCall(token,"authorize");
@@ -50,9 +57,9 @@ async function routeRow(admin:any){
  if(error||!data)throw new Error("ROUTE_CONTROL_LOOKUP_FAILED");return data;
 }
 async function verifyTargetLogin(admin:any,token:string,user:any,password:string){
- if(!password)throw new Error("DB2_PASSWORD_REQUIRED");
+ if(!password)throw new Error("TARGET_DB_PASSWORD_REQUIRED");
  if(!user.email)throw new Error("OWNER_EMAIL_REQUIRED");
- const response=await fetch(DB2_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:DB2_KEY,"content-type":"application/json"},body:JSON.stringify({email:user.email,password}),cache:"no-store"});
+ const response=await fetch(SELF_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:SELF_KEY,"content-type":"application/json"},body:JSON.stringify({email:user.email,password}),cache:"no-store"});
  const data:any=await response.json().catch(()=>({}));
  if(!response.ok||!data?.access_token||String(data.user?.id||"")!==user.id)throw new Error("DB2_LOGIN_TEST_FAILED: sign in to DB2 with this account's current DB2 password or reset that password in DB2 first");
  // Do not return/store the target access token.
@@ -60,10 +67,10 @@ async function verifyTargetLogin(admin:any,token:string,user:any,password:string
  const prior=await routeRow(admin);
  const verified=[...new Set([...(prior.auth_verified_user_ids||[]).map(String),user.id])];
  const targetAuthReady=required.every(id=>verified.includes(id));
- const {error:targetError}=await admin.from("db_route_control").update({auth_verified_user_ids:verified,auth_parity_ready:targetAuthReady,backup_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_note:"A real DB2 password login test passed for one active owner/admin. Data readiness is checked separately."}).eq("id",1);
+ const {error:targetError}=await admin.from("db_route_control").update({auth_verified_user_ids:verified,auth_parity_ready:targetAuthReady,last_parity_check_note:"A real password login test passed on the target database for one active owner/admin. Data readiness is checked separately."}).eq("id",1);
  if(targetError)throw new Error("TARGET_AUTH_VERIFICATION_SAVE_FAILED");
  const source=await sourceCall(token,"record-auth-verification",{userId:user.id});
- const sourceResp=await fetch(DB1_URL+"/functions/v1/db-route-status",{headers:{apikey:DB1_KEY},cache:"no-store"});
+ const sourceResp=await fetch(PEER_URL+"/functions/v1/db-route-status",{headers:{apikey:PEER_KEY},cache:"no-store"});
  const sourceStatus:any=await sourceResp.json().catch(()=>({}));
  const sourceRoute=sourceStatus?.route;
  const authReady=targetAuthReady&&source.authParityReady===true&&sourceRoute?.auth_parity_ready===true;
@@ -84,16 +91,23 @@ async function handler(req:Request){
     if(error)throw new Error("TARGET_COUNT_FAILED:"+item.table);
     tables.push({table:item.table,sourceCount:Number(item.count)||0,targetCount:count??0});
    }
-   return out(200,{ok:true,sourceRef:"wzkjpycjizexxcxrfdvr",targetRef:"xcdbipgsvohesxhxydep",tables,auth:manifest.auth});
+   return out(200,{ok:true,sourceRef:PEER_REF,targetRef:SELF_REF,tables,auth:manifest.auth});
   }
   if(action==="start"){
-   const {data:run,error:insertError}=await admin.from("db_sync_runs").insert({started_by:user.id,state:"running",summary:{mode:"upsert_db1_to_db2",startedBy:"admin-menu"}}).select("id,started_at").single();
-   if(insertError||!run)throw new Error("SYNC_RUN_CREATE_FAILED");
-   await sourceCall(token,"mark-not-ready",{note:"DB Sync in progress; DB1 is source of truth. Failover blocked until every table hash matches."});
-   const {error:targetError}=await admin.from("db_route_control").update({backup_ready:false,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_at:null,last_parity_check_note:"DB Sync in progress. DB1 remains active; cutover blocked."}).eq("id",1);
-   if(targetError)throw new Error("TARGET_READINESS_LOCK_FAILED");
+   const {data:existing,error:existingError}=await admin.from("db_sync_runs").select("id,started_by,started_at,state").eq("state","running").order("started_at",{ascending:false}).limit(1).maybeSingle();
+   if(existingError)throw new Error("SYNC_RUN_LOOKUP_FAILED");
+   let run=existing;
+   if(run&&String(run.started_by)!==user.id)throw new Error("SYNC_ALREADY_RUNNING_FOR_ANOTHER_OWNER");
+   if(!run){
+    const {data:created,error:insertError}=await admin.from("db_sync_runs").insert({started_by:user.id,state:"running",summary:{mode:"upsert_active_source_to_standby",startedBy:"admin-menu"}}).select("id,started_at,state,started_by").single();
+    if(insertError||!created)throw new Error("SYNC_RUN_CREATE_FAILED");
+    run=created;
+   }
+   await sourceCall(token,"start-sync",{note:"Cross-database sync is running. Current active route remains online; route changes are locked until verification."});
+   const {error:targetError}=await admin.from("db_route_control").update({sync_in_progress:true,last_parity_check_note:"DB Sync in progress. Current global route remains online; switch requests are locked."}).eq("id",1);
+   if(targetError)throw new Error("TARGET_SYNC_LOCK_FAILED");
    const manifest=await sourceCall(token,"manifest");
-   return out(200,{ok:true,runId:run.id,startedAt:run.started_at,tables:manifest.tables});
+   return out(200,{ok:true,runId:run.id,startedAt:run.started_at,tables:manifest.tables,sourceRef:PEER_REF,targetRef:SELF_REF});
   }
   if(action==="apply-page"){
    const runId=String(body.runId||"");await runRow(admin,runId,user.id);
@@ -124,12 +138,12 @@ async function handler(req:Request){
    const runId=String(body.runId||""),run=await runRow(admin,runId,user.id);
    const {data:evidence,error:evidenceError}=await admin.from("db_sync_verification").select("table_name,matched,checked_at").eq("run_id",runId);
    if(evidenceError)throw new Error("SYNC_EVIDENCE_LOOKUP_FAILED");
-   const expected=Object.keys(TABLES),byName=new Map((evidence||[]).map((e:any)=>[e.table_name,e]));
+   const expected=Object.keys(TABLES).filter(name=>!NON_BLOCKING_TABLES.has(name)),byName=new Map((evidence||[]).map((e:any)=>[e.table_name,e]));
    const missing=expected.filter(name=>!byName.has(name)||byName.get(name)?.matched!==true||Date.parse(byName.get(name)?.checked_at||"")<Date.parse(run.started_at));
    if(missing.length)throw new Error("TABLE_PARITY_NOT_VERIFIED:"+missing.join(","));
    const ids=await activeIds(token),route=await routeRow(admin);
    const targetAuthOk=ids.every(id=>(route.auth_verified_user_ids||[]).map(String).includes(id));
-   const sourceResp=await fetch(DB1_URL+"/functions/v1/db-route-status",{headers:{apikey:DB1_KEY},cache:"no-store"});
+   const sourceResp=await fetch(PEER_URL+"/functions/v1/db-route-status",{headers:{apikey:PEER_KEY},cache:"no-store"});
    const sourceStatus:any=await sourceResp.json().catch(()=>({}));
    const sourceRoute=sourceStatus?.route;
    const sourceAuthOk=sourceResp.ok&&sourceRoute?.auth_parity_ready===true&&ids.every((id:string)=>(sourceRoute.auth_verified_user_ids||[]).map(String).includes(id));
@@ -140,7 +154,7 @@ async function handler(req:Request){
    const targetVersion=String(route.schema_version||route.primary_schema_version||"");
    const sourceVersion=String(sourceRoute?.schema_version||sourceRoute?.primary_schema_version||"");
    if(!targetVersion||!sourceVersion||targetVersion!==sourceVersion)throw new Error("SCHEMA_VERSION_MISMATCH");
-   const now=new Date().toISOString(),note="Sync run "+runId+" verified: "+expected.length+" table hashes match DB1 and active owner/admin logins verified.";
+   const now=new Date().toISOString(),note="Sync run "+runId+" verified: "+expected.length+" critical table hashes match the active source and active owner/admin logins are verified. Volatile heartbeat/audit histories are best-effort.";
    const {error:updateError}=await admin.from("db_route_control").update({
     backup_ready:true,data_parity_ready:true,routing_gateway_ready:true,sync_ready:true,auth_parity_ready:true,
     primary_schema_version:sourceVersion,backup_schema_version:targetVersion,schema_version:targetVersion,
@@ -151,9 +165,12 @@ async function handler(req:Request){
     await admin.from("db_route_control").update({backup_ready:false,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_note:"Target data verified but source readiness update failed; cutover remains blocked."}).eq("id",1);
     throw e;
    }
-   const {error:runError}=await admin.from("db_sync_runs").update({state:"verified",completed_at:now,summary:{mode:"upsert_db1_to_db2",tablesVerified:expected.length,authVerified:ids.length}}).eq("id",runId);
+   const {error:unlockError}=await admin.from("db_route_control").update({sync_in_progress:false}).eq("id",1);
+   if(unlockError)throw new Error("TARGET_SYNC_UNLOCK_FAILED");
+   const advisory=Object.keys(TABLES).filter(name=>NON_BLOCKING_TABLES.has(name)&&byName.get(name)?.matched!==true);
+   const {error:runError}=await admin.from("db_sync_runs").update({state:"verified",completed_at:now,summary:{mode:"upsert_active_source_to_standby",tablesVerified:expected.length,advisoryTables:advisory,authVerified:ids.length}}).eq("id",runId);
    if(runError)throw new Error("SYNC_RUN_FINALIZE_FAILED");
-   return out(200,{ok:true,runId,verifiedTables:expected.length,verifiedOwners:ids.length,ready:true,activeTarget:"primary",message:"DB2 verified as standby. Whole-system route stays on DB1 until you choose the global switch."});
+   return out(200,{ok:true,runId,verifiedTables:expected.length,advisoryTables:advisory,verifiedOwners:ids.length,ready:true,sourceRef:PEER_REF,targetRef:SELF_REF,message:"Standby database verified. Active route remains unchanged until the global switch is requested."});
   }
   if(action==="status"){
    const route=await routeRow(admin);
