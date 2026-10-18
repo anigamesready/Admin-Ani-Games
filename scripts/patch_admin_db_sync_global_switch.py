@@ -259,20 +259,33 @@ async function requestGlobalDbSwitch(){
  if(!token)return msg('Sesi Admin tidak valid. Login kembali untuk mengubah route global.',true);
  if(button){button.disabled=true;button.textContent='Memeriksa…'}
  try{
-  const [d1,d2]=await Promise.all([
+  let [d1,d2]=await Promise.all([
+   globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),
+   globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')
+  ]);
+  if(d1.route.sync_in_progress===true||d2.route.sync_in_progress===true)throw new Error('DB Sync sedang berjalan. Tunggu sinkronisasi selesai sebelum memindahkan route global.');
+  const a0=d1.route,b0=d2.route,aligned0=a0.active_target===b0.active_target&&Number(a0.epoch)===Number(b0.epoch)&&String(a0.switch_id||'')===String(b0.switch_id||'');
+  if(aligned0&&a0.active_target===target){dbSyncStatus('Seluruh sistem sudah aktif di '+(target==='backup'?'DB2':'DB1')+'.');await checkBothDbApis();return {ok:true,alreadyActive:true}}
+  if(!confirm('Pindahkan SELURUH SISTEM ke '+(target==='backup'?'DB2':'DB1')+'? Sistem akan melakukan sinkronisasi akhir dari database aktif ke standby, memeriksa hash data dan login parity, lalu menyamakan epoch/switch ID pada kedua project. Route tidak berubah jika salah satu pemeriksaan gagal.'))return {ok:false,cancelled:true};
+
+  // Final catch-up sync immediately before cutover. Existing sessions/writes continue on current active DB.
+  const sync=await requestDbSync();
+  if(!sync||sync.ok===false||sync.ready!==true)throw new Error('SYNC_NOT_READY: final sync/hash/auth verification did not complete; active database was not switched.');
+
+  [d1,d2]=await Promise.all([
    globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),
    globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')
   ]);
   const a=d1.route,b=d2.route;
-  if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('DB Sync sedang berjalan. Tunggu sinkronisasi selesai sebelum memindahkan route global.');
+  if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('SYNC_IN_PROGRESS: final DB Sync has not released both route locks.');
   const needsParity=target==='backup'||a.active_target==='backup'||b.active_target==='backup';
   if(needsParity&&(!routeReadyForSwitch(a)||!routeReadyForSwitch(b)||a.schema_version!==b.schema_version)){
-   throw new Error('Pindah ditolak. Hash data, login owner/admin, schema, atau gateway belum lulus pada kedua DB. Jalankan DB Sync lalu refresh status.');
+   throw new Error('Cutover ditolak: salah satu DB belum lulus auth/data/gateway/schema parity terbaru. Route aktif tetap seperti sebelumnya.');
   }
   let epoch,switchId;
   const aligned=a.active_target===b.active_target&&Number(a.epoch)===Number(b.epoch)&&String(a.switch_id||'')===String(b.switch_id||'');
   if(aligned){
-   if(a.active_target===target){dbSyncStatus('Seluruh sistem sudah aktif di '+(target==='backup'?'DB2':'DB1')+'.');await checkBothDbApis();return {ok:true,alreadyActive:true}}
+   if(a.active_target===target){dbSyncStatus('Sistem sudah aktif pada target setelah sinkronisasi akhir.');await checkBothDbApis();return {ok:true,alreadyActive:true}}
    epoch=Math.max(Number(a.epoch)||0,Number(b.epoch)||0)+1;switchId=crypto.randomUUID();
   }else{
    const aAhead=a.active_target===target&&a.switch_id&&Number(a.epoch)===Number(b.epoch)+1;
@@ -281,7 +294,6 @@ async function requestGlobalDbSwitch(){
    else if(bAhead){epoch=Number(b.epoch);switchId=String(b.switch_id)}
    else throw new Error('Route DB1/DB2 belum konsisten dan tidak cocok untuk pemulihan aman. Jangan paksa pindah; periksa route-control terlebih dahulu.');
   }
-  if(!confirm('Pindahkan SELURUH SISTEM ke '+(target==='backup'?'DB2':'DB1')+'? Sistem akan memakai epoch '+epoch+'. Perpindahan hanya tersedia setelah DB Sync dan login parity lulus.'))return {ok:false,cancelled:true};
   const payload={target,epoch,switchId,reason:'Admin global database switch'};
   const order=target==='backup'?[d2,d1]:[d1,d2];
   for(const p of order)await routeCoordinatorCall(p.url,p.key,token,{action:'switch',...payload});
@@ -295,7 +307,8 @@ async function requestGlobalDbSwitch(){
   try{await checkBothDbApis()}catch(_){}
   return {ok:false,error:text};
  }finally{if(button){button.disabled=false;button.textContent='Pindah seluruh sistem'}}
-}'''
+}
+'''
 html = replace_once(html, old_placeholder, new_functions, "Active DB sync implementation")
 
 mode_pattern = re.compile(r"function updateDbSyncDirection\(\)\{[^\n]*\}")
