@@ -10,8 +10,12 @@ gradle = gradle_path.read_text(encoding="utf-8")
 
 def replace_once(source, old, new, label):
     count = source.count(old)
-    if count != 1:
-        raise SystemExit(f"{label}: expected one anchor, found {count}; refusing to patch")
+    if count == 0:
+        if new in source:
+            return source  # Idempotent rerun: the intended replacement is already present.
+        raise SystemExit(f"{label}: neither the original nor the replacement anchor exists; refusing to patch")
+    # Some legacy Admin pages contain the same badge/text in a visible panel and a compact panel.
+    # Replace one deterministic occurrence per patch call rather than aborting or changing unrelated UI.
     return source.replace(old, new, 1)
 
 # Make the route readiness result explicitly include authentication parity.
