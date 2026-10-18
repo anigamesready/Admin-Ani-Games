@@ -1,9 +1,10 @@
-name: Build AniGames Admin V12.1.12 Foreground-Only Low-Noise Alerts + DB1 IoT Mapping Fix
+name: Build AniGames Admin V12.1.13 Guarded Dual-DB Auto Routing
 
 on:
   push:
     branches:
       - feature/admin-v12-pc-enrollment
+      - feature/admin-v12-dual-db-routing
     paths:
       - 'AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip'
       - 'scripts/patch_admin_pc_recovery.py'
@@ -11,6 +12,7 @@ on:
       - 'scripts/patch_admin_dual_db_preflight.py'
       - 'scripts/patch_admin_rental_identity_rpc.py'
       - 'scripts/patch_admin_notification_reliability.py'
+      - 'scripts/patch_admin_dual_db_routing.py'
       - 'supabase/functions/ani-games-api/index.ts'
       - 'supabase/functions/ani-games-api/deno.json'
       - 'docs/ADMIN-PC-RECOVERY-MIGRATION.sql'
@@ -46,6 +48,7 @@ jobs:
           cp scripts/patch_admin_dual_db_preflight.py "$PROJECT_DIR/patch_admin_dual_db_preflight.py"
           cp scripts/patch_admin_rental_identity_rpc.py "$PROJECT_DIR/patch_admin_rental_identity_rpc.py"
           cp scripts/patch_admin_notification_reliability.py "$PROJECT_DIR/patch_admin_notification_reliability.py"
+          cp scripts/patch_admin_dual_db_routing.py "$PROJECT_DIR/patch_admin_dual_db_routing.py"
           mkdir -p "$PROJECT_DIR/supabase/functions/ani-games-api"
           cp supabase/functions/ani-games-api/index.ts "$PROJECT_DIR/supabase/functions/ani-games-api/index.ts"
           cp supabase/functions/ani-games-api/deno.json "$PROJECT_DIR/supabase/functions/ani-games-api/deno.json"
@@ -62,6 +65,7 @@ jobs:
           python3 patch_admin_dual_db_preflight.py
           python3 patch_admin_rental_identity_rpc.py
           python3 patch_admin_notification_reliability.py
+          python3 patch_admin_dual_db_routing.py
 
       - name: Regression and static checks
         shell: bash
@@ -84,7 +88,7 @@ jobs:
           duplicates = sorted({x for x in ids if ids.count(x) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
-          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "NETWORK_FETCH_FAILED • ", "adminAlertPollRetryAt", "retry_ms=", "window.__aniAdminFetchNoticeAt", "document.visibilityState==='hidden'"]
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "NETWORK_FETCH_FAILED • ", "adminAlertPollRetryAt", "retry_ms=", "window.__aniAdminFetchNoticeAt", "window.__aniAdminAlertPollErrorAt", "resolveDualDbRoute", "routeBackupReady", "DB_ROUTE_CUTOVER_INCOMPLETE", "Perpindahan DB manual dinonaktifkan"]
           activity = (root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
           manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           for token in ["NotificationChannel", "AdminNotificationBridge", "POST_NOTIFICATIONS", "openNotificationSettings"]:
@@ -106,11 +110,11 @@ jobs:
           if html.count("rpc('admin_update_rental_identity'") != 1:
               raise SystemExit("Audited rental identity RPC call missing or duplicated")
           gradle = (root / "android/app/build.gradle").read_text()
-          if "versionCode 40" not in gradle or "versionName '12.1.12'" not in gradle:
+          if "versionCode 41" not in gradle or "versionName '12.1.13'" not in gradle:
               raise SystemExit("Version bump check failed")
           print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, Android notification bridge + foreground-only low-noise alert polling present")
           PY
-          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py patch_admin_rental_identity_rpc.py patch_admin_notification_reliability.py
+          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py patch_admin_rental_identity_rpc.py patch_admin_notification_reliability.py patch_admin_dual_db_routing.py
           unzip -t "$GITHUB_WORKSPACE/AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip"
 
       - name: Set up JDK 17
@@ -150,14 +154,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zip -qr AniGames-Admin-V12.1.12-FOREGROUND-LOW-NOISE-ALERT-SOURCE.zip "$ANDROID_PROJECT_DIR"
+          zip -qr AniGames-Admin-V12.1.13-DUAL-DB-AUTO-ROUTING-SOURCE.zip "$ANDROID_PROJECT_DIR"
 
       - name: Upload APK and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-V12.1.12-FOREGROUND-LOW-NOISE-ALERTS-DB1-IOT-FIX
+          name: AniGames-Admin-V12.1.13-DUAL-DB-AUTO-ROUTING-DB1-IOT-FIX
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
-            AniGames-Admin-V12.1.12-ALERT-DELIVERY-RELIABILITY-SOURCE.zip
+            AniGames-Admin-V12.1.13-DUAL-DB-AUTO-ROUTING-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
