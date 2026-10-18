@@ -186,8 +186,8 @@ async function requestDbSync(){
   try{
    const ready=await dbSyncCall('mark-ready',{runId});
    const advisoryText=advisoryMismatches.length?' Riwayat/telemetri yang berubah saat sinkronisasi (non-blocking): '+advisoryMismatches.join(', ')+'.':'';
-   dbSyncStatus('DB Sync berhasil: '+ready.verifiedTables+' tabel utama lolos hash; '+ready.verifiedOwners+' owner/admin terverifikasi. '+(DB_TARGET==='backup'?'DB2':'DB1')+' tetap aktif sampai pindah global dipilih.'+advisoryText);
-   msg(sourceName+' → '+targetName+' selesai dan tervalidasi. Route aktif tetap tidak berubah.',false);
+   dbSyncStatus('Verifikasi data selesai: '+ready.verifiedTables+' tabel utama lolos hash; '+ready.verifiedOwners+' owner/admin terverifikasi. '+(ready.gatewayReady?'Gateway bersama juga terverifikasi.':'Gateway bersama BELUM terverifikasi; cutover tetap diblokir.')+' '+sourceName+' tetap aktif.'+advisoryText,ready.gatewayReady!==true);
+   msg(ready.gatewayReady?sourceName+' → '+targetName+' selesai dan siap sebagai standby; route aktif tetap tidak berubah.':sourceName+' → '+targetName+' data/schema/auth parity lulus, tetapi gateway bersama belum siap sehingga perpindahan DB tetap diblokir.',ready.gatewayReady!==true);
    await checkBothDbApis();return ready;
   }catch(e){
    const detail=String(e?.message||e);
@@ -213,7 +213,7 @@ async function verifyDb2OwnerLogin(){
   if(runId){
    try{
     const ready=await dbSyncCall('mark-ready',{runId});
-    dbSyncStatus('Database tujuan SIAP sebagai standby. '+ready.verifiedTables+' tabel utama cocok; '+ready.verifiedOwners+' akun owner/admin login-test lulus. Route aktif tidak berubah sampai perpindahan global dipilih.');
+    dbSyncStatus(ready.gatewayReady?'Database tujuan SIAP sebagai standby. '+ready.verifiedTables+' tabel utama cocok; '+ready.verifiedOwners+' akun owner/admin login-test lulus. Route aktif tidak berubah sampai perpindahan global dipilih.':'Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan.',ready.gatewayReady!==true);
     await checkBothDbApis();
    }catch(e){
     const detail=String(e?.message||e);
@@ -222,7 +222,9 @@ async function verifyDb2OwnerLogin(){
     else throw e;
    }
   }
-  msg(result.authParityReady?'Login '+(DB_TARGET==='backup'?'DB1':'DB2')+' terverifikasi untuk semua akun aktif.':'Login database tujuan berhasil untuk akun ini; verifikasi akun aktif lainnya masih diperlukan.',!result.authParityReady);
+  const verifiedRunId=localStorage.getItem(DB_SYNC_RUN_KEY)||'', verifiedStatus=verifiedRunId?await dbSyncCall('status').catch(()=>null):null;
+  const currentRun=(verifiedStatus?.runs||[]).find((run:any)=>String(run.id)===verifiedRunId),verifiedGateway=currentRun?.summary?.sharedGatewayReady===true;
+  msg(result.authParityReady&&verifiedGateway?'Login terverifikasi untuk semua akun aktif dan gateway bersama siap.':result.authParityReady?'Login semua akun aktif terverifikasi, tetapi gateway bersama belum terverifikasi; pindah DB tetap diblokir.':'Login database tujuan berhasil untuk akun ini; verifikasi akun aktif lainnya masih diperlukan.',!result.authParityReady||!verifiedGateway);
   return result;
  }catch(e){if(input)input.value='';const text=String(e?.message||e);dbSyncStatus('Verifikasi login DB2 gagal: '+text,true);msg('Verifikasi login DB2 gagal: '+text,true);return {ok:false,error:text}}
  finally{if(button)button.disabled=false}

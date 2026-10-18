@@ -17,6 +17,31 @@ const serviceKey=()=>Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||Deno.env.get("SU
 function db(){const k=serviceKey();if(!k)throw new Error("SYNC_BACKEND_NOT_CONFIGURED");return createClient(SELF_URL,k,{auth:{persistSession:false,autoRefreshToken:false}})}
 function stable(v:any):string{if(v===null||typeof v!=="object")return JSON.stringify(v);if(Array.isArray(v))return "["+v.map(stable).join(",")+"]";return "{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stable(v[k])).join(",")+"}";}
 async function sha(v:string){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return Array.from(new Uint8Array(d),b=>b.toString(16).padStart(2,"0")).join("");}
+async function sharedGatewayProbe(expectedRoute:any):Promise<{ready:boolean;reason:string}>{
+ const baseRaw=String(Deno.env.get("SHARED_GATEWAY_BASE_URL")||"").trim();
+ if(!baseRaw)return {ready:false,reason:"SHARED_GATEWAY_BASE_URL_NOT_CONFIGURED"};
+ let base:URL;
+ try{base=new URL(baseRaw)}catch(_){return {ready:false,reason:"SHARED_GATEWAY_URL_INVALID"}}
+ if(base.protocol!=="https:"||base.username||base.password||base.search||base.hash||base.hostname==="wzkjpycjizexxcxrfdvr.supabase.co"||base.hostname==="xcdbipgsvohesxhxydep.supabase.co")return {ready:false,reason:"SHARED_GATEWAY_MUST_USE_INDEPENDENT_HTTPS_HOST"};
+ const endpoint=new URL("/v1/route/resolve",base).toString(),ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),4000);
+ try{
+  const response=await fetch(endpoint,{method:"GET",headers:{accept:"application/json"},cache:"no-store",signal:ctl.signal});
+  const data:any=await response.json().catch(()=>({}));
+  if(!response.ok||data?.contract!=="ani-games-dual-db/v1")return {ready:false,reason:"SHARED_GATEWAY_CONTRACT_UNAVAILABLE"};
+  const route=data.routing||{},targets=data.targets||{},caps=data.capabilities||{};
+  const servedAt=Date.parse(String(data.served_at||"")),gatewayRaw=String(route.gateway_base_url||"");
+  let gatewayUrl:URL;try{gatewayUrl=new URL(gatewayRaw)}catch(_){return {ready:false,reason:"SHARED_GATEWAY_BASE_URL_INVALID_IN_RESPONSE"}}
+  const requiredCaps=["pc_heartbeat","pc_enrollment","rental_sync","device_commands","admin_alerts"];
+  if(route.status!=="ready"||route.allow_reads!==true||route.allow_writes!==true||route.allow_enrollment!==true)return {ready:false,reason:"SHARED_GATEWAY_READ_WRITE_CAPABILITY_NOT_READY"};
+  if(targets.primary?.project_ref!=="wzkjpycjizexxcxrfdvr"||targets.backup?.project_ref!=="xcdbipgsvohesxhxydep")return {ready:false,reason:"SHARED_GATEWAY_PROJECT_REF_MISMATCH"};
+  if(requiredCaps.some(k=>caps[k]!==true))return {ready:false,reason:"SHARED_GATEWAY_REQUIRED_CAPABILITY_MISSING"};
+  if(gatewayUrl.hostname!==base.hostname||gatewayUrl.protocol!=="https:"||gatewayUrl.pathname.replace(/\/+$/,"")!=="/v1")return {ready:false,reason:"SHARED_GATEWAY_URL_MISMATCH"};
+  if(!Number.isFinite(servedAt)||Date.now()-servedAt>120000||servedAt>Date.now()+60000)return {ready:false,reason:"SHARED_GATEWAY_STATUS_STALE"};
+  if(route.active_target!==expectedRoute?.active_target||Number(route.epoch)!==Number(expectedRoute?.epoch)||String(route.switch_id||"")!==String(expectedRoute?.switch_id||""))return {ready:false,reason:"SHARED_GATEWAY_ROUTE_EPOCH_MISMATCH"};
+  return {ready:true,reason:"SHARED_GATEWAY_ROUTE_CONTRACT_VERIFIED"};
+ }catch(_){return {ready:false,reason:"SHARED_GATEWAY_PROBE_FAILED"}}
+ finally{clearTimeout(timer)}
+}
 async function sourceCall(token:string,action:string,payload:Record<string,unknown>={}){
  const response=await fetch(PEER_URL+"/functions/v1/db-sync-export",{method:"POST",headers:{apikey:PEER_KEY,"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({action,...payload}),cache:"no-store"});
  const data:any=await response.json().catch(()=>({}));
@@ -154,23 +179,32 @@ async function handler(req:Request){
    const targetVersion=String(route.schema_version||route.primary_schema_version||"");
    const sourceVersion=String(sourceRoute?.schema_version||sourceRoute?.primary_schema_version||"");
    if(!targetVersion||!sourceVersion||targetVersion!==sourceVersion)throw new Error("SCHEMA_VERSION_MISMATCH");
-   const now=new Date().toISOString(),note="Sync run "+runId+" verified: "+expected.length+" critical table hashes match the active source and active owner/admin logins are verified. Volatile heartbeat/audit histories are best-effort.";
+   const gateway=await sharedGatewayProbe(route),gatewayReady=gateway.ready;
+   const now=new Date().toISOString();
+   const note="Sync run "+runId+" verified: "+expected.length+" critical table hashes match the active source and active owner/admin logins are verified. Volatile heartbeat/audit histories are best-effort. "+(gatewayReady?"Shared gateway resolver independently verified.":"Shared gateway remains unverified ("+gateway.reason+"); cutover stays blocked.");
    const {error:updateError}=await admin.from("db_route_control").update({
-    backup_ready:true,data_parity_ready:true,routing_gateway_ready:true,sync_ready:true,auth_parity_ready:true,
+    backup_ready:true,data_parity_ready:true,routing_gateway_ready:gatewayReady,sync_ready:gatewayReady,auth_parity_ready:true,
     primary_schema_version:sourceVersion,backup_schema_version:targetVersion,schema_version:targetVersion,
     last_schema_check_at:now,last_parity_check_at:now,last_parity_check_note:note
    }).eq("id",1);
    if(updateError)throw new Error("TARGET_READINESS_UPDATE_FAILED");
-   try{await sourceCall(token,"mark-ready",{runId})}catch(e){
+   let sourceReady:any;
+   try{sourceReady=await sourceCall(token,"mark-ready",{runId})}catch(e){
     await admin.from("db_route_control").update({backup_ready:false,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_note:"Target data verified but source readiness update failed; cutover remains blocked."}).eq("id",1);
     throw e;
+   }
+   const gatewayBothReady=gatewayReady&&sourceReady?.routingGatewayReady===true;
+   if(!gatewayBothReady){
+    const blockedNote="Data/schema/auth parity verified, but shared gateway verification is missing or inconsistent ("+gateway.reason+"). Cutover remains blocked.";
+    const {error:blockError}=await admin.from("db_route_control").update({backup_ready:true,data_parity_ready:true,routing_gateway_ready:false,sync_ready:false,last_parity_check_note:blockedNote}).eq("id",1);
+    if(blockError)throw new Error("GATEWAY_BLOCK_STATUS_SAVE_FAILED");
    }
    const {error:unlockError}=await admin.from("db_route_control").update({sync_in_progress:false}).eq("id",1);
    if(unlockError)throw new Error("TARGET_SYNC_UNLOCK_FAILED");
    const advisory=Object.keys(TABLES).filter(name=>NON_BLOCKING_TABLES.has(name)&&byName.get(name)?.matched!==true);
-   const {error:runError}=await admin.from("db_sync_runs").update({state:"verified",completed_at:now,summary:{mode:"upsert_active_source_to_standby",tablesVerified:expected.length,advisoryTables:advisory,authVerified:ids.length}}).eq("id",runId);
+   const {error:runError}=await admin.from("db_sync_runs").update({state:"verified",completed_at:now,summary:{mode:"upsert_active_source_to_standby",tablesVerified:expected.length,advisoryTables:advisory,authVerified:ids.length,sharedGatewayReady:gatewayBothReady,gatewayReason:gatewayBothReady?null:gateway.reason}}).eq("id",runId);
    if(runError)throw new Error("SYNC_RUN_FINALIZE_FAILED");
-   return out(200,{ok:true,runId,verifiedTables:expected.length,advisoryTables:advisory,verifiedOwners:ids.length,ready:true,sourceRef:PEER_REF,targetRef:SELF_REF,message:"Standby database verified. Active route remains unchanged until the global switch is requested."});
+   return out(200,{ok:true,runId,verifiedTables:expected.length,advisoryTables:advisory,verifiedOwners:ids.length,dataVerified:true,gatewayReady:gatewayBothReady,ready:gatewayBothReady,sourceRef:PEER_REF,targetRef:SELF_REF,message:gatewayBothReady?"Data parity verified and shared gateway is ready. Active route remains unchanged until the global switch is requested.":"Data/schema/auth parity passed, but shared gateway is not verified; DB2 remains blocked from cutover.",gatewayReason:gatewayBothReady?null:gateway.reason});
   }
   if(action==="abort"){
    const runId=String(body.runId||"");

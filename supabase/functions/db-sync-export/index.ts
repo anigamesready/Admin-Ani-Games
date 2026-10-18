@@ -15,6 +15,31 @@ const out=(s:number,d:unknown)=>new Response(JSON.stringify(d),{status:s,headers
 const serviceKey=()=>Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||Deno.env.get("SUPABASE_SECRET_KEY")||"";
 function stable(v:any):string{if(v===null||typeof v!=="object")return JSON.stringify(v);if(Array.isArray(v))return "["+v.map(stable).join(",")+"]";return "{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stable(v[k])).join(",")+"}";}
 async function sha(v:string){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return Array.from(new Uint8Array(d),b=>b.toString(16).padStart(2,"0")).join("");}
+async function sharedGatewayProbe(expectedRoute:any):Promise<{ready:boolean;reason:string}>{
+ const baseRaw=String(Deno.env.get("SHARED_GATEWAY_BASE_URL")||"").trim();
+ if(!baseRaw)return {ready:false,reason:"SHARED_GATEWAY_BASE_URL_NOT_CONFIGURED"};
+ let base:URL;
+ try{base=new URL(baseRaw)}catch(_){return {ready:false,reason:"SHARED_GATEWAY_URL_INVALID"}}
+ if(base.protocol!=="https:"||base.username||base.password||base.search||base.hash||base.hostname==="wzkjpycjizexxcxrfdvr.supabase.co"||base.hostname==="xcdbipgsvohesxhxydep.supabase.co")return {ready:false,reason:"SHARED_GATEWAY_MUST_USE_INDEPENDENT_HTTPS_HOST"};
+ const endpoint=new URL("/v1/route/resolve",base).toString(),ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),4000);
+ try{
+  const response=await fetch(endpoint,{method:"GET",headers:{accept:"application/json"},cache:"no-store",signal:ctl.signal});
+  const data:any=await response.json().catch(()=>({}));
+  if(!response.ok||data?.contract!=="ani-games-dual-db/v1")return {ready:false,reason:"SHARED_GATEWAY_CONTRACT_UNAVAILABLE"};
+  const route=data.routing||{},targets=data.targets||{},caps=data.capabilities||{};
+  const servedAt=Date.parse(String(data.served_at||"")),gatewayRaw=String(route.gateway_base_url||"");
+  let gatewayUrl:URL;try{gatewayUrl=new URL(gatewayRaw)}catch(_){return {ready:false,reason:"SHARED_GATEWAY_BASE_URL_INVALID_IN_RESPONSE"}}
+  const requiredCaps=["pc_heartbeat","pc_enrollment","rental_sync","device_commands","admin_alerts"];
+  if(route.status!=="ready"||route.allow_reads!==true||route.allow_writes!==true||route.allow_enrollment!==true)return {ready:false,reason:"SHARED_GATEWAY_READ_WRITE_CAPABILITY_NOT_READY"};
+  if(targets.primary?.project_ref!=="wzkjpycjizexxcxrfdvr"||targets.backup?.project_ref!=="xcdbipgsvohesxhxydep")return {ready:false,reason:"SHARED_GATEWAY_PROJECT_REF_MISMATCH"};
+  if(requiredCaps.some(k=>caps[k]!==true))return {ready:false,reason:"SHARED_GATEWAY_REQUIRED_CAPABILITY_MISSING"};
+  if(gatewayUrl.hostname!==base.hostname||gatewayUrl.protocol!=="https:"||gatewayUrl.pathname.replace(/\/+$/,"")!=="/v1")return {ready:false,reason:"SHARED_GATEWAY_URL_MISMATCH"};
+  if(!Number.isFinite(servedAt)||Date.now()-servedAt>120000||servedAt>Date.now()+60000)return {ready:false,reason:"SHARED_GATEWAY_STATUS_STALE"};
+  if(route.active_target!==expectedRoute?.active_target||Number(route.epoch)!==Number(expectedRoute?.epoch)||String(route.switch_id||"")!==String(expectedRoute?.switch_id||""))return {ready:false,reason:"SHARED_GATEWAY_ROUTE_EPOCH_MISMATCH"};
+  return {ready:true,reason:"SHARED_GATEWAY_ROUTE_CONTRACT_VERIFIED"};
+ }catch(_){return {ready:false,reason:"SHARED_GATEWAY_PROBE_FAILED"}}
+ finally{clearTimeout(timer)}
+}
 function client(){const k=serviceKey();if(!k)throw new Error("SYNC_BACKEND_NOT_CONFIGURED");return createClient(SELF_URL,k,{auth:{persistSession:false,autoRefreshToken:false}})}
 async function authorize(token:string,admin:any){
  if(!token)throw new Error("OWNER_TOKEN_REQUIRED");
@@ -115,14 +140,15 @@ async function handler(req:Request){
    const fresh=route?.last_parity_check_at&&Date.now()-Date.parse(route.last_parity_check_at)<=30*60*1000&&Date.parse(route.last_parity_check_at)<=Date.now()+60000;
    const versionsMatch=!!route?.schema_version&&route.schema_version===route.primary_schema_version&&route.schema_version===route.backup_schema_version;
    const local={};
-   const {data:own,error:ownError}=await admin.from("db_route_control").select("schema_version,auth_parity_ready,auth_verified_user_ids,data_parity_ready").eq("id",1).single();
+   const {data:own,error:ownError}=await admin.from("db_route_control").select("active_target,epoch,switch_id,schema_version,auth_parity_ready,auth_verified_user_ids,data_parity_ready,routing_gateway_ready").eq("id",1).single();
    if(ownError)throw new Error("SOURCE_ROUTE_LOOKUP_FAILED");
-   if(!targetRouteResp.ok||targetStatus?.projectRef!==PEER_REF||route?.auth_parity_ready!==true||route?.data_parity_ready!==true||route?.backup_ready!==true||route?.routing_gateway_ready!==true||!fresh||!versionsMatch||own.auth_parity_ready!==true)throw new Error("DB2_PARITY_OR_AUTH_PROOF_NOT_READY");
-   const now=new Date().toISOString(),note=String(route.last_parity_check_note||"Cross-database table hashes verified").slice(0,500);
+   if(!targetRouteResp.ok||targetStatus?.projectRef!==PEER_REF||route?.auth_parity_ready!==true||route?.data_parity_ready!==true||route?.backup_ready!==true||!fresh||!versionsMatch||own.auth_parity_ready!==true)throw new Error("DB2_PARITY_OR_AUTH_PROOF_NOT_READY");
+   const gateway=await sharedGatewayProbe(own),now=new Date().toISOString(),note=String(route.last_parity_check_note||"Cross-database table hashes verified").slice(0,500);
    const version=String(own.schema_version||route.schema_version);
-   const {error}=await admin.from("db_route_control").update({backup_ready:true,data_parity_ready:true,routing_gateway_ready:true,sync_ready:true,auth_parity_ready:true,primary_schema_version:version,backup_schema_version:version,schema_version:version,last_schema_check_at:now,last_parity_check_at:now,last_parity_check_note:"Cross-database business-table hashes match and all active owner/admin logins are verified. "+note,sync_in_progress:false}).eq("id",1);
+   const noteGateway=gateway.ready?"Shared gateway resolver independently verified.":"Shared gateway remains unverified ("+gateway.reason+"); cutover stays blocked.";
+   const {error}=await admin.from("db_route_control").update({backup_ready:true,data_parity_ready:true,routing_gateway_ready:gateway.ready,sync_ready:gateway.ready,auth_parity_ready:true,primary_schema_version:version,backup_schema_version:version,schema_version:version,last_schema_check_at:now,last_parity_check_at:now,last_parity_check_note:"Cross-database business-table hashes match and all active owner/admin logins are verified. "+note+" "+noteGateway,sync_in_progress:false}).eq("id",1);
    if(error)throw new Error("SOURCE_ROUTE_READY_UPDATE_FAILED");
-   return out(200,{ok:true,ready:true,verifiedAt:now,projectRef:SELF_REF});
+   return out(200,{ok:true,ready:gateway.ready,dataVerified:true,gatewayReady:gateway.ready,gatewayReason:gateway.ready?null:gateway.reason,verifiedAt:now,projectRef:SELF_REF});
   }
   return out(400,{ok:false,error:"unknown_action"});
  }catch(e){const m=e instanceof Error?e.message:"sync_export_failed";const status=/OWNER|SESSION|ACTIVE_OWNER|AUTH_VERIFICATION/.test(m)?403:/TABLE_NOT_ALLOWED|invalid_json/.test(m)?400:/FAILED|NOT_CONFIGURED|LIMIT/.test(m)?503:400;return out(status,{ok:false,error:m})}
