@@ -42,14 +42,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for patch in \\
-            scripts/patch_admin_pc_recovery.py \\
-            scripts/patch_admin_android_notifications.py \\
-            scripts/patch_admin_dual_db_preflight.py \\
-            scripts/patch_admin_rental_identity_rpc.py \\
-            scripts/patch_admin_notification_reliability.py \\
-            scripts/patch_admin_dual_db_routing.py \\
-            scripts/patch_admin_db_sync_global_switch.py; do
+          patches=(
+            "scripts/patch_admin_pc_recovery.py"
+            "scripts/patch_admin_android_notifications.py"
+            "scripts/patch_admin_dual_db_preflight.py"
+            "scripts/patch_admin_rental_identity_rpc.py"
+            "scripts/patch_admin_notification_reliability.py"
+            "scripts/patch_admin_dual_db_routing.py"
+            "scripts/patch_admin_db_sync_global_switch.py"
+          )
+          for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
           done
           cd "$ADMIN_PROJECT_DIR"
