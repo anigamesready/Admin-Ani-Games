@@ -79,17 +79,17 @@ sync_end = html.find('\n </div>\n</section>', sync_start)
 if sync_start < 0 or sync_end < 0:
     raise SystemExit("DB Sync UI anchors not found; refusing to patch")
 sync_ui = r'''  <div class="sync-options" style="margin-top:12px">
-   <div class="field"><label>Sumber</label><div class="pill">DB1 • Utama (sumber kanonis)</div></div>
-   <div class="field"><label>Tujuan</label><div class="pill">DB2 • Cadangan (upsert tanpa menghapus)</div></div>
+   <div class="field"><label>Sumber</label><div class="pill" id="dbSyncSourceLabel">DB1 • Utama (sumber kanonis)</div></div>
+   <div class="field"><label>Tujuan</label><div class="pill" id="dbSyncTargetLabel">DB2 • Cadangan (upsert tanpa menghapus)</div></div>
    <div class="field"><label>Mode</label><div class="pill">Update berdasarkan ID + audit hash</div></div>
    <div class="field"><label>Status route</label><div id="dbSyncRouteState" class="muted">DB1 tetap aktif selama sinkronisasi dan validasi.</div></div>
   </div>
   <div id="dbSyncPreviewSummary" class="msg" role="status" aria-live="polite">Tekan “Preview perbedaan” untuk membandingkan jumlah baris sebelum menulis data.</div>
-  <div class="field" style="margin-top:10px"><label for="dbSyncOwnerPassword">Password DB2 untuk akun owner yang sedang login di DB1</label><input id="dbSyncOwnerPassword" type="password" autocomplete="current-password" placeholder="Password akun ini yang berlaku di DB2; tidak disimpan"></div>
-  <div class="muted" style="margin-top:6px">Password hanya dipakai untuk mencoba login nyata di DB2. Proses ini tidak menyalin atau mengubah password dan tidak menyimpan token DB2. Jika password DB2 berbeda, masukkan password DB2 yang saat ini berlaku untuk akun tersebut.</div>
-  <div id="dbSyncSafetyNotice" class="msg">DB Sync melakukan upsert DB1 → DB2. Tidak menghapus baris tujuan, tidak mengubah sesi aktif di DB1, dan tidak memindahkan route sebelum hash tabel serta login owner/admin terverifikasi.</div>
+  <div class="field" style="margin-top:10px"><label for="dbSyncOwnerPassword" id="dbSyncOwnerPasswordLabel">Password DB2 untuk akun yang sedang login</label><input id="dbSyncOwnerPassword" type="password" autocomplete="current-password" placeholder="Password akun yang sedang diuji pada DB tujuan; tidak disimpan"></div>
+  <div class="muted" style="margin-top:6px">Password hanya dipakai untuk mencoba login nyata pada DB tujuan. Proses ini tidak menyalin atau mengubah password dan tidak menyimpan token database tujuan.</div>
+  <div id="dbSyncSafetyNotice" class="msg">DB Sync melakukan upsert dari database aktif ke database standby. Tidak menghapus baris tujuan; sesi aktif pada sumber tetap berjalan; route baru dapat berubah setelah hash tabel dan login owner/admin lulus.</div>
   <div id="dbSyncProgress" class="msg" role="status" aria-live="polite">Belum ada sinkronisasi dalam sesi ini.</div>
-  <div class="row" style="flex-wrap:wrap"><button type="button" onclick="previewDbSync()">Preview perbedaan</button><button type="button" id="dbSyncExecute" class="primary" onclick="requestDbSync()">Sinkronkan DB1 → DB2</button><button type="button" id="dbSyncVerifyOwner" onclick="verifyDb2OwnerLogin()">Verifikasi login DB2</button><button type="button" onclick="checkBothDbApis()">Refresh status global</button></div>'''
+  <div class="row" style="flex-wrap:wrap"><button type="button" onclick="previewDbSync()">Preview perbedaan</button><button type="button" id="dbSyncExecute" class="primary" onclick="requestDbSync()">Sinkronkan DB1 → DB2</button><button type="button" id="dbSyncVerifyOwner" onclick="verifyDb2OwnerLogin()">Verifikasi login DB tujuan</button><button type="button" onclick="checkBothDbApis()">Refresh status global</button></div>'''
 html = html[:sync_start] + sync_ui + html[sync_end:]
 
 # Compatibility: the old menu entry must use the new global route button, not a removed local selector.
