@@ -364,6 +364,12 @@ html = replace_once(
     "Global status badge"
 )
 
+# The supplied Admin ZIP can contain a stale v12 script with a TypeScript-only callback annotation.
+# Normalize it to plain browser JavaScript before the syntax regression check.
+html = html.replace(".find((run:any)=>", ".find(run=>")
+if "(run:any)" in html:
+    raise SystemExit("TypeScript annotation remains in browser Admin JavaScript")
+
 # The route must be stable before the owner sees the sync/switch actions as active.
 if "function requestGlobalDbSwitch()" not in html or "function previewDbSync()" not in html or "function verifyDb2OwnerLogin()" not in html or "function abortDbSync()" not in html:
     raise SystemExit("DB Sync/global switch implementation incomplete")

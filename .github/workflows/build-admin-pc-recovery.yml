@@ -114,6 +114,16 @@ jobs:
                   raise SystemExit("IoT mapping regression check missing: " + token)
           if "configured!==deviceId" in edge:
               raise SystemExit("Unsafe cross-domain BLYNK_DEVICE_ID vs Supabase UUID comparison remains")
+          sync_apply = (root / "supabase/functions/db-sync-apply/index.ts").read_text(encoding="utf-8")
+          sync_export = (root / "supabase/functions/db-sync-export/index.ts").read_text(encoding="utf-8")
+          for name, source in [("db-sync-apply", sync_apply), ("db-sync-export", sync_export)]:
+              for token in ["sharedGatewayProbe", "SHARED_GATEWAY_BASE_URL", "SHARED_GATEWAY_ROUTE_EPOCH_MISMATCH"]:
+                  if token not in source:
+                      raise SystemExit(f"{name} missing independent gateway readiness guard: {token}")
+              if "backup_ready:true,data_parity_ready:true,routing_gateway_ready:true,sync_ready:true" in source:
+                  raise SystemExit(f"{name} must not mark the shared gateway ready merely because data hashes match")
+          if "sourceReady?.gatewayReady===true" not in sync_apply:
+              raise SystemExit("Target sync must confirm the source-side gateway probe before route readiness")
           missing = [x for x in required if x not in html]
           if missing:
               raise SystemExit("Recovery UI missing: " + ", ".join(missing))
