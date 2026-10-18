@@ -25,8 +25,8 @@ Deno.serve(async(req:Request)=>{
    auth_verified_user_ids:Array.isArray(r.auth_verified_user_ids)?r.auth_verified_user_ids:[],sync_in_progress:r.sync_in_progress===true,
    data_parity_ready:dataParity,routing_gateway_ready:gateway,
    primary_schema_version:r.primary_schema_version||null,backup_schema_version:r.backup_schema_version||null,
-   can_switch_to_backup:r.backup_ready===true&&readiness,
-   can_switch_to_primary:r.primary_ready===true&&readiness,
+   can_switch_to_backup:r.backup_ready===true&&readiness&&r.sync_in_progress!==true,
+   can_switch_to_primary:r.primary_ready===true&&readiness&&r.sync_in_progress!==true,
    last_schema_check_at:r.last_schema_check_at||null,last_parity_check_at:r.last_parity_check_at||null,
    last_parity_check_note:r.last_parity_check_note||null,last_cutover_test_at:r.last_cutover_test_at||null,
    cutover_test_note:r.cutover_test_note||null
