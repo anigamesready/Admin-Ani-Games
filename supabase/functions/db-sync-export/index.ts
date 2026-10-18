@@ -3,16 +3,22 @@ const DB1_URL = "https://wzkjpycjizexxcxrfdvr.supabase.co";
 const DB1_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6a2pweWNqaXpleHhjeHJmZHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzc0OTUsImV4cCI6MjEwNjYxMzQ5NX0.lxjSt7CqWDJhKItPi1ckVRIcc-kM7etMzxTu3txANaI";
 const DB2_URL = "https://xcdbipgsvohesxhxydep.supabase.co";
 const DB2_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhjZGJpcGdzdm9oZXN4aHh5ZGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNjI5ODUsImV4cCI6MjEwNzYzODk4NX0.kHymS-T8a_PcKk-oQBYMGhHy3SSW1kAKStOBJVzMoSI";
+const SELF_URL=Deno.env.get("SUPABASE_URL")||DB1_URL;
+const SELF_REF=new URL(SELF_URL).hostname.split(".")[0];
+const SELF_KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||(SELF_REF==="wzkjpycjizexxcxrfdvr"?DB1_KEY:DB2_KEY);
+const PEER_URL=SELF_REF==="wzkjpycjizexxcxrfdvr"?DB2_URL:DB1_URL;
+const PEER_REF=SELF_REF==="wzkjpycjizexxcxrfdvr"?"xcdbipgsvohesxhxydep":"wzkjpycjizexxcxrfdvr";
+const PEER_KEY=SELF_REF==="wzkjpycjizexxcxrfdvr"?DB2_KEY:DB1_KEY;
 const TABLES:Record<string,string> = {"themes":"id","organizations":"id","org_members":"id","devices":"id","device_tokens":"id","device_enrollments":"id","rental_accounts":"id","billing_control_accounts":"id","rental_sessions":"id","billing_control_sessions":"id","device_commands":"id","device_command_logs":"id","device_heartbeats":"id","device_trial_requests":"id","billing_transactions":"id","admin_accounts":"id","admin_pc_access":"id","admin_alert_events":"id","audit_logs":"id","usage_events":"id","superadmin_access_codes":"user_id","superadmin_audit":"id"};
 const H={"access-control-allow-origin":"*","access-control-allow-methods":"POST,OPTIONS","access-control-allow-headers":"authorization,content-type,apikey,x-client-info","content-type":"application/json; charset=utf-8"};
 const out=(s:number,d:unknown)=>new Response(JSON.stringify(d),{status:s,headers:{...H,"cache-control":"no-store"}});
 const serviceKey=()=>Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||Deno.env.get("SUPABASE_SECRET_KEY")||"";
 function stable(v:any):string{if(v===null||typeof v!=="object")return JSON.stringify(v);if(Array.isArray(v))return "["+v.map(stable).join(",")+"]";return "{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stable(v[k])).join(",")+"}";}
 async function sha(v:string){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return Array.from(new Uint8Array(d),b=>b.toString(16).padStart(2,"0")).join("");}
-function client(){const k=serviceKey();if(!k)throw new Error("SYNC_BACKEND_NOT_CONFIGURED");return createClient(DB1_URL,k,{auth:{persistSession:false,autoRefreshToken:false}})}
+function client(){const k=serviceKey();if(!k)throw new Error("SYNC_BACKEND_NOT_CONFIGURED");return createClient(SELF_URL,k,{auth:{persistSession:false,autoRefreshToken:false}})}
 async function authorize(token:string,admin:any){
  if(!token)throw new Error("OWNER_TOKEN_REQUIRED");
- const r=await fetch(DB1_URL+"/auth/v1/user",{headers:{apikey:DB1_KEY,authorization:"Bearer "+token},cache:"no-store"});
+ const r=await fetch(SELF_URL+"/auth/v1/user",{headers:{apikey:SELF_KEY,authorization:"Bearer "+token},cache:"no-store"});
  if(!r.ok)throw new Error("OWNER_SESSION_INVALID");
  const user=await r.json();
  const {data:members,error}=await admin.from("org_members").select("org_id").eq("auth_user_id",user.id).eq("role","owner");
@@ -43,9 +49,9 @@ async function tableHash(admin:any,table:string){
  return {table,count:offset,hash:await sha(items.join("\n"))};
 }
 async function recordAuthVerification(admin:any,userId:string){
- const routeResp=await fetch(DB2_URL+"/functions/v1/db-route-status",{headers:{apikey:DB2_KEY},cache:"no-store"});
+ const routeResp=await fetch(PEER_URL+"/functions/v1/db-route-status",{headers:{apikey:PEER_KEY},cache:"no-store"});
  const status=await routeResp.json().catch(()=>({})),route=status?.route;
- if(!routeResp.ok||status?.projectRef!=="xcdbipgsvohesxhxydep"||!Array.isArray(route?.auth_verified_user_ids)||!route.auth_verified_user_ids.includes(userId)){
+ if(!routeResp.ok||status?.projectRef!==PEER_REF||!Array.isArray(route?.auth_verified_user_ids)||!route.auth_verified_user_ids.includes(userId)){
   throw new Error("TARGET_LOGIN_VERIFICATION_NOT_FOUND");
  }
  const ids=await activeAuthIds(admin);
@@ -55,10 +61,7 @@ async function recordAuthVerification(admin:any,userId:string){
  const ready=ids.every(id=>verified.includes(id))&&ids.every(id=>route.auth_verified_user_ids.includes(id));
  const {error:updateError}=await admin.from("db_route_control").update({
    auth_verified_user_ids:verified,auth_parity_ready:ready,
-   backup_ready:ready&&current.data_parity_ready===true&&current.routing_gateway_ready===true,
-   routing_gateway_ready:ready&&current.data_parity_ready===true,
-   sync_ready:ready&&current.data_parity_ready===true,
-   last_parity_check_note:ready?"All active owner/Admin accounts have completed a DB2 password login test.":"Login verification recorded for "+verified.length+"/"+ids.length+" active owner/Admin accounts."
+   last_parity_check_note:ready?"All active owner/admin accounts completed a successful login test on both databases.":"Login verification recorded for "+verified.length+"/"+ids.length+" active owner/admin accounts."
  }).eq("id",1);
  if(updateError)throw new Error("AUTH_VERIFICATION_RECORD_FAILED");
  return {verifiedUserCount:verified.length,requiredUserCount:ids.length,authParityReady:ready};
@@ -70,7 +73,7 @@ async function handler(req:Request){
  try{
   const admin=client(),token=String((req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"")||body.accessToken||"");
   const auth=await authorize(token,admin),action=String(body.action||"");
-  if(action==="authorize")return out(200,{ok:true,projectRef:"wzkjpycjizexxcxrfdvr",userId:auth.id,role:"owner",orgCount:auth.orgIds.length});
+  if(action==="authorize")return out(200,{ok:true,projectRef:SELF_REF,userId:auth.id,role:"owner",orgCount:auth.orgIds.length});
   if(action==="manifest"){
    const tables:any[]=[];
    for(const [table,pk] of Object.entries(TABLES)){
@@ -79,42 +82,47 @@ async function handler(req:Request){
     tables.push({table,count:count??0});
    }
    const activeIds=await activeAuthIds(admin);
-   return out(200,{ok:true,projectRef:"wzkjpycjizexxcxrfdvr",tables,auth:{activeUserIds:activeIds,activeUserCount:activeIds.length}});
+   return out(200,{ok:true,projectRef:SELF_REF,tables,auth:{activeUserIds:activeIds,activeUserCount:activeIds.length}});
   }
-  if(action==="auth-members")return out(200,{ok:true,projectRef:"wzkjpycjizexxcxrfdvr",userIds:await activeAuthIds(admin)});
+  if(action==="auth-members")return out(200,{ok:true,projectRef:SELF_REF,userIds:await activeAuthIds(admin)});
   if(action==="page"){
    const table=String(body.table||""),offset=Math.max(0,Math.trunc(Number(body.offset)||0)),limit=Math.min(500,Math.max(1,Math.trunc(Number(body.limit)||250)));
    if(!TABLES[table])return out(400,{ok:false,error:"TABLE_NOT_ALLOWED"});
-   return out(200,{ok:true,projectRef:"wzkjpycjizexxcxrfdvr",table,...await getPage(admin,table,offset,limit)});
+   return out(200,{ok:true,projectRef:SELF_REF,table,...await getPage(admin,table,offset,limit)});
   }
   if(action==="hash"){
    const table=String(body.table||"");if(!TABLES[table])return out(400,{ok:false,error:"TABLE_NOT_ALLOWED"});
-   return out(200,{ok:true,projectRef:"wzkjpycjizexxcxrfdvr",...(await tableHash(admin,table))});
+   return out(200,{ok:true,projectRef:SELF_REF,...(await tableHash(admin,table))});
   }
-  if(action==="mark-not-ready"){
-   const note=String(body.note||"Admin-initiated DB1 → DB2 sync in progress").slice(0,500);
-   const {error}=await admin.from("db_route_control").update({backup_ready:false,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_at:new Date().toISOString(),last_parity_check_note:note}).eq("id",1);
-   if(error)throw new Error("ROUTE_READINESS_UPDATE_FAILED");
-   return out(200,{ok:true,readiness:"blocked"});
+  if(action==="mark-not-ready"||action==="start-sync"){
+   const note=String(body.note||"Cross-database sync is in progress; active route remains online.").slice(0,500);
+   const {error}=await admin.from("db_route_control").update({sync_in_progress:true,last_parity_check_note:note}).eq("id",1);
+   if(error)throw new Error("SYNC_LOCK_FAILED");
+   return out(200,{ok:true,readiness:"sync_in_progress",projectRef:SELF_REF});
+  }
+  if(action==="finish-sync"){
+   const {error}=await admin.from("db_route_control").update({sync_in_progress:false}).eq("id",1);
+   if(error)throw new Error("SYNC_UNLOCK_FAILED");
+   return out(200,{ok:true,projectRef:SELF_REF});
   }
   if(action==="record-auth-verification"){
    if(String(body.userId||"")!==auth.id)throw new Error("AUTH_VERIFICATION_USER_MISMATCH");
-   return out(200,{ok:true,projectRef:"wzkjpycjizexxcxrfdvr",...(await recordAuthVerification(admin,auth.id))});
+   return out(200,{ok:true,projectRef:SELF_REF,...(await recordAuthVerification(admin,auth.id))});
   }
   if(action==="mark-ready"){
-   const targetRouteResp=await fetch(DB2_URL+"/functions/v1/db-route-status",{headers:{apikey:DB2_KEY},cache:"no-store"});
+   const targetRouteResp=await fetch(PEER_URL+"/functions/v1/db-route-status",{headers:{apikey:PEER_KEY},cache:"no-store"});
    const targetStatus=await targetRouteResp.json().catch(()=>({})),route=targetStatus?.route;
    const fresh=route?.last_parity_check_at&&Date.now()-Date.parse(route.last_parity_check_at)<=30*60*1000&&Date.parse(route.last_parity_check_at)<=Date.now()+60000;
    const versionsMatch=!!route?.schema_version&&route.schema_version===route.primary_schema_version&&route.schema_version===route.backup_schema_version;
    const local={};
    const {data:own,error:ownError}=await admin.from("db_route_control").select("schema_version,auth_parity_ready,auth_verified_user_ids,data_parity_ready").eq("id",1).single();
    if(ownError)throw new Error("SOURCE_ROUTE_LOOKUP_FAILED");
-   if(!targetRouteResp.ok||targetStatus?.projectRef!=="xcdbipgsvohesxhxydep"||route?.auth_parity_ready!==true||route?.data_parity_ready!==true||route?.backup_ready!==true||route?.routing_gateway_ready!==true||!fresh||!versionsMatch||own.auth_parity_ready!==true)throw new Error("DB2_PARITY_OR_AUTH_PROOF_NOT_READY");
-   const now=new Date().toISOString(),note=String(route.last_parity_check_note||"DB1 → DB2 table hashes verified").slice(0,500);
+   if(!targetRouteResp.ok||targetStatus?.projectRef!==PEER_REF||route?.auth_parity_ready!==true||route?.data_parity_ready!==true||route?.backup_ready!==true||route?.routing_gateway_ready!==true||!fresh||!versionsMatch||own.auth_parity_ready!==true)throw new Error("DB2_PARITY_OR_AUTH_PROOF_NOT_READY");
+   const now=new Date().toISOString(),note=String(route.last_parity_check_note||"Cross-database table hashes verified").slice(0,500);
    const version=String(own.schema_version||route.schema_version);
-   const {error}=await admin.from("db_route_control").update({backup_ready:true,data_parity_ready:true,routing_gateway_ready:true,sync_ready:true,auth_parity_ready:true,primary_schema_version:version,backup_schema_version:version,schema_version:version,last_schema_check_at:now,last_parity_check_at:now,last_parity_check_note:"DB1/DB2 business-table hashes match and all active owner/Admin logins are verified. "+note}).eq("id",1);
+   const {error}=await admin.from("db_route_control").update({backup_ready:true,data_parity_ready:true,routing_gateway_ready:true,sync_ready:true,auth_parity_ready:true,primary_schema_version:version,backup_schema_version:version,schema_version:version,last_schema_check_at:now,last_parity_check_at:now,last_parity_check_note:"Cross-database business-table hashes match and all active owner/admin logins are verified. "+note,sync_in_progress:false}).eq("id",1);
    if(error)throw new Error("SOURCE_ROUTE_READY_UPDATE_FAILED");
-   return out(200,{ok:true,ready:true,verifiedAt:now,projectRef:"wzkjpycjizexxcxrfdvr"});
+   return out(200,{ok:true,ready:true,verifiedAt:now,projectRef:SELF_REF});
   }
   return out(400,{ok:false,error:"unknown_action"});
  }catch(e){const m=e instanceof Error?e.message:"sync_export_failed";const status=/OWNER|SESSION|ACTIVE_OWNER|AUTH_VERIFICATION/.test(m)?403:/TABLE_NOT_ALLOWED|invalid_json/.test(m)?400:/FAILED|NOT_CONFIGURED|LIMIT/.test(m)?503:400;return out(status,{ok:false,error:m})}
