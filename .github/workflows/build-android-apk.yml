@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.0 APK
+name: Build AniGames Admin V12.1.14 Dual DB APK
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.0 Debug APK
+    name: Build AniGames Admin V12.1.14 Dual DB Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -94,7 +94,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.0-debug-apk
+          name: AniGames-Admin-Android-v12.1.14-dual-db-debug-apk
           path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
