@@ -299,7 +299,17 @@ async function requestGlobalDbSwitch(){
   for(const p of order)await routeCoordinatorCall(p.url,p.key,token,{action:'switch',...payload});
   const finalOrder=target==='backup'?[d1,d2]:[d2,d1];
   for(const p of finalOrder)await routeCoordinatorCall(p.url,p.key,token,{action:'finalize',...payload});
-  dbSyncStatus('Berhasil pindah seluruh sistem ke '+(target==='backup'?'DB2':'DB1')+' • epoch '+epoch+'. Menyegarkan aplikasi…');
+  // Never report success based on coordinator responses alone; re-read both authoritative route rows.
+  const [confirmD1,confirmD2]=await Promise.all([
+   globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),
+   globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')
+  ]);
+  const r1=confirmD1.route,r2=confirmD2.route;
+  const confirmed=(r)=>r.active_target===target&&Number(r.epoch)===epoch&&String(r.switch_id||'')===switchId;
+  if(!confirmed(r1)||!confirmed(r2))throw new Error('ROUTE_FINAL_CONFIRMATION_FAILED: DB1 and DB2 did not both confirm the same target, epoch, and switch ID. No successful cutover is reported.');
+  if(target==='backup'&&(!routeReadyForSwitch(r1)||!routeReadyForSwitch(r2)||r1.schema_version!==r2.schema_version))throw new Error('ROUTE_FINAL_PARITY_CHECK_FAILED: DB2 is not ready on both projects after finalization.');
+  if(target==='primary'&&(r1.primary_ready!==true||r2.primary_ready!==true))throw new Error('ROUTE_PRIMARY_CONFIRMATION_FAILED: primary readiness failed after route finalization.');
+  dbSyncStatus('Berhasil pindah seluruh sistem ke '+(target==='backup'?'DB2':'DB1')+' • epoch '+epoch+'. Kedua DB mengonfirmasi route. Menyegarkan aplikasi…');
   try{localStorage.removeItem(DB_ROUTE_NOTICE_KEY)}catch(_){}
   location.reload();return {ok:true,target,epoch,switchId};
  }catch(e){
@@ -342,7 +352,7 @@ if "function requestGlobalDbSwitch()" not in html or "function previewDbSync()" 
     raise SystemExit("DB Sync/global switch implementation incomplete")
 if "DB_TARGET!== 'primary'" in html:
     raise SystemExit("Unexpected malformed DB target guard")
-for required in ["db-sync-apply","db-route-coordinator","auth_parity_ready","dbSyncPreviewSummary","globalDbTarget","DB_SYNC_RUN_KEY","abortDbSync"]:
+for required in ["db-sync-apply","db-route-coordinator","auth_parity_ready","dbSyncPreviewSummary","globalDbTarget","DB_SYNC_RUN_KEY","abortDbSync","ROUTE_FINAL_CONFIRMATION_FAILED","confirmD1","confirmD2"]:
     if required not in html:
         raise SystemExit("Missing required dual-DB UI token: "+required)
 
