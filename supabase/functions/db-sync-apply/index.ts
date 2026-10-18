@@ -193,7 +193,7 @@ async function handler(req:Request){
     await admin.from("db_route_control").update({backup_ready:false,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_note:"Target data verified but source readiness update failed; cutover remains blocked."}).eq("id",1);
     throw e;
    }
-   const gatewayBothReady=gatewayReady&&sourceReady?.routingGatewayReady===true;
+   const gatewayBothReady=gatewayReady&&sourceReady?.gatewayReady===true;
    if(!gatewayBothReady){
     const blockedNote="Data/schema/auth parity verified, but shared gateway verification is missing or inconsistent ("+gateway.reason+"). Cutover remains blocked.";
     const {error:blockError}=await admin.from("db_route_control").update({backup_ready:true,data_parity_ready:true,routing_gateway_ready:false,sync_ready:false,last_parity_check_note:blockedNote}).eq("id",1);

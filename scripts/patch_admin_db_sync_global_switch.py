@@ -144,11 +144,11 @@ async function previewDbSync(){
 async function requestDbSync(){
  if(!dualDbRouteReady)return msg('Route global belum terverifikasi. Refresh status sebelum sinkronisasi.',true);
  if(typeof ctx==='undefined'||ctx?.role!=='owner')return msg('Hanya owner yang dapat menjalankan DB Sync.',true);
- const button=$('dbSyncExecute');if(button)button.disabled=true;
+ const button=$('dbSyncExecute');if(button)button.disabled=true;let activeRunId='';
  try{
   const start=await dbSyncCall('start'),runId=String(start.runId||'');
   if(!runId)throw new Error('SYNC_RUN_ID_MISSING');
-  localStorage.setItem(DB_SYNC_RUN_KEY,runId);
+  activeRunId=runId;localStorage.setItem(DB_SYNC_RUN_KEY,runId);
   const tables=start.tables||[];let totalRows=0,mismatches=[],advisoryMismatches=[];
   const sourceName=DB_TARGET==='backup'?'DB2':'DB1',targetName=DB_TARGET==='backup'?'DB1':'DB2';
   dbSyncStatus('Sinkronisasi '+sourceName+' → '+targetName+' dimulai. '+sourceName+' tetap aktif. Memproses '+tables.length+' tabel…');
@@ -178,13 +178,16 @@ async function requestDbSync(){
   }
   const summary=$('dbSyncPreviewSummary');
   if(mismatches.length){
-   if(summary)summary.textContent='Penulisan selesai, tetapi hash belum cocok pada: '+mismatches.join(', ')+'. DB2 tetap diblokir; tinjau perbedaan lalu ulangi sync.';
-   dbSyncStatus('Data tertulis, verifikasi belum lulus. Tidak ada cutover dilakukan.',true);
-   return {ok:false,mismatches};
+   let released=false;
+   try{await dbSyncCall('abort',{runId});localStorage.removeItem(DB_SYNC_RUN_KEY);activeRunId='';released=true}catch(_){}
+   if(summary)summary.textContent='Penulisan selesai, tetapi hash belum cocok pada: '+mismatches.join(', ')+'. DB tetap aktif; target diblokir sampai perbedaan diperbaiki.';
+   dbSyncStatus('Hash belum cocok. '+(released?'Kunci sync dilepas dengan aman; jalankan ulang setelah memeriksa data.':'Kunci sync belum terlepas; gunakan Hentikan sync sebelum mencoba lagi.'),true);
+   return {ok:false,mismatches,lockReleased:released};
   }
   if(summary)summary.textContent='Upsert selesai untuk '+tables.length+' tabel. Verifikasi hash data dan login owner/admin '+targetName+' akan menentukan kesiapan database standby.';
   try{
    const ready=await dbSyncCall('mark-ready',{runId});
+   localStorage.removeItem(DB_SYNC_RUN_KEY);activeRunId='';
    const advisoryText=advisoryMismatches.length?' Riwayat/telemetri yang berubah saat sinkronisasi (non-blocking): '+advisoryMismatches.join(', ')+'.':'';
    dbSyncStatus('Verifikasi data selesai: '+ready.verifiedTables+' tabel utama lolos hash; '+ready.verifiedOwners+' owner/admin terverifikasi. '+(ready.gatewayReady?'Gateway bersama juga terverifikasi.':'Gateway bersama BELUM terverifikasi; cutover tetap diblokir.')+' '+sourceName+' tetap aktif.'+advisoryText,ready.gatewayReady!==true);
    msg(ready.gatewayReady?sourceName+' → '+targetName+' selesai dan siap sebagai standby; route aktif tetap tidak berubah.':sourceName+' → '+targetName+' data/schema/auth parity lulus, tetapi gateway bersama belum siap sehingga perpindahan DB tetap diblokir.',ready.gatewayReady!==true);
@@ -197,7 +200,14 @@ async function requestDbSync(){
    }
    throw e;
   }
- }catch(e){const text=String(e?.message||e);dbSyncStatus('DB Sync terhenti: '+text+'. DB1 tetap aktif dan DB2 tetap terkunci.',true);msg('DB Sync terhenti: '+text,true);return {ok:false,error:text}}
+ }catch(e){
+  const text=String(e?.message||e);let lockReleased=false;
+  if(activeRunId&&!text.includes('AUTH_VERIFICATION_REQUIRED')){
+   try{await dbSyncCall('abort',{runId:activeRunId});localStorage.removeItem(DB_SYNC_RUN_KEY);lockReleased=true}catch(_){}
+  }
+  dbSyncStatus('DB Sync terhenti: '+text+'. '+(lockReleased?'Kunci sinkronisasi dilepas; route aktif tidak berubah.':'Jika proses masih terkunci, gunakan Hentikan sync; route aktif tidak berubah.'),true);
+  msg('DB Sync terhenti: '+text,true);return {ok:false,error:text,lockReleased}
+ }
  finally{if(button)button.disabled=false}
 }
 async function verifyDb2OwnerLogin(){
@@ -206,13 +216,15 @@ async function verifyDb2OwnerLogin(){
  const input=$('dbSyncOwnerPassword'),password=String(input?.value||'');
  if(!password)return msg('Masukkan password yang saat ini berlaku untuk akun ini di DB2. Password tidak disimpan.',true);
  const button=$('dbSyncVerifyOwner');if(button)button.disabled=true;
+ let readyGatewayAfterAuth=false;
  try{
   const result=await dbSyncCall('verify-owner-login',{password});if(input)input.value='';
   dbSyncStatus('Login '+(DB_TARGET==='backup'?'DB1':'DB2')+' berhasil untuk akun ini • '+result.verifiedUserCount+'/'+result.requiredUserCount+' akun aktif terverifikasi.');
   const runId=localStorage.getItem(DB_SYNC_RUN_KEY)||'';
   if(runId){
    try{
-    const ready=await dbSyncCall('mark-ready',{runId});
+    const ready=await dbSyncCall('mark-ready',{runId});readyGatewayAfterAuth=ready.gatewayReady===true;
+    if(ready.dataVerified===true)localStorage.removeItem(DB_SYNC_RUN_KEY);
     dbSyncStatus(ready.gatewayReady?'Database tujuan SIAP sebagai standby. '+ready.verifiedTables+' tabel utama cocok; '+ready.verifiedOwners+' akun owner/admin login-test lulus. Route aktif tidak berubah sampai perpindahan global dipilih.':'Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan.',ready.gatewayReady!==true);
     await checkBothDbApis();
    }catch(e){
@@ -222,8 +234,7 @@ async function verifyDb2OwnerLogin(){
     else throw e;
    }
   }
-  const verifiedRunId=localStorage.getItem(DB_SYNC_RUN_KEY)||'', verifiedStatus=verifiedRunId?await dbSyncCall('status').catch(()=>null):null;
-  const currentRun=(verifiedStatus?.runs||[]).find((run:any)=>String(run.id)===verifiedRunId),verifiedGateway=currentRun?.summary?.sharedGatewayReady===true;
+  const verifiedGateway=readyGatewayAfterAuth;
   msg(result.authParityReady&&verifiedGateway?'Login terverifikasi untuk semua akun aktif dan gateway bersama siap.':result.authParityReady?'Login semua akun aktif terverifikasi, tetapi gateway bersama belum terverifikasi; pindah DB tetap diblokir.':'Login database tujuan berhasil untuk akun ini; verifikasi akun aktif lainnya masih diperlukan.',!result.authParityReady||!verifiedGateway);
   return result;
  }catch(e){if(input)input.value='';const text=String(e?.message||e);dbSyncStatus('Verifikasi login DB2 gagal: '+text,true);msg('Verifikasi login DB2 gagal: '+text,true);return {ok:false,error:text}}
@@ -235,7 +246,7 @@ async function abortDbSync(){
  if(!runId)return msg('Tidak ada run DB Sync aktif yang tercatat pada perangkat ini.',true);
  if(!confirm('Hentikan proses sinkronisasi saat ini? Data yang sudah ter-upsert tidak dihapus. Database aktif tetap berjalan, tetapi kesiapan cutover akan tetap gagal sampai sinkronisasi dan verifikasi hash diulang.'))return {ok:false,cancelled:true};
  const button=$('dbSyncAbort');if(button)button.disabled=true;
- try{const result=await dbSyncCall('abort',{runId});dbSyncStatus('Sinkronisasi dihentikan. Route aktif tidak berubah; pindah database tetap diblokir sampai sinkronisasi ulang dan hash lulus.');msg('Sync dihentikan dengan aman. DB aktif tetap berjalan.',true);await checkBothDbApis();return result}
+ try{const result=await dbSyncCall('abort',{runId});localStorage.removeItem(DB_SYNC_RUN_KEY);dbSyncStatus('Sinkronisasi dihentikan. Route aktif tidak berubah; pindah database tetap diblokir sampai sinkronisasi ulang dan hash lulus.');msg('Sync dihentikan dengan aman. DB aktif tetap berjalan.',true);await checkBothDbApis();return result}
  catch(e){const text=String(e?.message||e);dbSyncStatus('Tidak bisa menghentikan sync: '+text,true);msg('Tidak bisa menghentikan sync: '+text,true);return {ok:false,error:text}}
  finally{if(button)button.disabled=false}
 }
