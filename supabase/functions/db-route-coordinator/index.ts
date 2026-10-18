@@ -19,16 +19,28 @@ async function routeAt(url:string,key:string){
 }
 async function authorize(token:string,admin:any){
  if(!token)throw new Error("OWNER_TOKEN_REQUIRED");
- const r=await fetch(DB1_URL+"/auth/v1/user",{headers:{apikey:DB1_KEY,authorization:"Bearer "+token},cache:"no-store"});
- if(!r.ok)throw new Error("OWNER_SESSION_INVALID");
- const user:any=await r.json();
+ // The Admin app can have a session minted by either project. Verify against the
+ // matching Supabase Auth endpoint, then independently require owner membership
+ // in this coordinator's local database before allowing a route-control write.
+ const candidates=[{url:DB1_URL,key:DB1_KEY,ref:"wzkjpycjizexxcxrfdvr"},{url:DB2_URL,key:DB2_KEY,ref:"xcdbipgsvohesxhxydep"}];
+ let user:any=null,authProjectRef="";
+ for(const target of candidates){
+  try{
+   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),3500);
+   try{
+    const response=await fetch(target.url+"/auth/v1/user",{headers:{apikey:target.key,authorization:"Bearer "+token},cache:"no-store",signal:ctl.signal});
+    if(response.ok){const candidate:any=await response.json();if(candidate?.id){user=candidate;authProjectRef=target.ref;break}}
+   }finally{clearTimeout(timer)}
+  }catch(_){}
+ }
+ if(!user)throw new Error("OWNER_SESSION_INVALID");
  const {data:rows,error}=await admin.from("org_members").select("org_id").eq("auth_user_id",user.id).eq("role","owner");
  if(error)throw new Error("OWNER_ROLE_LOOKUP_FAILED");
  const orgIds=(rows||[]).map((x:any)=>String(x.org_id)).filter(Boolean);
  if(!orgIds.length)throw new Error("OWNER_ONLY");
  const {data:orgs,error:orgError}=await admin.from("organizations").select("id").in("id",orgIds).eq("status","active");
  if(orgError||!orgs?.length)throw new Error("ACTIVE_OWNER_ONLY");
- return {id:String(user.id),email:String(user.email||"")};
+ return {id:String(user.id),email:String(user.email||""),authProjectRef,orgIds};
 }
 function requireBackupReadiness(a:any,b:any){
  if(a.projectRef!=="wzkjpycjizexxcxrfdvr"||b.projectRef!=="xcdbipgsvohesxhxydep")throw new Error("PROJECT_ID_MISMATCH");
