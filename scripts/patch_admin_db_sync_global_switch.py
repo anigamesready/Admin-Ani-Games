@@ -36,8 +36,7 @@ html = replace_once(
 html = replace_once(
     html,
     "if(!a.dataParityReady||!b.dataParityReady)problems.push('Parity isi data belum dinyatakan lolos pada kedua project.');",
-    "if(a.syncInProgress||b.syncInProgress)problems.push('DB Sync sedang berjalan pada salah satu database. Perpindahan global ditahan.');
- if(!a.authParityReady||!b.authParityReady)problems.push('Login owner/admin aktif belum diverifikasi pada kedua project.');\n if(!a.dataParityReady||!b.dataParityReady)problems.push('Parity isi data belum dinyatakan lolos pada kedua project.');",
+    "if(a.syncInProgress||b.syncInProgress)problems.push('DB Sync sedang berjalan pada salah satu database. Perpindahan global ditahan.');\n if(!a.authParityReady||!b.authParityReady)problems.push('Login owner/admin aktif belum diverifikasi pada kedua project.');\n if(!a.dataParityReady||!b.dataParityReady)problems.push('Parity isi data belum dinyatakan lolos pada kedua project.');",
     "Preflight auth blocker"
 )
 
