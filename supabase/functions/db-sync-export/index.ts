@@ -96,12 +96,12 @@ async function handler(req:Request){
   }
   if(action==="mark-not-ready"||action==="start-sync"){
    const note=String(body.note||"Cross-database sync is in progress; active route remains online.").slice(0,500);
-   const {error}=await admin.from("db_route_control").update({sync_in_progress:true,last_parity_check_note:note}).eq("id",1);
+   const {error}=await admin.from("db_route_control").update({sync_in_progress:true,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_at:null,last_parity_check_note:note}).eq("id",1);
    if(error)throw new Error("SYNC_LOCK_FAILED");
    return out(200,{ok:true,readiness:"sync_in_progress",projectRef:SELF_REF});
   }
   if(action==="finish-sync"){
-   const {error}=await admin.from("db_route_control").update({sync_in_progress:false}).eq("id",1);
+   const {error}=await admin.from("db_route_control").update({sync_in_progress:false,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_at:null,last_parity_check_note:"Sync was stopped or not verified. Route changes remain blocked until a complete parity check succeeds."}).eq("id",1);
    if(error)throw new Error("SYNC_UNLOCK_FAILED");
    return out(200,{ok:true,projectRef:SELF_REF});
   }
