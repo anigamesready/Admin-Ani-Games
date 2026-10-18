@@ -10,7 +10,7 @@ const PEER_URL=SELF_REF==="wzkjpycjizexxcxrfdvr"?DB2_URL:DB1_URL;
 const PEER_REF=SELF_REF==="wzkjpycjizexxcxrfdvr"?"xcdbipgsvohesxhxydep":"wzkjpycjizexxcxrfdvr";
 const PEER_KEY=SELF_REF==="wzkjpycjizexxcxrfdvr"?DB2_KEY:DB1_KEY;
 const NON_BLOCKING_TABLES=new Set(["device_heartbeats","device_command_logs","audit_logs","usage_events"]);
-const TABLES:Record<string,string>={"themes":"id","organizations":"id","org_members":"id","devices":"id","device_tokens":"id","device_enrollments":"id","rental_accounts":"id","billing_control_accounts":"id","rental_sessions":"id","billing_control_sessions":"id","device_commands":"id","device_command_logs":"id","device_heartbeats":"id","device_trial_requests":"id","billing_transactions":"id","admin_accounts":"id","admin_pc_access":"id","admin_alert_events":"id","audit_logs":"id","usage_events":"id","superadmin_access_codes":"user_id","superadmin_audit":"id"};
+const TABLES:Record<string,string>={"themes":"id","organizations":"id","org_members":"id","devices":"id","device_tokens":"id","device_enrollments":"id","rental_accounts":"id","billing_control_accounts":"id","billing_control_sessions":"id","device_commands":"id","device_command_logs":"id","device_heartbeats":"id","device_trial_requests":"id","admin_accounts":"id","admin_pc_access":"id","admin_alert_events":"id","audit_logs":"id","usage_events":"id","superadmin_access_codes":"user_id","superadmin_audit":"id","rental_sessions":"id","billing_transactions":"id"};
 const H={"access-control-allow-origin":"*","access-control-allow-methods":"POST,OPTIONS","access-control-allow-headers":"authorization,content-type,apikey,x-client-info","content-type":"application/json; charset=utf-8"};
 const out=(s:number,d:unknown)=>new Response(JSON.stringify(d),{status:s,headers:{...H,"cache-control":"no-store"}});
 const serviceKey=()=>Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||Deno.env.get("SUPABASE_SECRET_KEY")||"";
@@ -128,7 +128,7 @@ async function handler(req:Request){
    const matched=Number(source.count)===target.count&&String(source.hash||"")===target.hash;
    const {error}=await admin.from("db_sync_verification").upsert({run_id:runId,table_name:table,source_count:Number(source.count)||0,target_count:target.count,source_hash:String(source.hash||""),target_hash:target.hash,matched,checked_at:new Date().toISOString()},{onConflict:"run_id,table_name"});
    if(error)throw new Error("SYNC_EVIDENCE_SAVE_FAILED:"+table);
-   return out(200,{ok:true,runId,table,sourceCount:Number(source.count)||0,targetCount:target.count,matched});
+   return out(200,{ok:true,runId,table,sourceCount:Number(source.count)||0,targetCount:target.count,matched,required:!NON_BLOCKING_TABLES.has(table)});
   }
   if(action==="verify-owner-login"){
    const password=String(body.password||"");
