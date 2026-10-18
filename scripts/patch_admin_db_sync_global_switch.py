@@ -268,7 +268,7 @@ function routeReadyForSwitch(r){
  return r.backup_ready===true&&r.auth_parity_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&fresh&&schema;
 }
 async function requestGlobalDbSwitch(){
- if(!dualDbRouteReady)return msg('Route belum terverifikasi. Refresh status sebelum pindah.',true);
+ // Read both authoritative route rows directly below. Do not gate interrupted-switch recovery on the cached UI resolver.
  if(typeof ctx==='undefined'||ctx?.role!=='owner')return msg('Hanya owner yang dapat memindahkan seluruh sistem database.',true);
  const target=String($('globalDbTarget')?.value||''),button=$('globalDbSwitchButton');
  if(!['primary','backup'].includes(target))return msg('Target database tidak valid.',true);
@@ -282,17 +282,27 @@ async function requestGlobalDbSwitch(){
   ]);
   if(d1.route.sync_in_progress===true||d2.route.sync_in_progress===true)throw new Error('DB Sync sedang berjalan. Tunggu sinkronisasi selesai sebelum memindahkan route global.');
   const a0=d1.route,b0=d2.route,aligned0=a0.active_target===b0.active_target&&Number(a0.epoch)===Number(b0.epoch)&&String(a0.switch_id||'')===String(b0.switch_id||'');
+  const aAhead0=a0.active_target===target&&!!a0.switch_id&&Number(a0.epoch)===Number(b0.epoch)+1;
+  const bAhead0=b0.active_target===target&&!!b0.switch_id&&Number(b0.epoch)===Number(a0.epoch)+1;
+  const recoveringPartial=!aligned0&&(aAhead0||bAhead0);
   if(aligned0&&a0.active_target===target){dbSyncStatus('Seluruh sistem sudah aktif di '+(target==='backup'?'DB2':'DB1')+'.');await checkBothDbApis();return {ok:true,alreadyActive:true}}
-  if(!confirm('Pindahkan SELURUH SISTEM ke '+(target==='backup'?'DB2':'DB1')+'? Sistem akan melakukan sinkronisasi akhir dari database aktif ke standby, memeriksa hash data dan login parity, lalu menyamakan epoch/switch ID pada kedua project. Route tidak berubah jika salah satu pemeriksaan gagal.'))return {ok:false,cancelled:true};
+  if(!aligned0&&!recoveringPartial)throw new Error('Route DB1/DB2 tidak selaras dan tidak cocok untuk pemulihan otomatis. Jangan paksa pindah; audit route-control terlebih dahulu.');
+  const confirmText=recoveringPartial
+   ? 'Terdeteksi perpindahan sebelumnya yang terhenti setelah satu database diperbarui. Lanjutkan switch ID/epoch yang sama pada target '+(target==='backup'?'DB2':'DB1')+'? Kesiapan kedua DB tetap akan diperiksa.'
+   : 'Pindahkan SELURUH SISTEM ke '+(target==='backup'?'DB2':'DB1')+'? Sistem akan melakukan sinkronisasi akhir dari database aktif ke standby, memeriksa hash data dan login parity, lalu menyamakan epoch/switch ID pada kedua project. Route tidak berubah jika salah satu pemeriksaan gagal.';
+  if(!confirm(confirmText))return {ok:false,cancelled:true};
 
-  // Final catch-up sync immediately before cutover. Existing sessions/writes continue on current active DB.
-  const sync=await requestDbSync();
-  if(!sync||sync.ok===false||sync.ready!==true)throw new Error('SYNC_NOT_READY: final sync/hash/auth verification did not complete; active database was not switched.');
-
-  [d1,d2]=await Promise.all([
-   globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),
-   globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')
-  ]);
+  if(!recoveringPartial){
+   // A fresh catch-up sync is required before starting a new epoch/switch ID.
+   const sync=await requestDbSync();
+   if(!sync||sync.ok===false||sync.ready!==true)throw new Error('SYNC_NOT_READY: final sync/hash/auth/gateway verification did not complete; active database was not switched.');
+   [d1,d2]=await Promise.all([
+    globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),
+    globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')
+   ]);
+  }else{
+   dbSyncStatus('Memulihkan perpindahan yang terhenti dengan switch ID/epoch yang sama. Tidak memulai sync baru saat route tidak selaras.');
+  }
   const a=d1.route,b=d2.route;
   if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('SYNC_IN_PROGRESS: final DB Sync has not released both route locks.');
   const needsParity=target==='backup'||a.active_target==='backup'||b.active_target==='backup';
@@ -375,7 +385,7 @@ if "function requestGlobalDbSwitch()" not in html or "function previewDbSync()" 
     raise SystemExit("DB Sync/global switch implementation incomplete")
 if "DB_TARGET!== 'primary'" in html:
     raise SystemExit("Unexpected malformed DB target guard")
-for required in ["db-sync-apply","db-route-coordinator","auth_parity_ready","dbSyncPreviewSummary","globalDbTarget","DB_SYNC_RUN_KEY","abortDbSync","ROUTE_FINAL_CONFIRMATION_FAILED","confirmD1","confirmD2"]:
+for required in ["db-sync-apply","db-route-coordinator","auth_parity_ready","dbSyncPreviewSummary","globalDbTarget","DB_SYNC_RUN_KEY","abortDbSync","ROUTE_FINAL_CONFIRMATION_FAILED","confirmD1","confirmD2","recoveringPartial","aAhead0","bAhead0"]:
     if required not in html:
         raise SystemExit("Missing required dual-DB UI token: "+required)
 
