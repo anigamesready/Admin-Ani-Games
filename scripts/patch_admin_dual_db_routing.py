@@ -28,8 +28,9 @@ let DB_TARGET='primary',SB_URL=DB1_URL,SB_KEY=DB1_KEY,SB_FUNCTION_URL=DB1_URL+'/
 let DB_ROUTE_EPOCH=0,DB_ROUTE_SWITCH_ID=null,dualDbRouteState=null,dualDbRouteCheckedAt=0,dualDbRoutePromise=null,dualDbRouteReady=false,dualDbRouteMonitorStarted=false,dualDbRouteLocked=false;
 function routeBackupReady(r){
  const parityAt=Date.parse(r?.last_parity_check_at||'');
+ const parityFresh=Number.isFinite(parityAt)&&Date.now()-parityAt<=30*60*1000&&parityAt<=Date.now()+60000;
  const schemasMatch=!!r?.schema_version&&!!r?.primary_schema_version&&!!r?.backup_schema_version&&r.primary_schema_version===r.backup_schema_version&&r.schema_version===r.primary_schema_version;
- return !!r&&r.active_target==='backup'&&r.backup_ready===true&&Number.isFinite(Number(r.epoch))&&Number(r.epoch)>0&&typeof r.switch_id==='string'&&r.switch_id.length>0&&schemasMatch;
+ return !!r&&r.active_target==='backup'&&r.backup_ready===true&&r.auth_parity_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.can_switch_to_backup===true&&Number.isFinite(Number(r.epoch))&&Number(r.epoch)>0&&typeof r.switch_id==='string'&&r.switch_id.length>0&&parityFresh&&schemasMatch;
 }
 async function readDualDbRoute(target){
  const cfg=target==='backup'?{ref:'xcdbipgsvohesxhxydep',url:DB2_URL,key:DB2_ROUTE_KEY}:{ref:'wzkjpycjizexxcxrfdvr',url:DB1_URL,key:DB1_ROUTE_KEY};
@@ -43,19 +44,19 @@ async function resolveDualDbRoute(force=false){
  if(dualDbRoutePromise)return dualDbRoutePromise;
  dualDbRoutePromise=(async()=>{
   let primary=null;try{primary=await readDualDbRoute('primary')}catch(_){}
-  if(primary){
-   const route=primary;
-   if(route.active_target==='primary'&&route.primary_ready===true)return rememberDualDbRoute('primary',route);
-   if(route.active_target!=='backup')throw new Error('DB_ROUTE_INVALID_TARGET');
-   if(!routeBackupReady(route))throw new Error('DB_ROUTE_CUTOVER_BLOCKED: parity/readiness/schema/gateway checks are not current');
-   let backup;try{backup=await readDualDbRoute('backup')}catch(_){throw new Error('DB_ROUTE_CUTOVER_INCOMPLETE: DB2 route endpoint is unavailable')}
-   // Each project currently generates its own switch_id. Target+epoch/readiness is the cross-project fence.
-   if(!routeBackupReady(backup)||backup.active_target!=='backup'||Number(backup.epoch)!==Number(route.epoch)||!route.switch_id||!backup.switch_id)throw new Error('DB_ROUTE_CUTOVER_INCOMPLETE: DB1 and DB2 target/epoch controls do not agree');
-   return rememberDualDbRoute('backup',backup);
+  if(!primary)throw new Error('DB_ROUTE_STATUS_UNAVAILABLE: DB1 route authority cannot be verified; automatic failover is disabled');
+  const route=primary;
+  if(!['primary','backup'].includes(route.active_target))throw new Error('DB_ROUTE_INVALID_TARGET');
+  if(route.active_target==='primary'&&route.primary_ready!==true)throw new Error('DB_ROUTE_PRIMARY_NOT_READY');
+  if(route.active_target==='backup'&&!routeBackupReady(route))throw new Error('DB_ROUTE_CUTOVER_BLOCKED: parity/readiness/schema/gateway checks are not current');
+  let backup;try{backup=await readDualDbRoute('backup')}catch(_){throw new Error('DB_ROUTE_CUTOVER_INCOMPLETE: DB2 route endpoint is unavailable; refusing split-brain writes')}
+  if(backup.active_target!==route.active_target||Number(backup.epoch)!==Number(route.epoch)||String(backup.switch_id||'')!==String(route.switch_id||''))throw new Error('DB_ROUTE_CUTOVER_INCOMPLETE: DB1 and DB2 target, epoch, or switch ID differ');
+  if(route.active_target==='primary'){
+   if(backup.primary_ready!==true)throw new Error('DB_ROUTE_PRIMARY_NOT_READY_ON_BOTH_PROJECTS');
+   return rememberDualDbRoute('primary',route);
   }
-  let backup=null;try{backup=await readDualDbRoute('backup')}catch(_){}
-  if(backup&&routeBackupReady(backup))return rememberDualDbRoute('backup',backup);
-  throw new Error('DB_ROUTE_STATUS_UNAVAILABLE: active database cannot be verified safely');
+  if(!routeBackupReady(backup))throw new Error('DB_ROUTE_CUTOVER_BLOCKED: parity/readiness/schema/gateway checks are not current on both projects');
+  return rememberDualDbRoute('backup',backup);
  })();
  try{return await dualDbRoutePromise}finally{dualDbRoutePromise=null}
 }
@@ -113,6 +114,9 @@ else:
 
 if "function readDualDbRoute(" not in html or "function monitorDualDbRoute(" not in html or '<select id="dbTargetApp"' in html:
     raise SystemExit('Post-patch routing structure validation failed')
+for required in ["automatic failover is disabled", "String(backup.switch_id||'')!==String(route.switch_id||'')", "r.auth_parity_ready===true", "r.data_parity_ready===true", "r.routing_gateway_ready===true", "r.can_switch_to_backup===true"]:
+    if required not in html:
+        raise SystemExit('Missing strict DB route consistency guard: '+required)
 
 if "versionCode 40" not in gradle or "versionName '12.1.12'" not in gradle:
     raise SystemExit('Unexpected baseline version; expected v12.1.12 / code 40')
