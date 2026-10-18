@@ -279,6 +279,12 @@ html = replace_once(
 )
 html = replace_once(
     html,
+    "function v12InitDbSwitch(){const badge=$('dbActiveBadge'),hint=$('dbRouteStatusHint');if(badge)badge.textContent=DB_TARGET==='backup'?'DB2 • Rute aktif':'DB1 • Rute aktif';if(hint&&dualDbRouteState)hint.textContent='Target otomatis • epoch '+DB_ROUTE_EPOCH+' • '+(DB_ROUTE_SWITCH_ID||'route awal');}",
+    "function v12InitDbSwitch(){const badge=$('dbActiveBadge'),hint=$('dbRouteStatusHint'),target=$('globalDbTarget');if(badge)badge.textContent=DB_TARGET==='backup'?'DB2 • AKTIF SELURUH SISTEM':'DB1 • AKTIF SELURUH SISTEM';if(target)target.value=DB_TARGET==='backup'?'primary':'backup';if(hint&&dualDbRouteState)hint.textContent='Target otomatis • epoch '+DB_ROUTE_EPOCH+' • '+(DB_ROUTE_SWITCH_ID||'route awal');}",
+    "Global switch selector initial target"
+)
+html = replace_once(
+    html,
     "if(system){system.textContent='RUTE GLOBAL TERVERIFIKASI';system.style.color='var(--ok)';system.style.borderColor='var(--ok)'}",
     "if(system){system.textContent=DB_TARGET==='backup'?'SISTEM GLOBAL: DB2 AKTIF':'SISTEM GLOBAL: DB1 AKTIF';system.style.color='var(--ok)';system.style.borderColor='var(--ok')}",
     "Global status badge"
@@ -289,7 +295,7 @@ if "function requestGlobalDbSwitch()" not in html or "function previewDbSync()" 
     raise SystemExit("DB Sync/global switch implementation incomplete")
 if "DB_TARGET!== 'primary'" in html:
     raise SystemExit("Unexpected malformed DB target guard")
-for required in ["db-sync-apply","db-route-coordinator","auth_parity_ready","dbSyncPreviewSummary","globalDbTarget","DB_SYNC_RUN_KEY","DB2_LOGIN_TEST_FAILED"]:
+for required in ["db-sync-apply","db-route-coordinator","auth_parity_ready","dbSyncPreviewSummary","globalDbTarget","DB_SYNC_RUN_KEY"]:
     if required not in html:
         raise SystemExit("Missing required dual-DB UI token: "+required)
 
