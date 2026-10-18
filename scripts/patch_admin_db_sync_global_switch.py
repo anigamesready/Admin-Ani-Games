@@ -107,7 +107,8 @@ async function adminAccessToken(){
 }
 async function dbSyncCall(action,payload={}){
  const token=await adminAccessToken();
- const response=await fetch(DB2_URL+'/functions/v1/db-sync-apply',{method:'POST',headers:{apikey:DB2_KEY,'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({action,...payload}),cache:'no-store'});
+ const destination=DB_TARGET==='backup'?{url:DB1_URL,key:DB1_KEY,ref:'wzkjpycjizexxcxrfdvr'}:{url:DB2_URL,key:DB2_KEY,ref:'xcdbipgsvohesxhxydep'};
+ const response=await fetch(destination.url+'/functions/v1/db-sync-apply',{method:'POST',headers:{apikey:destination.key,'content-type':'application/json',authorization:'Bearer '+token},body:JSON.stringify({action,...payload}),cache:'no-store'});
  const data=await response.json().catch(()=>({}));
  if(!response.ok||data?.ok!==true)throw new Error(String(data?.error||('DB_SYNC_HTTP_'+response.status)));
  return data;
@@ -120,7 +121,7 @@ function showDbSyncSafetyDetails(){
 }
 async function previewDbSync(){
  const button=document.querySelector('#databaseTools button[onclick="previewDbSync()"]');
- if(DB_TARGET!=='primary')return msg('Preview/sinkronisasi hanya dijalankan ketika DB1 menjadi route aktif.',true);
+ if(!dualDbRouteReady)return msg('Route global belum terverifikasi. Refresh status sebelum preview.',true);
  if(typeof ctx==='undefined'||ctx?.role!=='owner')return msg('Hanya owner yang dapat menjalankan DB Sync.',true);
  if(button)button.disabled=true;
  try{
@@ -134,14 +135,14 @@ async function previewDbSync(){
  finally{if(button)button.disabled=false}
 }
 async function requestDbSync(){
- if(DB_TARGET!=='primary')return msg('DB Sync DB1 → DB2 hanya boleh berjalan saat DB1 menjadi route aktif.',true);
+ if(!dualDbRouteReady)return msg('Route global belum terverifikasi. Refresh status sebelum sinkronisasi.',true);
  if(typeof ctx==='undefined'||ctx?.role!=='owner')return msg('Hanya owner yang dapat menjalankan DB Sync.',true);
  const button=$('dbSyncExecute');if(button)button.disabled=true;
  try{
   const start=await dbSyncCall('start'),runId=String(start.runId||'');
   if(!runId)throw new Error('SYNC_RUN_ID_MISSING');
   localStorage.setItem(DB_SYNC_RUN_KEY,runId);
-  const tables=start.tables||[];let totalRows=0,mismatches=[];
+  const tables=start.tables||[];let totalRows=0,mismatches=[],advisoryMismatches=[];
   dbSyncStatus('Sinkronisasi dimulai. DB1 tetap aktif. Memproses '+tables.length+' tabel…');
   for(let i=0;i<tables.length;i++){
    const table=String(tables[i].table||''),count=Math.max(0,Number(tables[i].count)||0);let offset=0;
@@ -153,7 +154,7 @@ async function requestDbSync(){
     dbSyncStatus('Sinkronisasi '+(i+1)+'/'+tables.length+' • '+table+' '+Math.min(offset,count).toLocaleString('id-ID')+'/'+count.toLocaleString('id-ID')+' baris • total '+totalRows.toLocaleString('id-ID'));
    }
    const verification=await dbSyncCall('verify-table',{runId,table});
-   if(!verification.matched)mismatches.push(table);
+   if(verification.required!==false&&!verification.matched)mismatches.push(table);else if(!verification.matched)advisoryMismatches.push(table);
    dbSyncStatus('Verifikasi '+(i+1)+'/'+tables.length+' • '+table+' • '+(verification.matched?'HASH COCOK':'HASH BERBEDA'));
   }
   const summary=$('dbSyncPreviewSummary');
@@ -165,7 +166,8 @@ async function requestDbSync(){
   if(summary)summary.textContent='Semua '+tables.length+' tabel selesai di-upsert dan hash cocok. Login DB2 untuk owner/admin aktif masih harus diverifikasi.';
   try{
    const ready=await dbSyncCall('mark-ready',{runId});
-   dbSyncStatus('DB Sync berhasil: '+ready.verifiedTables+' tabel lolos hash; '+ready.verifiedOwners+' owner/admin terverifikasi. DB1 tetap aktif sampai pindah global dipilih.');
+   const advisoryText=advisoryMismatches.length?' Riwayat/telemetri yang berubah saat sinkronisasi (non-blocking): '+advisoryMismatches.join(', ')+'.':'';
+   dbSyncStatus('DB Sync berhasil: '+ready.verifiedTables+' tabel utama lolos hash; '+ready.verifiedOwners+' owner/admin terverifikasi. '+(DB_TARGET==='backup'?'DB2':'DB1')+' tetap aktif sampai pindah global dipilih.'+advisoryText);
    msg('DB1 → DB2 selesai dan tervalidasi. Sistem tetap aktif di DB1.',false);
    await checkBothDbApis();return ready;
   }catch(e){
@@ -180,7 +182,7 @@ async function requestDbSync(){
  finally{if(button)button.disabled=false}
 }
 async function verifyDb2OwnerLogin(){
- if(DB_TARGET!=='primary')return msg('Login-test DB2 harus dimulai dari sesi Admin DB1 yang masih aktif.',true);
+ if(!dualDbRouteReady)return msg('Route global belum terverifikasi. Refresh status sebelum login-test.',true);
  if(typeof ctx==='undefined'||ctx?.role!=='owner')return msg('Hanya owner yang dapat memverifikasi login DB2.',true);
  const input=$('dbSyncOwnerPassword'),password=String(input?.value||'');
  if(!password)return msg('Masukkan password yang saat ini berlaku untuk akun ini di DB2. Password tidak disimpan.',true);
