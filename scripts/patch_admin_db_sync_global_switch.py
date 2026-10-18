@@ -36,7 +36,8 @@ html = replace_once(
 html = replace_once(
     html,
     "if(!a.dataParityReady||!b.dataParityReady)problems.push('Parity isi data belum dinyatakan lolos pada kedua project.');",
-    "if(!a.authParityReady||!b.authParityReady)problems.push('Login owner/admin aktif belum diverifikasi pada kedua project.');\n if(!a.dataParityReady||!b.dataParityReady)problems.push('Parity isi data belum dinyatakan lolos pada kedua project.');",
+    "if(a.syncInProgress||b.syncInProgress)problems.push('DB Sync sedang berjalan pada salah satu database. Perpindahan global ditahan.');
+ if(!a.authParityReady||!b.authParityReady)problems.push('Login owner/admin aktif belum diverifikasi pada kedua project.');\n if(!a.dataParityReady||!b.dataParityReady)problems.push('Parity isi data belum dinyatakan lolos pada kedua project.');",
     "Preflight auth blocker"
 )
 
@@ -90,7 +91,7 @@ sync_ui = r'''  <div class="sync-options" style="margin-top:12px">
   <div class="muted" style="margin-top:6px">Password hanya dipakai untuk mencoba login nyata pada DB tujuan. Proses ini tidak menyalin atau mengubah password dan tidak menyimpan token database tujuan.</div>
   <div id="dbSyncSafetyNotice" class="msg">DB Sync melakukan upsert dari database aktif ke database standby. Tidak menghapus baris tujuan; sesi aktif pada sumber tetap berjalan; route baru dapat berubah setelah hash tabel dan login owner/admin lulus.</div>
   <div id="dbSyncProgress" class="msg" role="status" aria-live="polite">Belum ada sinkronisasi dalam sesi ini.</div>
-  <div class="row" style="flex-wrap:wrap"><button type="button" onclick="previewDbSync()">Preview perbedaan</button><button type="button" id="dbSyncExecute" class="primary" onclick="requestDbSync()">Sinkronkan DB1 → DB2</button><button type="button" id="dbSyncVerifyOwner" onclick="verifyDb2OwnerLogin()">Verifikasi login DB tujuan</button><button type="button" onclick="checkBothDbApis()">Refresh status global</button></div>'''
+  <div class="row" style="flex-wrap:wrap"><button type="button" onclick="previewDbSync()">Preview perbedaan</button><button type="button" id="dbSyncExecute" class="primary" onclick="requestDbSync()">Sinkronkan DB1 → DB2</button><button type="button" id="dbSyncVerifyOwner" onclick="verifyDb2OwnerLogin()">Verifikasi login DB tujuan</button><button type="button" onclick="checkBothDbApis()">Refresh status global</button><button type="button" id="dbSyncAbort" onclick="abortDbSync()">Hentikan sync (tetap blokir pindah DB)</button></div>'''
 html = html[:sync_start] + sync_ui + html[sync_end:]
 
 # Compatibility: the old menu entry must use the new global route button, not a removed local selector.
@@ -118,7 +119,7 @@ function dbSyncStatus(text,error=false){
  const el=$('dbSyncProgress');if(el){el.textContent=text;el.style.borderLeftColor=error?'var(--bad)':'var(--ok)';el.setAttribute('aria-live','polite')}
 }
 function showDbSyncSafetyDetails(){
- alert('Sinkronisasi berjalan satu arah DB1 → DB2. Baris dengan ID sama diperbarui; baris DB2 yang tidak ada di DB1 tidak otomatis dihapus. Setelah penulisan, sistem memeriksa hash semua tabel. DB2 tetap terkunci bila ada tabel yang berbeda atau login owner/admin aktif belum terverifikasi.');
+ alert('Sinkronisasi berjalan dari DB yang sedang aktif ke DB standby. Baris dengan ID sama diperbarui; baris target yang tidak ada pada sumber tidak otomatis dihapus. Sesudah upsert, sistem memeriksa hash. Target tetap tidak dapat menjadi aktif bila tabel penting berbeda atau login owner/admin belum terverifikasi.');
 }
 async function previewDbSync(){
  const button=document.querySelector('#databaseTools button[onclick="previewDbSync()"]');
@@ -182,7 +183,7 @@ async function requestDbSync(){
    const ready=await dbSyncCall('mark-ready',{runId});
    const advisoryText=advisoryMismatches.length?' Riwayat/telemetri yang berubah saat sinkronisasi (non-blocking): '+advisoryMismatches.join(', ')+'.':'';
    dbSyncStatus('DB Sync berhasil: '+ready.verifiedTables+' tabel utama lolos hash; '+ready.verifiedOwners+' owner/admin terverifikasi. '+(DB_TARGET==='backup'?'DB2':'DB1')+' tetap aktif sampai pindah global dipilih.'+advisoryText);
-   msg('DB1 → DB2 selesai dan tervalidasi. Sistem tetap aktif di DB1.',false);
+   msg(sourceName+' → '+targetName+' selesai dan tervalidasi. Route aktif tetap tidak berubah.',false);
    await checkBothDbApis();return ready;
   }catch(e){
    const detail=String(e?.message||e);
@@ -217,9 +218,19 @@ async function verifyDb2OwnerLogin(){
     else throw e;
    }
   }
-  msg(result.authParityReady?'Login DB2 terverifikasi untuk semua akun aktif.':'Login DB2 berhasil untuk akun ini; verifikasi akun aktif lainnya masih diperlukan.',!result.authParityReady);
+  msg(result.authParityReady?'Login '+(DB_TARGET==='backup'?'DB1':'DB2')+' terverifikasi untuk semua akun aktif.':'Login database tujuan berhasil untuk akun ini; verifikasi akun aktif lainnya masih diperlukan.',!result.authParityReady);
   return result;
  }catch(e){if(input)input.value='';const text=String(e?.message||e);dbSyncStatus('Verifikasi login DB2 gagal: '+text,true);msg('Verifikasi login DB2 gagal: '+text,true);return {ok:false,error:text}}
+ finally{if(button)button.disabled=false}
+}
+async function abortDbSync(){
+ if(typeof ctx==='undefined'||ctx?.role!=='owner')return msg('Hanya owner yang dapat menghentikan DB Sync.',true);
+ const runId=localStorage.getItem(DB_SYNC_RUN_KEY)||'';
+ if(!runId)return msg('Tidak ada run DB Sync aktif yang tercatat pada perangkat ini.',true);
+ if(!confirm('Hentikan proses sinkronisasi saat ini? Data yang sudah ter-upsert tidak dihapus. Database aktif tetap berjalan, tetapi kesiapan cutover akan tetap gagal sampai sinkronisasi dan verifikasi hash diulang.'))return {ok:false,cancelled:true};
+ const button=$('dbSyncAbort');if(button)button.disabled=true;
+ try{const result=await dbSyncCall('abort',{runId});dbSyncStatus('Sinkronisasi dihentikan. Route aktif tidak berubah; pindah database tetap diblokir sampai sinkronisasi ulang dan hash lulus.');msg('Sync dihentikan dengan aman. DB aktif tetap berjalan.',true);await checkBothDbApis();return result}
+ catch(e){const text=String(e?.message||e);dbSyncStatus('Tidak bisa menghentikan sync: '+text,true);msg('Tidak bisa menghentikan sync: '+text,true);return {ok:false,error:text}}
  finally{if(button)button.disabled=false}
 }
 async function globalRouteStatus(url,key,ref){
@@ -255,7 +266,6 @@ async function requestGlobalDbSwitch(){
   const a=d1.route,b=d2.route;
   if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('DB Sync sedang berjalan. Tunggu sinkronisasi selesai sebelum memindahkan route global.');
   const needsParity=target==='backup'||a.active_target==='backup'||b.active_target==='backup';
-  if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('DB Sync sedang berjalan. Tunggu sampai pemeriksaan selesai sebelum pindah route global.');
   if(needsParity&&(!routeReadyForSwitch(a)||!routeReadyForSwitch(b)||a.schema_version!==b.schema_version)){
    throw new Error('Pindah ditolak. Hash data, login owner/admin, schema, atau gateway belum lulus pada kedua DB. Jalankan DB Sync lalu refresh status.');
   }
@@ -289,7 +299,7 @@ async function requestGlobalDbSwitch(){
 html = replace_once(html, old_placeholder, new_functions, "Active DB sync implementation")
 
 mode_pattern = re.compile(r"function updateDbSyncDirection\(\)\{[^\n]*\}")
-mode_replacement = r"""function updateDbSyncDirection(){const source=DB_TARGET==='backup'?'DB2':'DB1',target=DB_TARGET==='backup'?'DB1':'DB2',sourceLabel=$('dbSyncSourceLabel'),targetLabel=$('dbSyncTargetLabel'),button=$('dbSyncExecute'),verify=$('dbSyncVerifyOwner'),passwordLabel=$('dbSyncOwnerPasswordLabel'),state=$('dbSyncRouteState');if(sourceLabel)sourceLabel.textContent=source+' • Sumber aktif';if(targetLabel)targetLabel.textContent=target+' • Standby tujuan (upsert, tanpa delete)';if(button){button.textContent='Sinkronkan '+source+' → '+target;button.disabled=!dualDbRouteReady||ctx?.role!=='owner'}if(verify){verify.textContent='Verifikasi login '+target;verify.disabled=!dualDbRouteReady||ctx?.role!=='owner'}if(passwordLabel)passwordLabel.textContent='Password '+target+' untuk akun owner yang sedang login';if(state)state.textContent='Route global aktif: '+source+' • standby: '+target+' • epoch '+DB_ROUTE_EPOCH+(dualDbRouteState?.route?.sync_in_progress?' • SYNC BERJALAN':'');}"""
+mode_replacement = r"""function updateDbSyncDirection(){const source=DB_TARGET==='backup'?'DB2':'DB1',target=DB_TARGET==='backup'?'DB1':'DB2',sourceLabel=$('dbSyncSourceLabel'),targetLabel=$('dbSyncTargetLabel'),button=$('dbSyncExecute'),verify=$('dbSyncVerifyOwner'),passwordLabel=$('dbSyncOwnerPasswordLabel'),state=$('dbSyncRouteState');if(sourceLabel)sourceLabel.textContent=source+' • Sumber aktif';if(targetLabel)targetLabel.textContent=target+' • Standby tujuan (upsert, tanpa delete)';if(button){button.textContent='Sinkronkan '+source+' → '+target;button.disabled=!dualDbRouteReady||ctx?.role!=='owner'}if(verify){verify.textContent='Verifikasi login '+target;verify.disabled=!dualDbRouteReady||ctx?.role!=='owner'}if(passwordLabel)passwordLabel.textContent='Password '+target+' untuk akun owner yang sedang login';const syncing=dualDbRouteState?.route?.syncInProgress===true;if(state)state.textContent='Route global aktif: '+source+' • standby: '+target+' • epoch '+DB_ROUTE_EPOCH+(syncing?' • SYNC BERJALAN':'');if(button&&syncing)button.disabled=true;if(verify&&syncing)verify.disabled=true;}"""
 html, count = mode_pattern.subn(mode_replacement, html, count=1)
 if count != 1:
     raise SystemExit("updateDbSyncDirection function anchor mismatch")
@@ -315,11 +325,11 @@ html = replace_once(
 )
 
 # The route must be stable before the owner sees the sync/switch actions as active.
-if "function requestGlobalDbSwitch()" not in html or "function previewDbSync()" not in html or "function verifyDb2OwnerLogin()" not in html:
+if "function requestGlobalDbSwitch()" not in html or "function previewDbSync()" not in html or "function verifyDb2OwnerLogin()" not in html or "function abortDbSync()" not in html:
     raise SystemExit("DB Sync/global switch implementation incomplete")
 if "DB_TARGET!== 'primary'" in html:
     raise SystemExit("Unexpected malformed DB target guard")
-for required in ["db-sync-apply","db-route-coordinator","auth_parity_ready","dbSyncPreviewSummary","globalDbTarget","DB_SYNC_RUN_KEY"]:
+for required in ["db-sync-apply","db-route-coordinator","auth_parity_ready","dbSyncPreviewSummary","globalDbTarget","DB_SYNC_RUN_KEY","abortDbSync"]:
     if required not in html:
         raise SystemExit("Missing required dual-DB UI token: "+required)
 
