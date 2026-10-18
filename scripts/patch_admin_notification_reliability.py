@@ -191,11 +191,20 @@ async function pollPcAdminAlerts(){
  if(adminAlertsPolling||!session||!currentOrg)return;"""
 poll_new = """let adminAlertsPolling=false,adminAlertPollFailureCount=0,adminAlertPollRetryAt=0,adminAlertPollLastNoticeAt=0;
 async function pollPcAdminAlerts(){
- if(adminAlertsPolling||!session||!currentOrg||Date.now()<adminAlertPollRetryAt)return;"""
+ if(adminAlertsPolling||!session||!currentOrg||document.visibilityState==='hidden'||Date.now()<adminAlertPollRetryAt)return;"""
 if 'adminAlertPollRetryAt' not in html:
     if html.count(poll_old) != 1:
         raise SystemExit("Alert poller start anchor mismatch; refusing to patch.")
     html=html.replace(poll_old,poll_new,1)
+
+# Background WebView polling does not guarantee notification delivery when Android throttles
+# or stops the WebView. Do not keep generating API/OPTIONS logs while the Admin UI is hidden.
+poll_guard_backoff = "if(adminAlertsPolling||!session||!currentOrg||Date.now()<adminAlertPollRetryAt)return;"
+poll_guard_foreground = "if(adminAlertsPolling||!session||!currentOrg||document.visibilityState==='hidden'||Date.now()<adminAlertPollRetryAt)return;"
+if poll_guard_foreground not in html:
+    if html.count(poll_guard_backoff) != 1:
+        raise SystemExit("Alert poll visibility guard anchor mismatch; refusing to patch.")
+    html=html.replace(poll_guard_backoff,poll_guard_foreground,1)
 
 success_anchor = """  const rows=await rpc('admin_recent_alerts',{p_org_id:currentOrg.id,p_since:since});
   if(!Array.isArray(rows))return;"""
@@ -269,14 +278,14 @@ if 'window.__aniAdminFetchNoticeAt' not in html:
 
 # Final APK patch version after the existing v12.1.9 hardening passes.
 if "versionCode 37" in gradle and "versionName '12.1.9'" in gradle:
-    gradle = gradle.replace("versionCode 37", "versionCode 39", 1).replace("versionName '12.1.9'", "versionName '12.1.11'", 1)
-elif "versionCode 39" not in gradle or "versionName '12.1.11'" not in gradle:
+    gradle = gradle.replace("versionCode 37", "versionCode 40", 1).replace("versionName '12.1.9'", "versionName '12.1.12'", 1)
+elif "versionCode 40" not in gradle or "versionName '12.1.12'" not in gradle:
     raise SystemExit("Unexpected Android baseline version; refusing to bump blindly")
 
 html_path.write_text(html, encoding="utf-8")
 activity_path.write_text(activity, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
-(ROOT / "VERSION.txt").write_text("v12.1.11-alert-delivery-diagnostics-backoff\n", encoding="utf-8")
+(ROOT / "VERSION.txt").write_text("v12.1.12-foreground-only-low-noise-alert-polling\n", encoding="utf-8")
 
 for token in ("ensureNativeNotificationPermission()", "admin_recent_alerts", "pollPcAdminAlerts"):
     if token not in html:
@@ -284,4 +293,6 @@ for token in ("ensureNativeNotificationPermission()", "admin_recent_alerts", "po
 for token in ("areAdminNotificationsEnabled", "hasPostNotificationPermission", "POST_NOTIFICATIONS"):
     if token not in activity:
         raise SystemExit("Final native notification regression check missing: " + token)
-print("Patched Android permission/status detection, owner-login permission flow, background poll guard and visible poll diagnostics. Version 12.1.11 / versionCode 39.")
+if "document.visibilityState==='hidden'" not in html:
+    raise SystemExit("Foreground-only alert polling guard missing.")
+print("Patched Android permission/status detection, owner-login permission flow, foreground-only alert polling, retry backoff and visible diagnostics. Version 12.1.12 / versionCode 40.")
