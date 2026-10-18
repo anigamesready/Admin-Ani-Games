@@ -128,8 +128,9 @@ async function previewDbSync(){
   const data=await dbSyncCall('preview'),rows=data.tables||[],different=rows.filter(x=>Number(x.sourceCount)!==Number(x.targetCount));
   const sourceTotal=rows.reduce((n,x)=>n+Number(x.sourceCount||0),0),targetTotal=rows.reduce((n,x)=>n+Number(x.targetCount||0),0);
   const summary=$('dbSyncPreviewSummary');
-  if(summary)summary.textContent='Preview: '+rows.length+' tabel • DB1 '+sourceTotal.toLocaleString('id-ID')+' baris • DB2 '+targetTotal.toLocaleString('id-ID')+' baris • '+different.length+' tabel berbeda jumlah. Perbedaan isi dengan jumlah sama akan ditemukan oleh audit hash sesudah upsert.';
-  dbSyncStatus('Preview hanya membaca data. DB1 tetap aktif; belum ada perubahan data.');
+  const sourceName=DB_TARGET==='backup'?'DB2':'DB1',targetName=DB_TARGET==='backup'?'DB1':'DB2';
+  if(summary)summary.textContent='Preview '+sourceName+' → '+targetName+': '+rows.length+' tabel • sumber '+sourceTotal.toLocaleString('id-ID')+' baris • tujuan '+targetTotal.toLocaleString('id-ID')+' baris • '+different.length+' tabel berbeda jumlah. Hash akan diperiksa setelah upsert.';
+  dbSyncStatus('Preview hanya membaca data. '+(DB_TARGET==='backup'?'DB2':'DB1')+' tetap aktif; belum ada perubahan data.');
   return data;
  }catch(e){const text=String(e?.message||e);dbSyncStatus('Preview gagal: '+text,true);msg('Preview DB Sync gagal: '+text,true);return null}
  finally{if(button)button.disabled=false}
@@ -143,7 +144,8 @@ async function requestDbSync(){
   if(!runId)throw new Error('SYNC_RUN_ID_MISSING');
   localStorage.setItem(DB_SYNC_RUN_KEY,runId);
   const tables=start.tables||[];let totalRows=0,mismatches=[],advisoryMismatches=[];
-  dbSyncStatus('Sinkronisasi dimulai. DB1 tetap aktif. Memproses '+tables.length+' tabel…');
+  const sourceName=DB_TARGET==='backup'?'DB2':'DB1',targetName=DB_TARGET==='backup'?'DB1':'DB2';
+  dbSyncStatus('Sinkronisasi '+sourceName+' → '+targetName+' dimulai. '+sourceName+' tetap aktif. Memproses '+tables.length+' tabel…');
   for(let i=0;i<tables.length;i++){
    const table=String(tables[i].table||''),count=Math.max(0,Number(tables[i].count)||0);let offset=0;
    while(offset<count){
@@ -157,13 +159,24 @@ async function requestDbSync(){
    if(verification.required!==false&&!verification.matched)mismatches.push(table);else if(!verification.matched)advisoryMismatches.push(table);
    dbSyncStatus('Verifikasi '+(i+1)+'/'+tables.length+' • '+table+' • '+(verification.matched?'HASH COCOK':'HASH BERBEDA'));
   }
+  // Catch up critical rows after the first pass to reduce races with live writes on the active database.
+  if(mismatches.length){
+   const retryTables=[...mismatches];mismatches=[];
+   for(const table of retryTables){
+    const def=tables.find(x=>String(x.table)===table),count=Math.max(0,Number(def?.count)||0);let offset=0;
+    while(offset<count){const page=await dbSyncCall('apply-page',{runId,table,offset,limit:250});const processed=Math.max(0,Number(page.processed)||0);if(processed===0&&offset<count)throw new Error('SYNC_CATCHUP_EMPTY:'+table+':'+offset);offset+=processed;totalRows+=processed;}
+    const verification=await dbSyncCall('verify-table',{runId,table});
+    if(verification.required!==false&&!verification.matched)mismatches.push(table);else if(!verification.matched)advisoryMismatches.push(table);
+    dbSyncStatus('Catch-up '+table+' • '+(verification.matched?'HASH COCOK':'MASIH BERBEDA'));
+   }
+  }
   const summary=$('dbSyncPreviewSummary');
   if(mismatches.length){
    if(summary)summary.textContent='Penulisan selesai, tetapi hash belum cocok pada: '+mismatches.join(', ')+'. DB2 tetap diblokir; tinjau perbedaan lalu ulangi sync.';
    dbSyncStatus('Data tertulis, verifikasi belum lulus. Tidak ada cutover dilakukan.',true);
    return {ok:false,mismatches};
   }
-  if(summary)summary.textContent='Semua '+tables.length+' tabel selesai di-upsert dan hash cocok. Login DB2 untuk owner/admin aktif masih harus diverifikasi.';
+  if(summary)summary.textContent='Upsert selesai untuk '+tables.length+' tabel. Verifikasi hash data dan login owner/admin '+targetName+' akan menentukan kesiapan database standby.';
   try{
    const ready=await dbSyncCall('mark-ready',{runId});
    const advisoryText=advisoryMismatches.length?' Riwayat/telemetri yang berubah saat sinkronisasi (non-blocking): '+advisoryMismatches.join(', ')+'.':'';
@@ -173,8 +186,8 @@ async function requestDbSync(){
   }catch(e){
    const detail=String(e?.message||e);
    if(detail.includes('AUTH_VERIFICATION_REQUIRED')){
-    dbSyncStatus('Hash data cocok. Setiap akun owner/admin aktif perlu login-test DB2 dari akunnya sendiri. Masukkan password DB2 untuk akun yang sedang login lalu tekan Verifikasi login DB2.');
-    msg('Data DB2 sudah disinkronkan; verifikasi login owner/admin belum lengkap.',true);return {ok:false,authVerificationRequired:true};
+    dbSyncStatus('Hash data cocok. Setiap akun owner/admin aktif perlu login-test '+targetName+' dari akunnya sendiri. Masukkan password target untuk akun yang sedang login lalu tekan Verifikasi login database tujuan.');
+    msg('Data telah disinkronkan; verifikasi login owner/admin belum lengkap.',true);return {ok:false,authVerificationRequired:true};
    }
    throw e;
   }
@@ -189,12 +202,12 @@ async function verifyDb2OwnerLogin(){
  const button=$('dbSyncVerifyOwner');if(button)button.disabled=true;
  try{
   const result=await dbSyncCall('verify-owner-login',{password});if(input)input.value='';
-  dbSyncStatus('Login DB2 berhasil untuk akun ini • '+result.verifiedUserCount+'/'+result.requiredUserCount+' akun aktif terverifikasi.');
+  dbSyncStatus('Login '+(DB_TARGET==='backup'?'DB1':'DB2')+' berhasil untuk akun ini • '+result.verifiedUserCount+'/'+result.requiredUserCount+' akun aktif terverifikasi.');
   const runId=localStorage.getItem(DB_SYNC_RUN_KEY)||'';
   if(runId){
    try{
     const ready=await dbSyncCall('mark-ready',{runId});
-    dbSyncStatus('DB2 SIAP sebagai cadangan. '+ready.verifiedTables+' tabel cocok; '+ready.verifiedOwners+' akun owner/admin login-test lulus. DB1 masih aktif sampai perpindahan global dipilih.');
+    dbSyncStatus('Database tujuan SIAP sebagai standby. '+ready.verifiedTables+' tabel utama cocok; '+ready.verifiedOwners+' akun owner/admin login-test lulus. Route aktif tidak berubah sampai perpindahan global dipilih.');
     await checkBothDbApis();
    }catch(e){
     const detail=String(e?.message||e);
@@ -239,6 +252,7 @@ async function requestGlobalDbSwitch(){
    globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')
   ]);
   const a=d1.route,b=d2.route;
+  if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('DB Sync sedang berjalan. Tunggu sinkronisasi selesai sebelum memindahkan route global.');
   const needsParity=target==='backup'||a.active_target==='backup'||b.active_target==='backup';
   if(needsParity&&(!routeReadyForSwitch(a)||!routeReadyForSwitch(b)||a.schema_version!==b.schema_version)){
    throw new Error('Pindah ditolak. Hash data, login owner/admin, schema, atau gateway belum lulus pada kedua DB. Jalankan DB Sync lalu refresh status.');
@@ -271,6 +285,12 @@ async function requestGlobalDbSwitch(){
  }finally{if(button){button.disabled=false;button.textContent='Pindah seluruh sistem'}}
 }'''
 html = replace_once(html, old_placeholder, new_functions, "Active DB sync implementation")
+
+mode_pattern = re.compile(r"function updateDbSyncDirection\(\)\{[^\n]*\}")
+mode_replacement = r"""function updateDbSyncDirection(){const source=DB_TARGET==='backup'?'DB2':'DB1',target=DB_TARGET==='backup'?'DB1':'DB2',sourceLabel=$('dbSyncSourceLabel'),targetLabel=$('dbSyncTargetLabel'),button=$('dbSyncExecute'),verify=$('dbSyncVerifyOwner'),passwordLabel=$('dbSyncOwnerPasswordLabel'),state=$('dbSyncRouteState');if(sourceLabel)sourceLabel.textContent=source+' • Sumber aktif';if(targetLabel)targetLabel.textContent=target+' • Standby tujuan (upsert, tanpa delete)';if(button){button.textContent='Sinkronkan '+source+' → '+target;button.disabled=!dualDbRouteReady||ctx?.role!=='owner'}if(verify){verify.textContent='Verifikasi login '+target;verify.disabled=!dualDbRouteReady||ctx?.role!=='owner'}if(passwordLabel)passwordLabel.textContent='Password '+target+' untuk akun owner yang sedang login';if(state)state.textContent='Route global aktif: '+source+' • standby: '+target+' • epoch '+DB_ROUTE_EPOCH+(dualDbRouteState?.route?.sync_in_progress?' • SYNC BERJALAN':'');}"""
+html, count = mode_pattern.subn(mode_replacement, html, count=1)
+if count != 1:
+    raise SystemExit("updateDbSyncDirection function anchor mismatch")
 
 # Reflect the actual target in the badge and make the selector propose the opposite target.
 html = replace_once(
