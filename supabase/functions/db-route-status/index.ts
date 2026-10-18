@@ -9,7 +9,7 @@ Deno.serve(async(req:Request)=>{
  let projectRef="unknown";try{projectRef=new URL(url).hostname.split(".")[0]||"unknown"}catch(_){}
  try{
   const db=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
-  const {data:r,error}=await db.from("db_route_control").select("active_target,epoch,updated_at,updated_by,reason,sync_ready,schema_version,switch_id,primary_ready,backup_ready,auth_parity_ready,auth_verified_user_ids,data_parity_ready,routing_gateway_ready,primary_schema_version,backup_schema_version,last_schema_check_at,last_parity_check_at,last_parity_check_note,last_cutover_test_at,cutover_test_note").eq("id",1).maybeSingle();
+  const {data:r,error}=await db.from("db_route_control").select("active_target,epoch,updated_at,updated_by,reason,sync_ready,schema_version,switch_id,primary_ready,backup_ready,auth_parity_ready,auth_verified_user_ids,sync_in_progress,data_parity_ready,routing_gateway_ready,primary_schema_version,backup_schema_version,last_schema_check_at,last_parity_check_at,last_parity_check_note,last_cutover_test_at,cutover_test_note").eq("id",1).maybeSingle();
   if(error||!r)return json(503,{ok:false,readOnly:true,projectRef,error:"route_unavailable"});
   const fresh=!!r.last_parity_check_at&&Date.now()-Date.parse(r.last_parity_check_at)<=30*60*1000&&Date.parse(r.last_parity_check_at)<=Date.now()+60000;
   const versionsMatch=!!r.schema_version&&r.schema_version===r.primary_schema_version&&r.schema_version===r.backup_schema_version;
@@ -22,7 +22,7 @@ Deno.serve(async(req:Request)=>{
    local_profile:projectRef==="xcdbipgsvohesxhxydep"?"backup":"primary",project_ref:projectRef,
    sync_ready:r.sync_ready===true,schema_version:r.schema_version||null,switch_id:r.switch_id||null,
    primary_ready:r.primary_ready===true,backup_ready:r.backup_ready===true,auth_parity_ready:authParity,
-   auth_verified_user_ids:Array.isArray(r.auth_verified_user_ids)?r.auth_verified_user_ids:[],
+   auth_verified_user_ids:Array.isArray(r.auth_verified_user_ids)?r.auth_verified_user_ids:[],sync_in_progress:r.sync_in_progress===true,
    data_parity_ready:dataParity,routing_gateway_ready:gateway,
    primary_schema_version:r.primary_schema_version||null,backup_schema_version:r.backup_schema_version||null,
    can_switch_to_backup:r.backup_ready===true&&readiness,
