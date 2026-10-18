@@ -21,12 +21,12 @@ if old_route_ready in html:
     html = replace_once(html, old_route_ready, new_route_ready, "Admin backup readiness auth guard")
 elif new_route_ready not in html:
     raise SystemExit("Admin backup readiness condition missing; refusing to weaken the cutover guard")
-html = replace_once(
-    html,
-    "backupReady:source.backup_ready===true,syncInProgress:source.sync_in_progress===true,authParityReady:source.auth_parity_ready===true,authVerifiedUserIds:Array.isArray(source.auth_verified_user_ids)?source.auth_verified_user_ids:[],dataParityReady:source.data_parity_ready===true,routingGatewayReady:source.routing_gateway_ready===true",
-    "backupReady:source.backup_ready===true,authParityReady:source.auth_parity_ready===true,authVerifiedUserIds:Array.isArray(source.auth_verified_user_ids)?source.auth_verified_user_ids:[],dataParityReady:source.data_parity_ready===true,routingGatewayReady:source.routing_gateway_ready===true",
-    "Route status auth fields"
-)
+route_status_with_sync = "backupReady:source.backup_ready===true,syncInProgress:source.sync_in_progress===true,authParityReady:source.auth_parity_ready===true,authVerifiedUserIds:Array.isArray(source.auth_verified_user_ids)?source.auth_verified_user_ids:[],dataParityReady:source.data_parity_ready===true,routingGatewayReady:source.routing_gateway_ready===true"
+route_status_without_sync = "backupReady:source.backup_ready===true,authParityReady:source.auth_parity_ready===true,authVerifiedUserIds:Array.isArray(source.auth_verified_user_ids)?source.auth_verified_user_ids:[],dataParityReady:source.data_parity_ready===true,routingGatewayReady:source.routing_gateway_ready===true"
+if route_status_with_sync not in html:
+    if route_status_without_sync not in html:
+        raise SystemExit("Route status mapping anchor missing; refusing to remove sync lock checks")
+    html = replace_once(html, route_status_without_sync, route_status_with_sync, "Route status sync lock field")
 html = replace_once(
     html,
     "' • parity '+(route.dataParityReady?'OK':'NO')+' • gateway '",
