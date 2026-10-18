@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.13 Guarded Dual-DB Auto Routing
+name: Build AniGames Admin V12.1.14 DB Sync + Global Route Switch
 
 on:
   push:
@@ -13,6 +13,11 @@ on:
       - 'scripts/patch_admin_rental_identity_rpc.py'
       - 'scripts/patch_admin_notification_reliability.py'
       - 'scripts/patch_admin_dual_db_routing.py'
+      - 'scripts/patch_admin_db_sync_global_switch.py'
+      - 'supabase/functions/db-route-status/index.ts'
+      - 'supabase/functions/db-route-coordinator/index.ts'
+      - 'supabase/functions/db-sync-export/index.ts'
+      - 'supabase/functions/db-sync-apply/index.ts'
       - 'supabase/functions/ani-games-api/index.ts'
       - 'supabase/functions/ani-games-api/deno.json'
       - 'docs/ADMIN-PC-RECOVERY-MIGRATION.sql'
@@ -49,9 +54,15 @@ jobs:
           cp scripts/patch_admin_rental_identity_rpc.py "$PROJECT_DIR/patch_admin_rental_identity_rpc.py"
           cp scripts/patch_admin_notification_reliability.py "$PROJECT_DIR/patch_admin_notification_reliability.py"
           cp scripts/patch_admin_dual_db_routing.py "$PROJECT_DIR/patch_admin_dual_db_routing.py"
+          cp scripts/patch_admin_db_sync_global_switch.py "$PROJECT_DIR/patch_admin_db_sync_global_switch.py"
           mkdir -p "$PROJECT_DIR/supabase/functions/ani-games-api"
           cp supabase/functions/ani-games-api/index.ts "$PROJECT_DIR/supabase/functions/ani-games-api/index.ts"
           cp supabase/functions/ani-games-api/deno.json "$PROJECT_DIR/supabase/functions/ani-games-api/deno.json"
+          for FUNCTION in db-route-status db-route-coordinator db-sync-export db-sync-apply; do
+            mkdir -p "$PROJECT_DIR/supabase/functions/$FUNCTION"
+            cp "supabase/functions/$FUNCTION/index.ts" "$PROJECT_DIR/supabase/functions/$FUNCTION/index.ts"
+            cp "supabase/functions/$FUNCTION/deno.json" "$PROJECT_DIR/supabase/functions/$FUNCTION/deno.json"
+          done
           echo "ANDROID_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Detected source: $PROJECT_DIR"
 
@@ -65,7 +76,8 @@ jobs:
           python3 patch_admin_dual_db_preflight.py
           python3 patch_admin_rental_identity_rpc.py
           python3 patch_admin_notification_reliability.py
-          python3 patch_admin_dual_db_routing.py
+          python3 patch_admin_dual_db_routing.py patch_admin_db_sync_global_switch.py
+          python3 patch_admin_db_sync_global_switch.py
 
       - name: Regression and static checks
         shell: bash
@@ -88,7 +100,7 @@ jobs:
           duplicates = sorted({x for x in ids if ids.count(x) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
-          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "NETWORK_FETCH_FAILED • ", "adminAlertPollRetryAt", "retry_ms=", "window.__aniAdminFetchNoticeAt", "resolveDualDbRoute", "routeBackupReady", "DB_ROUTE_CUTOVER_INCOMPLETE", "Pergantian DB manual dinonaktifkan"]
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "BACKEND_NOT_READY", "Sinkronisasi menunggu backend", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "NETWORK_FETCH_FAILED • ", "adminAlertPollRetryAt", "retry_ms=", "window.__aniAdminFetchNoticeAt", "resolveDualDbRoute", "routeBackupReady", "DB_ROUTE_CUTOVER_INCOMPLETE", "requestGlobalDbSwitch", "previewDbSync", "verifyDb2OwnerLogin", "dbSyncCall", "dbSyncPreviewSummary", "globalDbTarget", "Pindah seluruh sistem", "Sinkronkan DB1 → DB2", "auth_parity_ready"]
           activity = (root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
           manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           for token in ["NotificationChannel", "AdminNotificationBridge", "POST_NOTIFICATIONS", "openNotificationSettings"]:
@@ -110,7 +122,7 @@ jobs:
           if html.count("rpc('admin_update_rental_identity'") != 1:
               raise SystemExit("Audited rental identity RPC call missing or duplicated")
           gradle = (root / "android/app/build.gradle").read_text()
-          if "versionCode 41" not in gradle or "versionName '12.1.13'" not in gradle:
+          if "versionCode 42" not in gradle or "versionName '12.1.14'" not in gradle:
               raise SystemExit("Version bump check failed")
           print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, Android notification bridge + foreground-only low-noise alert polling present")
           PY
@@ -154,14 +166,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zip -qr AniGames-Admin-V12.1.13-DUAL-DB-AUTO-ROUTING-SOURCE.zip "$ANDROID_PROJECT_DIR"
+          zip -qr AniGames-Admin-V12.1.14-DB-SYNC-GLOBAL-SWITCH-SOURCE.zip "$ANDROID_PROJECT_DIR"
 
       - name: Upload APK and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-V12.1.13-DUAL-DB-AUTO-ROUTING-DB1-IOT-FIX
+          name: AniGames-Admin-V12.1.14-DB-SYNC-GLOBAL-SWITCH
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
-            AniGames-Admin-V12.1.13-DUAL-DB-AUTO-ROUTING-SOURCE.zip
+            AniGames-Admin-V12.1.14-DB-SYNC-GLOBAL-SWITCH-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
