@@ -23,7 +23,7 @@ html = replace_once(
 )
 html = replace_once(
     html,
-    "backupReady:source.backup_ready===true,dataParityReady:source.data_parity_ready===true,routingGatewayReady:source.routing_gateway_ready===true",
+    "backupReady:source.backup_ready===true,syncInProgress:source.sync_in_progress===true,authParityReady:source.auth_parity_ready===true,authVerifiedUserIds:Array.isArray(source.auth_verified_user_ids)?source.auth_verified_user_ids:[],dataParityReady:source.data_parity_ready===true,routingGatewayReady:source.routing_gateway_ready===true",
     "backupReady:source.backup_ready===true,authParityReady:source.auth_parity_ready===true,authVerifiedUserIds:Array.isArray(source.auth_verified_user_ids)?source.auth_verified_user_ids:[],dataParityReady:source.data_parity_ready===true,routingGatewayReady:source.routing_gateway_ready===true",
     "Route status auth fields"
 )
@@ -40,6 +40,7 @@ html = replace_once(
     "Preflight auth blocker"
 )
 
+# Keep the DB sync panel direction in sync with the globally active database.
 # Prominent system-wide active database badge and global switch selector.
 html = replace_once(
     html,
@@ -254,6 +255,7 @@ async function requestGlobalDbSwitch(){
   const a=d1.route,b=d2.route;
   if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('DB Sync sedang berjalan. Tunggu sinkronisasi selesai sebelum memindahkan route global.');
   const needsParity=target==='backup'||a.active_target==='backup'||b.active_target==='backup';
+  if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('DB Sync sedang berjalan. Tunggu sampai pemeriksaan selesai sebelum pindah route global.');
   if(needsParity&&(!routeReadyForSwitch(a)||!routeReadyForSwitch(b)||a.schema_version!==b.schema_version)){
    throw new Error('Pindah ditolak. Hash data, login owner/admin, schema, atau gateway belum lulus pada kedua DB. Jalankan DB Sync lalu refresh status.');
   }
