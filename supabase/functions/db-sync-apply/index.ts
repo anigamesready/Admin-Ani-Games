@@ -104,7 +104,7 @@ async function handler(req:Request){
     run=created;
    }
    await sourceCall(token,"start-sync",{note:"Cross-database sync is running. Current active route remains online; route changes are locked until verification."});
-   const {error:targetError}=await admin.from("db_route_control").update({sync_in_progress:true,last_parity_check_note:"DB Sync in progress. Current global route remains online; switch requests are locked."}).eq("id",1);
+   const {error:targetError}=await admin.from("db_route_control").update({sync_in_progress:true,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_at:null,last_parity_check_note:"DB Sync in progress. Current global route remains online; cutover locked."}).eq("id",1);
    if(targetError)throw new Error("TARGET_SYNC_LOCK_FAILED");
    const manifest=await sourceCall(token,"manifest");
    return out(200,{ok:true,runId:run.id,startedAt:run.started_at,tables:manifest.tables,sourceRef:PEER_REF,targetRef:SELF_REF});
@@ -171,6 +171,17 @@ async function handler(req:Request){
    const {error:runError}=await admin.from("db_sync_runs").update({state:"verified",completed_at:now,summary:{mode:"upsert_active_source_to_standby",tablesVerified:expected.length,advisoryTables:advisory,authVerified:ids.length}}).eq("id",runId);
    if(runError)throw new Error("SYNC_RUN_FINALIZE_FAILED");
    return out(200,{ok:true,runId,verifiedTables:expected.length,advisoryTables:advisory,verifiedOwners:ids.length,ready:true,sourceRef:PEER_REF,targetRef:SELF_REF,message:"Standby database verified. Active route remains unchanged until the global switch is requested."});
+  }
+  if(action==="abort"){
+   const runId=String(body.runId||"");
+   const run=await runRow(admin,runId,user.id);
+   await sourceCall(token,"finish-sync",{note:"DB Sync was stopped before parity completed. Route switch stays blocked until a clean sync succeeds."});
+   const now=new Date().toISOString();
+   const {error:unlockError}=await admin.from("db_route_control").update({sync_in_progress:false,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_at:null,last_parity_check_note:"DB Sync stopped; a complete table-hash verification is required before any route switch."}).eq("id",1);
+   if(unlockError)throw new Error("TARGET_SYNC_UNLOCK_FAILED");
+   const {error:runError}=await admin.from("db_sync_runs").update({state:"failed",completed_at:now,summary:{mode:"upsert_active_source_to_standby",aborted:true,reason:"owner_abort"}}).eq("id",runId);
+   if(runError)throw new Error("SYNC_RUN_FINALIZE_FAILED");
+   return out(200,{ok:true,runId,aborted:true,cutoverReady:false,message:"Sync stopped. Current database remains active; switching stays blocked until sync and parity verification pass."});
   }
   if(action==="status"){
    const route=await routeRow(admin);
