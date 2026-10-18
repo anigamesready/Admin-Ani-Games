@@ -32,11 +32,12 @@ async function authorize(token:string,admin:any){
 }
 function requireBackupReadiness(a:any,b:any){
  if(a.projectRef!=="wzkjpycjizexxcxrfdvr"||b.projectRef!=="xcdbipgsvohesxhxydep")throw new Error("PROJECT_ID_MISMATCH");
+ if(a.route?.sync_in_progress===true||b.route?.sync_in_progress===true)throw new Error("SYNC_IN_PROGRESS: wait for DB Sync to complete before switching");
  if(!a.ready||!b.ready||!a.schema||!b.schema||!a.fresh||!b.fresh)throw new Error("CUTOVER_BLOCKED: both DBs require verified recent table and auth parity, schema equality and gateway readiness");
  if(a.route.schema_version!==b.route.schema_version)throw new Error("SCHEMA_VERSION_MISMATCH");
 }
 async function localRoute(admin:any){
- const {data,error}=await admin.from("db_route_control").select("active_target,epoch,switch_id,updated_at,schema_version,primary_schema_version,backup_schema_version,primary_ready,backup_ready,auth_parity_ready,data_parity_ready,routing_gateway_ready,last_parity_check_at").eq("id",1).single();
+ const {data,error}=await admin.from("db_route_control").select("active_target,epoch,switch_id,updated_at,schema_version,primary_schema_version,backup_schema_version,primary_ready,backup_ready,auth_parity_ready,data_parity_ready,routing_gateway_ready,last_parity_check_at,sync_in_progress").eq("id",1).single();
  if(error||!data)throw new Error("LOCAL_ROUTE_CONTROL_UNAVAILABLE");return data;
 }
 async function handler(req:Request){
@@ -49,11 +50,12 @@ async function handler(req:Request){
   const localRef=new URL(url).hostname.split(".")[0];
   const remote=localRef==="wzkjpycjizexxcxrfdvr"?await routeAt(DB2_URL,DB2_KEY):await routeAt(DB1_URL,DB1_KEY);
   const local=await localRoute(admin);
-  const current={projectRef:localRef,route:local,fresh:!!local.last_parity_check_at&&Date.now()-Date.parse(local.last_parity_check_at)<=30*60*1000,schema:!!local.schema_version&&local.schema_version===local.primary_schema_version&&local.schema_version===local.backup_schema_version,ready:local.backup_ready===true&&local.auth_parity_ready===true&&local.data_parity_ready===true&&local.routing_gateway_ready===true};
+  const current={projectRef:localRef,route:local,fresh:!!local.last_parity_check_at&&Date.now()-Date.parse(local.last_parity_check_at)<=30*60*1000&&Date.parse(local.last_parity_check_at)<=Date.now()+60000,schema:!!local.schema_version&&local.schema_version===local.primary_schema_version&&local.schema_version===local.backup_schema_version,ready:local.backup_ready===true&&local.auth_parity_ready===true&&local.data_parity_ready===true&&local.routing_gateway_ready===true,syncInProgress:local.sync_in_progress===true};
   if(action==="status")return out(200,{ok:true,local:current,remote});
   const target=String(body.target||"");
   if(action==="switch"){
    if(target!=="primary"&&target!=="backup")throw new Error("INVALID_DB_TARGET");
+   if(local.syncInProgress||remote.route?.sync_in_progress===true)throw new Error("SYNC_IN_PROGRESS: wait for DB Sync to complete before switching");
    if(target==="backup"||local.route.active_target==="backup")requireBackupReadiness(localRef==="wzkjpycjizexxcxrfdvr"?current:remote,localRef==="wzkjpycjizexxcxrfdvr"?remote:current);
    const epoch=Math.trunc(Number(body.epoch)),switchId=String(body.switchId||""),reason=String(body.reason||"Admin global DB switch").slice(0,160);
    if(!Number.isInteger(epoch)||epoch<1||!switchId)throw new Error("SWITCH_EPOCH_OR_ID_REQUIRED");
