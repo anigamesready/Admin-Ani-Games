@@ -124,9 +124,13 @@ html = html[:anchor.start()] + functions + html[anchor.start():]
 
 gradle_path = Path('android/app/build.gradle')
 gradle = gradle_path.read_text(encoding='utf-8')
-if "versionCode 32" not in gradle or "versionName '12.1.0'" not in gradle:
-    raise SystemExit('Unexpected baseline Android version; refusing to bump blindly')
-gradle = gradle.replace('versionCode 32', 'versionCode 34', 1).replace("versionName '12.1.0'", "versionName '12.1.6'", 1)
+if "versionCode 32" in gradle and "versionName '12.1.0'" in gradle:
+    gradle = gradle.replace('versionCode 32', 'versionCode 34', 1).replace("versionName '12.1.0'", "versionName '12.1.6'", 1)
+elif "versionCode 33" in gradle and "versionName '12.1.4'" in gradle:
+    # This repository carries the v12.1.4 source ZIP, not the older v12.1.0 ZIP.
+    gradle = gradle.replace('versionCode 33', 'versionCode 34', 1).replace("versionName '12.1.4'", "versionName '12.1.6'", 1)
+else:
+    raise SystemExit('Unexpected Android baseline; expected v12.1.0/code32 or v12.1.4/code33')
 gradle_path.write_text(gradle, encoding='utf-8')
 Path('VERSION.txt').write_text('v12.1.6-admin-pc-enrollment-db2-alerts\n', encoding='utf-8')
 html_path.write_text(html, encoding='utf-8')

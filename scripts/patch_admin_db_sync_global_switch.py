@@ -15,12 +15,12 @@ def replace_once(source, old, new, label):
     return source.replace(old, new, 1)
 
 # Make the route readiness result explicitly include authentication parity.
-html = replace_once(
-    html,
-    "r.backup_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.can_switch_to_backup===true",
-    "r.backup_ready===true&&r.auth_parity_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.can_switch_to_backup===true",
-    "Admin backup readiness auth guard"
-)
+old_route_ready = "r.backup_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.can_switch_to_backup===true"
+new_route_ready = "r.backup_ready===true&&r.auth_parity_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.can_switch_to_backup===true"
+if old_route_ready in html:
+    html = replace_once(html, old_route_ready, new_route_ready, "Admin backup readiness auth guard")
+elif new_route_ready not in html:
+    raise SystemExit("Admin backup readiness condition missing; refusing to weaken the cutover guard")
 html = replace_once(
     html,
     "backupReady:source.backup_ready===true,syncInProgress:source.sync_in_progress===true,authParityReady:source.auth_parity_ready===true,authVerifiedUserIds:Array.isArray(source.auth_verified_user_ids)?source.auth_verified_user_ids:[],dataParityReady:source.data_parity_ready===true,routingGatewayReady:source.routing_gateway_ready===true",
