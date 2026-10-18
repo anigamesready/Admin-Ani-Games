@@ -76,7 +76,7 @@ jobs:
           python3 patch_admin_dual_db_preflight.py
           python3 patch_admin_rental_identity_rpc.py
           python3 patch_admin_notification_reliability.py
-          python3 patch_admin_dual_db_routing.py patch_admin_db_sync_global_switch.py
+          python3 patch_admin_dual_db_routing.py
           python3 patch_admin_db_sync_global_switch.py
 
       - name: Regression and static checks
@@ -126,7 +126,7 @@ jobs:
               raise SystemExit("Version bump check failed")
           print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, Android notification bridge + foreground-only low-noise alert polling present")
           PY
-          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py patch_admin_rental_identity_rpc.py patch_admin_notification_reliability.py patch_admin_dual_db_routing.py
+          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py patch_admin_rental_identity_rpc.py patch_admin_notification_reliability.py patch_admin_dual_db_routing.py patch_admin_db_sync_global_switch.py
           unzip -t "$GITHUB_WORKSPACE/AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip"
 
       - name: Set up JDK 17
