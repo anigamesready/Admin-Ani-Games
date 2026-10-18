@@ -128,8 +128,9 @@ async function handler(req:Request){
     if(insertError||!created)throw new Error("SYNC_RUN_CREATE_FAILED");
     run=created;
    }
-   let sourceLocked=false,targetLocked=false;
+   let sourceLockAttempted=false,targetLocked=false;
    try{
+    sourceLockAttempted=true;
     await sourceCall(token,"start-sync",{note:"Cross-database sync is running. Current active route remains online; route changes are locked until verification."});
     sourceLocked=true;
     const {error:targetError}=await admin.from("db_route_control").update({sync_in_progress:true,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_at:null,last_parity_check_note:"DB Sync in progress. Current global route remains online; cutover locked."}).eq("id",1);
@@ -139,7 +140,7 @@ async function handler(req:Request){
     return out(200,{ok:true,runId:run.id,startedAt:run.started_at,tables:manifest.tables,sourceRef:PEER_REF,targetRef:SELF_REF});
    }catch(startError){
     // Never leave only one database locked if the second lock or manifest read fails.
-    if(sourceLocked){try{await sourceCall(token,"finish-sync",{note:"DB Sync start failed before page processing; both routes remain blocked pending a fresh parity check."})}catch(_){}}
+    if(sourceLockAttempted){try{await sourceCall(token,"finish-sync",{note:"DB Sync start failed before page processing; both routes remain blocked pending a fresh parity check."})}catch(_){}}
     if(targetLocked){try{await admin.from("db_route_control").update({sync_in_progress:false,data_parity_ready:false,routing_gateway_ready:false,sync_ready:false,last_parity_check_at:null,last_parity_check_note:"DB Sync start failed before page processing; route changes remain blocked until a fresh parity check."}).eq("id",1)}catch(_){}}
     try{await admin.from("db_sync_runs").update({state:"failed",completed_at:new Date().toISOString(),summary:{mode:"upsert_active_source_to_standby",startFailed:true}}).eq("id",run.id)}catch(_){}
     throw startError;
