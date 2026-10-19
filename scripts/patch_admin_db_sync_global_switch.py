@@ -396,3 +396,153 @@ html_path.write_text(html,encoding="utf-8")
 gradle_path.write_text(gradle,encoding="utf-8")
 version_path.write_text("v12.1.14-admin-db-sync-global-switch\n",encoding="utf-8")
 print("Applied active DB1→DB2 sync UI, owner DB2 login verification, global route coordinator controls and DB badge; Android v12.1.14 / code 42")
+
+
+# V12.1.15 final additive safety patch. Keep source ZIP/master assets untouched.
+_final_html = html_path.read_text(encoding='utf-8')
+def _final_replace_once(source, old, new, label):
+    count = source.count(old)
+    if count == 0:
+        if new in source:
+            return source
+        raise SystemExit(label + ': source anchor missing; refusing patch')
+    if count != 1:
+        raise SystemExit(label + ': expected one anchor, found ' + str(count))
+    return source.replace(old, new, 1)
+
+_old_route_final = """function routeBackupReady(r){
+ const parityAt=Date.parse(r?.last_parity_check_at||'');
+ const parityFresh=Number.isFinite(parityAt)&&Date.now()-parityAt<=30*60*1000&&parityAt<=Date.now()+60000;
+ const schemasMatch=!!r?.schema_version&&!!r?.primary_schema_version&&!!r?.backup_schema_version&&r.primary_schema_version===r.backup_schema_version&&r.schema_version===r.primary_schema_version;
+ return !!r&&r.active_target==='backup'&&r.backup_ready===true&&r.auth_parity_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.can_switch_to_backup===true&&Number.isFinite(Number(r.epoch))&&Number(r.epoch)>0&&typeof r.switch_id==='string'&&r.switch_id.length>0&&parityFresh&&schemasMatch;
+}"""
+_new_route_final = """function routeFinalizedActive(r){
+ if(!r||r.active_target!=='backup'||!Number.isFinite(Number(r.epoch))||Number(r.epoch)<1||!r.switch_id)return false;
+ const expected='Coordinated global route finalized: backup epoch '+Number(r.epoch)+' switch '+String(r.switch_id);
+ return !!r.last_cutover_test_at&&String(r.cutover_test_note||'')===expected;
+}
+function routeBackupReady(r){
+ // Exact persisted finalization preserves an already-active backup route; it does not authorize another switch.
+ if(routeFinalizedActive(r))return true;
+ const parityAt=Date.parse(r?.last_parity_check_at||'');
+ const parityFresh=Number.isFinite(parityAt)&&Date.now()-parityAt<=30*60*1000&&parityAt<=Date.now()+60000;
+ const schemasMatch=!!r?.schema_version&&!!r?.primary_schema_version&&!!r?.backup_schema_version&&r.primary_schema_version===r.backup_schema_version&&r.schema_version===r.primary_schema_version;
+ return !!r&&r.active_target==='backup'&&r.backup_ready===true&&r.auth_parity_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.can_switch_to_backup===true&&Number.isFinite(Number(r.epoch))&&Number(r.epoch)>0&&typeof r.switch_id==='string'&&r.switch_id.length>0&&parityFresh&&schemasMatch;
+}"""
+if 'function routeFinalizedActive(r)' not in _final_html:
+    _final_html = _final_replace_once(_final_html, _old_route_final, _new_route_final, 'Admin finalized-route continuity')
+
+_final_html = _final_replace_once(
+    _final_html,
+    "const DB_SYNC_RUN_KEY='ani_games_db_sync_active_run_v1';",
+    "const DB_SYNC_RUN_KEY='ani_games_db_sync_active_run_v1',DB_SYNC_HOLD_QUIESCE_KEY='ani_games_db_sync_hold_quiesce_v1';",
+    'Admin sync-hold key'
+)
+_final_html = _final_replace_once(
+    _final_html,
+    'async function requestDbSync(){',
+    "async function requestDbSync(options={}){\n const holdQuiesce=options?.holdQuiesce===true;\n try{localStorage.setItem(DB_SYNC_HOLD_QUIESCE_KEY,holdQuiesce?'1':'0')}catch(_){}",
+    'Admin sync function signature'
+)
+_old_mismatch = "if(verification.required!==false&&!verification.matched)mismatches.push(table);else if(!verification.matched)advisoryMismatches.push(table);"
+if _final_html.count(_old_mismatch) != 2:
+    raise SystemExit('Admin all-table verification anchor count mismatch: ' + str(_final_html.count(_old_mismatch)))
+_final_html = _final_html.replace(_old_mismatch, 'if(!verification.matched)mismatches.push(table);', 2)
+
+_old_success_final = """   const ready=await dbSyncCall('mark-ready',{runId});
+   localStorage.removeItem(DB_SYNC_RUN_KEY);activeRunId='';
+   const advisoryText=advisoryMismatches.length?' Riwayat/telemetri yang berubah saat sinkronisasi (non-blocking): '+advisoryMismatches.join(', ')+'.':'';
+   dbSyncStatus('Verifikasi data selesai: '+ready.verifiedTables+' tabel utama lolos hash; '+ready.verifiedOwners+' owner/admin terverifikasi. '+(ready.gatewayReady?'Gateway bersama juga terverifikasi.':'Gateway bersama BELUM terverifikasi; cutover tetap diblokir.')+' '+sourceName+' tetap aktif.'+advisoryText,ready.gatewayReady!==true);
+   msg(ready.gatewayReady?sourceName+' → '+targetName+' selesai dan siap sebagai standby; route aktif tetap tidak berubah.':sourceName+' → '+targetName+' data/schema/auth parity lulus, tetapi gateway bersama belum siap sehingga perpindahan DB tetap diblokir.',ready.gatewayReady!==true);
+   await checkBothDbApis();return ready;"""
+_new_success_final = """   const ready=await dbSyncCall('mark-ready',{runId});
+   localStorage.removeItem(DB_SYNC_RUN_KEY);activeRunId='';
+   if(!holdQuiesce){
+    const resumed=await rpc('release_active_sync_quiesce');
+    localStorage.removeItem(DB_SYNC_HOLD_QUIESCE_KEY);
+    dbSyncStatus('Copy + hash selesai. Penulisan database aktif dibuka kembali; kesiapan standby sengaja dinonaktifkan sampai sinkronisasi final saat Pindah Seluruh Sistem.',false);
+    msg(sourceName+' → '+targetName+' selesai disalin. DB aktif kembali menerima penulisan; sebelum cutover, jalankan Pindah Seluruh Sistem untuk final sync/parity terbaru.');
+    await checkBothDbApis();return {...ready,ok:true,ready:false,standaloneResumed:true,writeQuiesce:false,readinessInvalidated:resumed?.standby_ready===false};
+   }
+   localStorage.removeItem(DB_SYNC_HOLD_QUIESCE_KEY);
+   const changedTables=advisoryMismatches.length?' Tabel yang berubah saat sinkronisasi: '+advisoryMismatches.join(', ')+'.':'';
+   dbSyncStatus('Verifikasi data selesai: '+ready.verifiedTables+' tabel lolos hash; '+ready.verifiedOwners+' owner/admin terverifikasi. '+(ready.gatewayReady?'Gateway bersama juga terverifikasi.':'Gateway bersama BELUM terverifikasi; cutover tetap diblokir.')+' Penulisan tetap dijeda aman sampai switch global selesai.'+changedTables,ready.gatewayReady!==true);
+   msg(ready.gatewayReady?sourceName+' → '+targetName+' lolos verifikasi dan ditahan dalam mode cutover.':sourceName+' → '+targetName+' belum memenuhi gateway bersama; cutover tetap diblokir.',ready.gatewayReady!==true);
+   await checkBothDbApis();return ready;"""
+_final_html = _final_replace_once(_final_html, _old_success_final, _new_success_final, 'Admin sync-success release policy')
+
+_final_html = _final_html.replace("try{await dbSyncCall('abort',{runId});localStorage.removeItem(DB_SYNC_RUN_KEY);activeRunId='';released=true}catch(_){}", "try{await dbSyncCall('abort',{runId});localStorage.removeItem(DB_SYNC_RUN_KEY);localStorage.removeItem(DB_SYNC_HOLD_QUIESCE_KEY);activeRunId='';released=true}catch(_){}", 1)
+_final_html = _final_html.replace("try{await dbSyncCall('abort',{runId:activeRunId});localStorage.removeItem(DB_SYNC_RUN_KEY);lockReleased=true}catch(_){}", "try{await dbSyncCall('abort',{runId:activeRunId});localStorage.removeItem(DB_SYNC_RUN_KEY);localStorage.removeItem(DB_SYNC_HOLD_QUIESCE_KEY);lockReleased=true}catch(_){}", 1)
+
+_old_auth_final = """    const ready=await dbSyncCall('mark-ready',{runId});readyGatewayAfterAuth=ready.gatewayReady===true;
+    if(ready.dataVerified===true)localStorage.removeItem(DB_SYNC_RUN_KEY);
+    dbSyncStatus(ready.gatewayReady?'Database tujuan SIAP sebagai standby. '+ready.verifiedTables+' tabel utama cocok; '+ready.verifiedOwners+' akun owner/admin login-test lulus. Route aktif tidak berubah sampai perpindahan global dipilih.':'Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan.',ready.gatewayReady!==true);
+    await checkBothDbApis();"""
+_new_auth_final = """    const ready=await dbSyncCall('mark-ready',{runId});readyGatewayAfterAuth=ready.gatewayReady===true;
+    if(ready.dataVerified===true)localStorage.removeItem(DB_SYNC_RUN_KEY);
+    const hold=localStorage.getItem(DB_SYNC_HOLD_QUIESCE_KEY)==='1';
+    if(ready.gatewayReady===true&&!hold){
+     await rpc('release_active_sync_quiesce');localStorage.removeItem(DB_SYNC_HOLD_QUIESCE_KEY);
+     dbSyncStatus('Login terverifikasi. Copy selesai dan penulisan aktif dibuka kembali; parity standby harus diperbarui pada final sync sebelum perpindahan global.');
+    }else{
+     localStorage.removeItem(DB_SYNC_HOLD_QUIESCE_KEY);
+     dbSyncStatus(ready.gatewayReady?'Database tujuan lolos hash/login/gateway. Penulisan ditahan agar perpindahan global dapat difinalisasi.':'Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan.',ready.gatewayReady!==true);
+    }
+    await checkBothDbApis();"""
+_final_html = _final_replace_once(_final_html, _old_auth_final, _new_auth_final, 'Admin deferred-login release policy')
+
+_final_html = _final_replace_once(_final_html, 'const sync=await requestDbSync();', 'const sync=await requestDbSync({holdQuiesce:true});', 'Global switch keeps write quiesce')
+_final_html = _final_replace_once(
+ _final_html,
+ " if(button){button.disabled=true;button.textContent='Memeriksa…'}\n try{\n  let [d1,d2]=await Promise.all([",
+ " if(button){button.disabled=true;button.textContent='Memeriksa…'}\n let routeStageStarted=false;\n try{\n  let [d1,d2]=await Promise.all([",
+ 'Global switch stage-start tracker'
+)
+_final_html = _final_replace_once(
+ _final_html,
+ "  for(const p of order)await routeCoordinatorCall(p.url,p.key,token,{action:'switch',...payload});",
+ "  routeStageStarted=true;\n  for(const p of order)await routeCoordinatorCall(p.url,p.key,token,{action:'switch',...payload});",
+ 'Global switch stage marker'
+)
+_old_catch_final = """ }catch(e){
+  const text=String(e?.message||e);dbSyncStatus('Perpindahan global ditolak atau belum lengkap: '+text,true);msg('Perpindahan database tidak diklaim berhasil: '+text,true);
+  try{await checkBothDbApis()}catch(_){}
+  return {ok:false,error:text};"""
+_new_catch_final = """ }catch(e){
+  const text=String(e?.message||e);dbSyncStatus('Perpindahan global ditolak atau belum lengkap: '+text,true);msg('Perpindahan database tidak diklaim berhasil: '+text,true);
+  if(!routeStageStarted){
+   try{
+    const [x,y]=await Promise.all([globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')]);
+    const rx=x.route,ry=y.route,stillAligned=rx.active_target===ry.active_target&&Number(rx.epoch)===Number(ry.epoch)&&String(rx.switch_id||'')===String(ry.switch_id||'');
+    if(stillAligned&&rx.sync_in_progress!==true&&ry.sync_in_progress!==true&&rx.sync_write_quiesce===true&&ry.sync_write_quiesce===true){
+     await rpc('release_active_sync_quiesce');
+     dbSyncStatus('Switch belum dimulai. Penulisan pada DB yang tetap aktif dibuka kembali; parity standby dinonaktifkan sampai sinkronisasi final berikutnya.');
+    }
+   }catch(_) { /* fail closed: keep quiesce if safe recovery cannot be proven */ }
+  }
+  try{await checkBothDbApis()}catch(_){}
+  return {ok:false,error:text};"""
+if _old_catch_final not in _final_html:
+    _old_catch_final = _old_catch_final.replace('catch(_){}','catch(_){}')
+    raise SystemExit('Admin global-switch catch anchor missing; refusing unsafe release behavior')
+_final_html = _final_html.replace(_old_catch_final, _new_catch_final, 1)
+_final_html = _final_html.replace('for: critical rows after the first pass to reduce races with live writes on the active database.', 'for: second-pass verification while the active source is write-quiesced.')
+_final_html = _final_html.replace('Source tetap aktif. Memproses', 'Sumber tetap terpilih, tetapi penulisan dijeda selama final sync. Memproses')
+
+for _token in [
+ 'function routeFinalizedActive(r)', 'cutover_test_note', 'DB_SYNC_HOLD_QUIESCE_KEY',
+ 'requestDbSync(options={})', 'if(!verification.matched)mismatches.push(table);',
+ 'requestDbSync({holdQuiesce:true})', "rpc('release_active_sync_quiesce')", 'routeStageStarted=true',
+ 'createRecoveryEnrollment', 'create_device_recovery_enrollment', 'recoverDeviceSelect'
+]:
+    if _token not in _final_html:
+        raise SystemExit('Admin V12.1.15 post-patch validation missing: ' + _token)
+html_path.write_text(_final_html, encoding='utf-8')
+_gradle_final = gradle_path.read_text(encoding='utf-8')
+if "versionName '12.1.14'" in _gradle_final and 'versionCode 42' in _gradle_final:
+    _gradle_final = _gradle_final.replace('versionCode 42', 'versionCode 43', 1).replace("versionName '12.1.14'", "versionName '12.1.15'", 1)
+elif "versionName '12.1.15'" not in _gradle_final or 'versionCode 43' not in _gradle_final:
+    raise SystemExit('Admin V12.1.15 Gradle version anchor mismatch')
+gradle_path.write_text(_gradle_final, encoding='utf-8')
+version_path.write_text('AniGames Admin V12.1.15 — dual DB safety + PC recovery enrollment\n', encoding='utf-8')
+print('PASS: Admin V12.1.15 route continuity, safe sync quiesce/recovery, all-table mismatch blocking, PC recovery retained')
