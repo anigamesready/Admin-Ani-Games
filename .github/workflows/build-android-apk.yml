@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.14 Dual DB APK
+name: Build AniGames Admin V12.1.15 Dual DB APK
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.14 Dual DB Debug APK
+    name: Build AniGames Admin V12.1.15 Dual DB Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -64,8 +64,8 @@ jobs:
           python3 patch_admin_db_sync_global_switch.py
           test "$(grep -c 'automatic failover is disabled' android/app/src/main/assets/web/admin.html)" -ge 1
           test "$(grep -c 'ROUTE_FINAL_CONFIRMATION_FAILED' android/app/src/main/assets/web/admin.html)" -ge 1
-          grep -q "versionCode 42" android/app/build.gradle
-          grep -q "versionName '12.1.14'" android/app/build.gradle
+          grep -q "versionCode 43" android/app/build.gradle
+          grep -q "versionName '12.1.15'" android/app/build.gradle
           echo "Dual-DB route guards and global-switch final confirmation verified in Admin HTML."
 
       - name: Set up JDK 17
@@ -94,7 +94,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.14-dual-db-debug-apk
+          name: AniGames-Admin-Android-v12.1.15-dual-db-debug-apk
           path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
