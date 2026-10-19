@@ -1,17 +1,8 @@
 from pathlib import Path
+import re
 
 html_path = Path("android/app/src/main/assets/web/admin.html")
 html = html_path.read_text(encoding="utf-8")
-
-old = """if(!recoveringPartial){
-   // A fresh catch-up sync is required before starting a new epoch/switch ID.
-   const sync=await requestDbSync({holdQuiesce:true});
-   if(!sync||sync.ok===false||sync.ready!==true)throw new Error('SYNC_NOT_READY: final sync/hash/auth/gateway verification did not complete; active database was not switched.');
-   [d1,d2]=await Promise.all([
-    globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),
-    globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')
-   ]);
-  }else{"""
 
 new = """if(!recoveringPartial){
    const a=d1.route,b=d2.route;
@@ -28,12 +19,39 @@ new = """if(!recoveringPartial){
    }
   }else{"""
 
-n = html.count(old)
-if n == 0 and new in html:
+if "DB_SYNC_REQUIRED: parity data/auth belum cocok" in html:
     print("Copy-first switch guard already applied.")
+    raise SystemExit(0)
+
+pattern = re.compile(
+    r"if\(!recoveringPartial\)\s*\{[\s\S]*?"
+    r"const sync=await requestDbSync\(\{holdQuiesce:true\}\);[\s\S]*?"
+    r"\[d1,d2\]=await Promise\.all\(\[[\s\S]*?"
+    r"globalRouteStatus\(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep'\)\s*\]\);\s*\}\s*else\s*\{"
+)
+matches = list(pattern.finditer(html))
+if len(matches) != 1:
+    old = """if(!recoveringPartial){
+   // A fresh catch-up sync is required before starting a new epoch/switch ID.
+   const sync=await requestDbSync({holdQuiesce:true});
+   if(!sync||sync.ok===false||sync.ready!==true)throw new Error('SYNC_NOT_READY: final sync/hash/auth/gateway verification did not complete; active database was not switched.');
+   [d1,d2]=await Promise.all([
+    globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),
+    globalRouteStatus(DB2_URL,DB2_ROUTE_KEY,'xcdbipgsvohesxhxydep')
+   ]);
+  }else{"""
+    if html.count(old) == 1:
+        html = html.replace(old, new, 1)
+    else:
+        raise SystemExit("Expected one guarded DB switch sync block; regex matches=" + str(len(matches)) + ", exact matches=" + str(html.count(old)))
 else:
-    if n != 1:
-        raise SystemExit("Expected exactly one global switch sync block; found " + str(n))
-    html = html.replace(old, new, 1)
-    html_path.write_text(html, encoding="utf-8")
-    print("DB cutover preflight now redirects to Database & Sync on parity mismatch; no implicit copy is started.")
+    match = matches[0]
+    html = html[:match.start()] + new + html[match.end():]
+
+if "DB_SYNC_REQUIRED: parity data/auth belum cocok" not in html:
+    raise SystemExit("Post-patch DB switch guard token missing")
+if "ROUTE_FINAL_CONFIRMATION_FAILED" not in html or "function requestGlobalDbSwitch()" not in html:
+    raise SystemExit("Global DB switch integrity checks missing")
+
+html_path.write_text(html, encoding="utf-8")
+print("DB cutover preflight updated: parity mismatch is redirected to Database & Sync; no implicit copy is started.")
