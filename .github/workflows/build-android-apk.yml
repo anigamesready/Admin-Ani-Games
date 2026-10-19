@@ -51,6 +51,7 @@ jobs:
             "scripts/patch_admin_dual_db_routing.py"
             "scripts/patch_admin_db_sync_global_switch.py"
             "scripts/patch_admin_final_readiness.py"
+            "scripts/patch_admin_copy_redirect.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -64,6 +65,7 @@ jobs:
           python3 patch_admin_dual_db_routing.py
           python3 patch_admin_db_sync_global_switch.py
           python3 patch_admin_final_readiness.py
+          python3 patch_admin_copy_redirect.py
           test "$(grep -c 'automatic failover is disabled' android/app/src/main/assets/web/admin.html)" -ge 1
           test "$(grep -c 'ROUTE_FINAL_CONFIRMATION_FAILED' android/app/src/main/assets/web/admin.html)" -ge 1
           grep -q "versionCode 44" android/app/build.gradle
@@ -71,6 +73,7 @@ jobs:
           grep -q "function exportExcelFallbackXLSX" android/app/src/main/assets/web/admin.html
           grep -q "async function ensureJsPDF" android/app/src/main/assets/web/admin.html
           grep -q "function blynkUserError" android/app/src/main/assets/web/admin.html
+          grep -q "DB_SYNC_REQUIRED: parity data/auth belum cocok" android/app/src/main/assets/web/admin.html
           python3 - <<'PY'
           import re
           from pathlib import Path
