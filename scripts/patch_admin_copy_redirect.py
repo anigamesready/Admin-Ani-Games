@@ -5,7 +5,7 @@ html = html_path.read_text(encoding="utf-8")
 
 old = """if(!recoveringPartial){
    // A fresh catch-up sync is required before starting a new epoch/switch ID.
-   const sync=await requestDbSync();
+   const sync=await requestDbSync({holdQuiesce:true});
    if(!sync||sync.ok===false||sync.ready!==true)throw new Error('SYNC_NOT_READY: final sync/hash/auth/gateway verification did not complete; active database was not switched.');
    [d1,d2]=await Promise.all([
     globalRouteStatus(DB1_URL,DB1_ROUTE_KEY,'wzkjpycjizexxcxrfdvr'),
