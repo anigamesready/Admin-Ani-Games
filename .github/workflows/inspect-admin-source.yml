@@ -1,0 +1,30 @@
+name: Inspect Admin Android Source Bundle
+
+on:
+  push:
+    branches:
+      - debug/inspect-admin-source-20261019
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Extract source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -q "AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip" -d source-bundle
+          test -n "$(find source-bundle -type f -name 'MainActivity.java' -print -quit)"
+          find source-bundle -type f \( -name 'MainActivity.java' -o -path '*/android/app/src/main/AndroidManifest.xml' -o -path '*/android/app/src/main/assets/web/admin.html' \) -print
+      - name: Upload extracted source for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-source-bundle-inspection
+          path: source-bundle/
+          if-no-files-found: error
+          retention-days: 1
