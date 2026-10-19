@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.14 DB Sync + Global Route Switch
+name: Build AniGames Admin V12.1.15 DB Sync + Global Route Switch
 
 on:
   push:
@@ -100,7 +100,7 @@ jobs:
           duplicates = sorted({x for x in ids if ids.count(x) > 1})
           if duplicates:
               raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
-          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "DB_SYNC_RUN_KEY", "db-sync-apply", "ROUTE_FINAL_CONFIRMATION_FAILED", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "NETWORK_FETCH_FAILED • ", "adminAlertPollRetryAt", "retry_ms=", "window.__aniAdminFetchNoticeAt", "resolveDualDbRoute", "routeBackupReady", "DB_ROUTE_CUTOVER_INCOMPLETE", "requestGlobalDbSwitch", "previewDbSync", "verifyDb2OwnerLogin", "dbSyncCall", "dbSyncPreviewSummary", "globalDbTarget", "Pindah seluruh sistem", "Sinkronkan DB1 → DB2", "auth_parity_ready"]
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "DB_SYNC_RUN_KEY", "db-sync-apply", "ROUTE_FINAL_CONFIRMATION_FAILED", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "NETWORK_FETCH_FAILED • ", "adminAlertPollRetryAt", "retry_ms=", "window.__aniAdminFetchNoticeAt", "resolveDualDbRoute", "routeBackupReady", "routeFinalizedActive", "DB_SYNC_HOLD_QUIESCE_KEY", "requestDbSync(options={})", "requestDbSync({holdQuiesce:true})", "routeStageStarted=true", "release_active_sync_quiesce", "DB_ROUTE_CUTOVER_INCOMPLETE", "requestGlobalDbSwitch", "previewDbSync", "verifyDb2OwnerLogin", "dbSyncCall", "dbSyncPreviewSummary", "globalDbTarget", "Pindah seluruh sistem", "Sinkronkan DB1 → DB2", "auth_parity_ready"]
           activity = (root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
           manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           for token in ["NotificationChannel", "AdminNotificationBridge", "POST_NOTIFICATIONS", "openNotificationSettings"]:
@@ -132,7 +132,7 @@ jobs:
           if html.count("rpc('admin_update_rental_identity'") != 1:
               raise SystemExit("Audited rental identity RPC call missing or duplicated")
           gradle = (root / "android/app/build.gradle").read_text()
-          if "versionCode 42" not in gradle or "versionName '12.1.14'" not in gradle:
+          if "versionCode 43" not in gradle or "versionName '12.1.15'" not in gradle:
               raise SystemExit("Version bump check failed")
           print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, Android notification bridge + foreground-only low-noise alert polling present")
           PY
@@ -176,14 +176,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          zip -qr AniGames-Admin-V12.1.14-DB-SYNC-GLOBAL-SWITCH-SOURCE.zip "$ANDROID_PROJECT_DIR"
+          zip -qr AniGames-Admin-V12.1.15-DB-SYNC-ROUTE-CONTINUITY-SOURCE.zip "$ANDROID_PROJECT_DIR"
 
       - name: Upload APK and patched source
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-V12.1.14-DB-SYNC-GLOBAL-SWITCH
+          name: AniGames-Admin-V12.1.15-DB-SYNC-ROUTE-CONTINUITY
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
-            AniGames-Admin-V12.1.14-DB-SYNC-GLOBAL-SWITCH-SOURCE.zip
+            AniGames-Admin-V12.1.15-DB-SYNC-ROUTE-CONTINUITY-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
