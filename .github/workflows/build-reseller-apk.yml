@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - feature/reseller-global-db-refresh-v1
     paths:
       - 'Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip'
       - '.github/workflows/build-reseller-apk.yml'
+      - 'scripts/patch_reseller_global_db_route.py'
   workflow_dispatch:
 
 permissions:
@@ -79,6 +81,13 @@ jobs:
                   (out / name).write_bytes(raw)
           print("Verified exact index.html and admin-control.html from the supplied HTML Review ZIP.")
           PY
+
+      - name: Patch Reseller global DB target refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_reseller_global_db_route.py
+          python3 -m py_compile scripts/patch_reseller_global_db_route.py
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
