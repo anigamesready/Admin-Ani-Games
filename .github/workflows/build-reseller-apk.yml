@@ -1,0 +1,303 @@
+name: Build Ani-Games Reseller APK
+
+on:
+  push:
+    branches:
+      - main
+      - feature/global-db-refresh-v1
+    paths:
+      - 'Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip'
+      - '.github/workflows/build-reseller-apk.yml'
+      - 'scripts/patch_reseller_global_db_route.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Audit source and compile reseller APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Android source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_ZIP="Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip"
+          test -s "$SOURCE_ZIP" || { echo "::error::Source ZIP is missing"; exit 1; }
+          unzip -t "$SOURCE_ZIP"
+          mkdir -p source
+          unzip -oq "$SOURCE_ZIP" -d source
+          SETTINGS="$(find source -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+          test -n "$SETTINGS" || { echo "::error::No settings.gradle(.kts) found in source ZIP"; find source -maxdepth 4 -type f | head -100; exit 1; }
+          ANDROID_DIR="$(dirname "$SETTINGS")"
+          echo "ANDROID_DIR=$ANDROID_DIR" >> "$GITHUB_ENV"
+          echo "Resolved Android project root: $ANDROID_DIR"
+          echo "Files near project root:"
+          find "$ANDROID_DIR" -maxdepth 2 -type f | sort | head -100
+
+      - name: Validate and extract exact HTML Review template
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, hashlib, io, tarfile
+          from pathlib import Path
+
+          part_dir = Path("reseller/ui-review-parts")
+          expected_parts = ["01.b64", "02.b64", "03a.b64", "03b.b64", "03c.b64",
+                            "03d.b64", "03e.b64", "04.b64"]
+          if any(not (part_dir / name).is_file() for name in expected_parts):
+              raise SystemExit("One or more verified HTML Review archive parts are missing")
+          encoded = "".join((part_dir / name).read_text().strip() for name in expected_parts)
+          if len(encoded) != 17764:
+              raise SystemExit(f"HTML Review archive encoded length mismatch: {len(encoded)}")
+          archive = base64.b64decode(encoded, validate=True)
+          digest = hashlib.sha256(archive).hexdigest()
+          if digest != "c90fc770c78687748caafb21b83a421bb61d65eb4ea2ef00f9280d76562993ed":
+              raise SystemExit(f"HTML Review archive SHA-256 mismatch: {digest}")
+          with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tf:
+              members = {Path(m.name).name: m for m in tf.getmembers() if m.isfile()}
+              expected_hashes = {
+                  "index.html": ("8df0434644b1d2d1ce46371453ebd3c15d8b53f82a54b623232d8a2674090f56", 5258),
+                  "admin-control.html": ("3504dbc2b91143627c191f18ddeabb246907467bb7348d690f42246ecbfd720e", 39028),
+              }
+              out = Path("review-ui")
+              out.mkdir(exist_ok=True)
+              for name, (expected_hash, expected_size) in expected_hashes.items():
+                  if name not in members:
+                      raise SystemExit(f"Supplied HTML Review archive lacks {name}")
+                  stream = tf.extractfile(members[name])
+                  if stream is None:
+                      raise SystemExit(f"Cannot read {name} from HTML Review archive")
+                  raw = stream.read()
+                  actual_hash = hashlib.sha256(raw).hexdigest()
+                  if len(raw) != expected_size or actual_hash != expected_hash:
+                      raise SystemExit(f"Supplied {name} failed integrity check")
+                  (out / name).write_bytes(raw)
+          print("Verified exact index.html and admin-control.html from the supplied HTML Review ZIP.")
+          PY
+
+      - name: Patch Reseller global DB target refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_reseller_global_db_route.py
+          python3 -m py_compile scripts/patch_reseller_global_db_route.py
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-34" "platforms;android-35" "build-tools;34.0.0" "build-tools;35.0.0"
+
+      - name: Configure isolated reseller identity and audit web assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          root = Path(os.environ["ANDROID_DIR"])
+          gradle_candidates = [root / "app/build.gradle", root / "app/build.gradle.kts"]
+          gradle = next((p for p in gradle_candidates if p.is_file()), None)
+          if gradle is None:
+              raise SystemExit("app/build.gradle or app/build.gradle.kts not found")
+          text = gradle.read_text(errors="replace")
+
+          def set_gradle_value(key, value):
+              nonlocal_text = None
+              pattern = re.compile(r'(' + re.escape(key) + r'\s*=?\s*["\'])[^"\']+(["\'])')
+              updated, count = pattern.subn(lambda m: m.group(1) + value + m.group(2), text, count=1)
+              return updated, count
+
+          text, ns_count = re.subn(
+              r'(\bnamespace\s*=?\s*["\'])[^"\']+(["\'])',
+              lambda m: m.group(1) + "com.anigames.reseller" + m.group(2), text, count=1)
+          text, app_count = re.subn(
+              r'(\bapplicationId\s*=?\s*["\'])[^"\']+(["\'])',
+              lambda m: m.group(1) + "com.anigames.reseller" + m.group(2), text, count=1)
+          if not ns_count:
+              raise SystemExit("Cannot isolate Android namespace: Gradle namespace setting not found")
+          if not app_count:
+              raise SystemExit("Cannot isolate app install ID: applicationId setting not found")
+          text, _ = re.subn(r'\bversionCode\s+\d+', 'versionCode 130', text, count=1)
+          text, _ = re.subn(r'(\bversionName\s*=?\s*["\'])[^"\']+(["\'])',
+                            lambda m: m.group(1) + "1.0.0" + m.group(2), text, count=1)
+          gradle.write_text(text)
+          print("Configured namespace and applicationId as com.anigames.reseller")
+
+          # Re-home Java/Kotlin package declarations so generated R references use the reseller namespace.
+          src = root / "app/src/main"
+          if src.exists():
+              for path in list(src.rglob("*.java")) + list(src.rglob("*.kt")):
+                  body = path.read_text(errors="replace")
+                  updated = body.replace("com.anigames.billingadmin", "com.anigames.reseller")
+                  if updated != body:
+                      path.write_text(updated)
+
+          manifests = list(root.glob("app/src/main/AndroidManifest.xml"))
+          if not manifests:
+              raise SystemExit("AndroidManifest.xml not found")
+          manifest_path = manifests[0]
+          manifest = manifest_path.read_text(errors="replace")
+          if re.search(r'android:label\s*=\s*"[^"]+"', manifest):
+              manifest = re.sub(r'android:label\s*=\s*"[^"]+"',
+                                'android:label="Ani-Games Reseller"', manifest, count=1)
+          else:
+              raise SystemExit("Manifest has no explicit android:label to isolate")
+          manifest_path.write_text(manifest)
+          for strings in root.glob("app/src/main/res/values*/strings.xml"):
+              body = strings.read_text(errors="replace")
+              body = re.sub(r'(<string\s+name="app_name"[^>]*>).*?(</string>)',
+                            r'\1Ani-Games Reseller\2', body, count=1, flags=re.S)
+              strings.write_text(body)
+
+          web_dirs = [p for p in root.glob("app/src/main/assets/**")
+                      if p.is_dir() and (p / "index.html").is_file()]
+          web_dir = next((p for p in web_dirs if p.name == "web"),
+                         web_dirs[0] if web_dirs else None)
+          if web_dir is None:
+              raise SystemExit("WebView assets/index.html not found")
+          print("Resolved WebView assets:", web_dir)
+          print("HTML assets before audit:", [str(p.relative_to(web_dir)) for p in web_dir.rglob("*.html")])
+          # Overlay the exact UI files supplied in Ani-Games-Reseller-HTML-Review-v1.0.0.zip.
+          for name in ("index.html", "admin-control.html"):
+              source_ui = Path("review-ui") / name
+              if not source_ui.is_file():
+                  raise SystemExit("Verified HTML Review UI file is missing: " + name)
+              (web_dir / name).write_bytes(source_ui.read_bytes())
+          print("Applied the exact supplied HTML Review login and dashboard.")
+          dashboard = web_dir / "admin-control.html"
+          if not dashboard.is_file():
+              raise SystemExit("Reseller dashboard admin-control.html is missing from WebView assets")
+
+          # Keep the review template's own dashboard markup and controls unchanged.
+          # The logo remains on its designed login screen; do not inject a new header or toolbar.
+          logo = web_dir / "icon/logo.png"
+          if not logo.is_file():
+              raise SystemExit("Expected reseller logo asset icon/logo.png is missing")
+
+          # Remove unused legacy entry points only; retain the reseller login and dashboard.
+          for name in ("admin.html", "billing.html", "v11-cloud.js"):
+              target = web_dir / name
+              if target.is_file():
+                  target.unlink()
+                  print("Removed unused legacy entry point:", target.name)
+          icon_dir = web_dir / "icon"
+          for name in ("admin.html", "admin-control.html", "billing.html", "index.html", "v11-cloud.js"):
+              target = icon_dir / name
+              if target.is_file():
+                  target.unlink()
+                  print("Removed duplicate legacy asset:", str(target.relative_to(web_dir)))
+
+          html_files = list(web_dir.rglob("*.html"))
+          forbidden = re.compile(r"billing_command\s*\(|billing_start_trial|admin_disconnect_device|restart_pc|shutdown_pc|\blogoff\b|start_trial|queue_command", re.I)
+          hits = []
+          for path in html_files:
+              for n, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
+                  if forbidden.search(line):
+                      hits.append(f"{path.relative_to(web_dir)}:{n}:{line.strip()[:180]}")
+          if hits:
+              print("\n".join(hits[:50]))
+              raise SystemExit("Restricted Windows/pairing command strings found in reseller HTML; refusing to compile this UI")
+
+          old_key = "sb_publishable_1Jsp3ZQDLwtozZ2hSPO83YA_7e1j723g"
+          new_key = "sb_publishable_DobdCrOd43-vluON5gV7hg_6Js2Ea5V"
+          # Migrate only the known obsolete public publishable key; no secret keys are embedded.
+          for path in web_dir.rglob("*"):
+              if path.is_file() and path.suffix.lower() in (".html", ".js", ".json", ".txt"):
+                  body_text = path.read_text(errors="replace")
+                  if old_key in body_text:
+                      path.write_text(body_text.replace(old_key, new_key))
+                      print("Updated obsolete public API key in", path.relative_to(web_dir))
+          all_web_text = "\n".join(
+              p.read_text(errors="replace") for p in web_dir.rglob("*")
+              if p.is_file() and p.suffix.lower() in (".html", ".js", ".json", ".txt"))
+          if old_key in all_web_text:
+              raise SystemExit("Rejected legacy publishable key found in reseller assets")
+          if new_key not in all_web_text:
+              raise SystemExit("Expected current Supabase publishable key not found in reseller assets")
+          if "icon/logo.png" not in (web_dir / "index.html").read_text(errors="replace"):
+              raise SystemExit("Reseller login does not reference icon/logo.png")
+          # Remove explanatory/disclaimer text at the bottom of the reseller login and dashboard,
+          # while keeping the actual form, app behavior, and navigation untouched.
+          login = web_dir / "index.html"
+          login_text = login.read_text(errors="replace")
+          login_text, login_removed = re.subn(
+              r'\s*<div\s+class=["\']hint["\'][^>]*>.*?</div\s*>', '', login_text,
+              count=1, flags=re.I | re.S)
+          if login_removed:
+              login.write_text(login_text)
+              print("Removed bottom explanatory hint from reseller login.")
+          dashboard_text = dashboard.read_text(errors="replace")
+          dashboard_text, footer_removed = re.subn(
+              r'\s*<div\s+class=["\']footer["\'][^>]*>.*?</div\s*>', '', dashboard_text,
+              count=1, flags=re.I | re.S)
+          if footer_removed:
+              dashboard.write_text(dashboard_text)
+              print("Removed bottom draft/disclaimer footer from reseller dashboard.")
+          # Keep the exact dark navy/blue/cyan UI from the supplied HTML Review template.
+          # Do not override its colors with a separate theme; only layout/functions are retained.
+
+          print("Reseller identity, package, UI entry-point, restricted-action, logo and API-key audits passed.")
+          PY
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.9'
+
+      - name: Compile debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ANDROID_DIR"
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew --no-daemon --stacktrace assembleDebug
+          else
+            gradle --no-daemon --stacktrace assembleDebug
+          fi
+
+      - name: Verify APK identity and prepare output
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find "$ANDROID_DIR" -type f -path '*/build/outputs/apk/debug/*.apk' -print -quit)"
+          test -n "$APK" || { echo "::error::No debug APK was produced"; exit 1; }
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
+          test -n "$AAPT" || { echo "::error::aapt not found"; exit 1; }
+          mkdir -p output
+          "$AAPT" dump badging "$APK" > output/apk-badging.txt
+          cat output/apk-badging.txt | head -8
+          grep -q "package: name='[^']*reseller[^']*'" output/apk-badging.txt || { echo "::error::Built package ID is not reseller-specific"; exit 1; }
+          cp "$APK" output/Ani-Games-Reseller-v11.30.0-debug.apk
+          sha256sum output/Ani-Games-Reseller-v11.30.0-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v11.30.0-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ani-Games-Reseller-v11.30.0-debug-apk
+          path: |
+            output/Ani-Games-Reseller-v11.30.0-debug.apk
+            output/SHA256SUMS.txt
+            output/apk-badging.txt
+          if-no-files-found: error
+          retention-days: 30
