@@ -7,6 +7,7 @@ on:
       - master
       - build/v12-admin-apk
       - feature/admin-v12-dual-db-routing
+      - feature/global-db-refresh-v1
   workflow_dispatch:
 
 permissions:
@@ -53,6 +54,7 @@ jobs:
             "scripts/patch_admin_final_readiness.py"
             "scripts/patch_admin_copy_redirect.py"
             "scripts/patch_admin_report_exports.py"
+            "scripts/patch_admin_global_db_refresh.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -68,14 +70,17 @@ jobs:
           python3 patch_admin_final_readiness.py
           python3 patch_admin_copy_redirect.py
           python3 patch_admin_report_exports.py
+          python3 patch_admin_global_db_refresh.py
           test "$(grep -c 'automatic failover is disabled' android/app/src/main/assets/web/admin.html)" -ge 1
           test "$(grep -c 'ROUTE_FINAL_CONFIRMATION_FAILED' android/app/src/main/assets/web/admin.html)" -ge 1
-          grep -q "versionCode 44" android/app/build.gradle
-          grep -q "versionName '12.1.16'" android/app/build.gradle
+          grep -q "versionCode 45" android/app/build.gradle
+          grep -q "versionName '12.1.17'" android/app/build.gradle
           grep -q "function exportExcelFallbackXLSX" android/app/src/main/assets/web/admin.html
           grep -q "async function ensureJsPDF" android/app/src/main/assets/web/admin.html
           grep -q "function blynkUserError" android/app/src/main/assets/web/admin.html
           grep -q "DB_SYNC_REQUIRED: parity data/auth belum cocok" android/app/src/main/assets/web/admin.html
+          grep -q "r.data_parity_ready===true&&r.sync_in_progress!==true&&r.can_switch_to_backup===true" android/app/src/main/assets/web/admin.html
+          grep -q "function monitorDualDbRoute" android/app/src/main/assets/web/admin.html
           grep -q "var charts=window.charts" android/app/src/main/assets/web/admin.html
           grep -q "async function saveReportFileDownload" android/app/src/main/assets/web/admin.html
           grep -q "saveReportFile(String filename, String mimeType, String base64Payload)" android/app/src/main/java/com/anigames/billingadmin/MainActivity.java
@@ -118,7 +123,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.16-dual-db-final-debug-apk
+          name: AniGames-Admin-Android-v12.1.17-global-db-route-refresh-debug-apk
           path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
