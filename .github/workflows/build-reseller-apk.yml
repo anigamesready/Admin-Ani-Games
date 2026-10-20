@@ -287,16 +287,16 @@ jobs:
           "$AAPT" dump badging "$APK" > output/apk-badging.txt
           cat output/apk-badging.txt | head -8
           grep -q "package: name='[^']*reseller[^']*'" output/apk-badging.txt || { echo "::error::Built package ID is not reseller-specific"; exit 1; }
-          cp "$APK" output/Ani-Games-Reseller-v11.30.0-debug.apk
-          sha256sum output/Ani-Games-Reseller-v11.30.0-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v11.30.0-debug.apk
+          cp "$APK" output/Ani-Games-Reseller-v11.30.1-GLOBAL-DB-ROUTE-REFRESH-debug.apk
+          sha256sum output/Ani-Games-Reseller-v11.30.1-GLOBAL-DB-ROUTE-REFRESH-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v11.30.1-GLOBAL-DB-ROUTE-REFRESH-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Reseller-v11.30.0-debug-apk
+          name: Ani-Games-Reseller-v11.30.1-global-db-route-refresh-debug-apk
           path: |
-            output/Ani-Games-Reseller-v11.30.0-debug.apk
+            output/Ani-Games-Reseller-v11.30.1-GLOBAL-DB-ROUTE-REFRESH-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
