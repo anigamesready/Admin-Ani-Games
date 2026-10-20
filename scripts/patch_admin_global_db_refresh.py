@@ -55,7 +55,7 @@ old_backup = "return !!r&&r.active_target==='backup'&&r.backup_ready===true&&r.a
 new_backup = "return !!r&&r.active_target==='backup'&&r.data_parity_ready===true&&r.sync_in_progress!==true&&r.can_switch_to_backup===true&&Number.isFinite(Number(r.epoch))&&Number(r.epoch)>0&&typeof r.switch_id==='string'&&r.switch_id.length>0&&parityFresh&&schemasMatch;"
 html = replace_once(html, old_backup, new_backup, "Admin active-backup route resolver")
 old_switch = "return r.backup_ready===true&&r.auth_parity_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&fresh&&schema;"
-new_switch = "return !!r&&r.data_parity_ready===true&&r.sync_in_progress!==true&&fresh&&schema;"
+new_switch = "return !!r&&r.data_parity_ready===true&&r.sync_in_progress!==true&&r.can_switch_to_backup===true&&fresh&&schema;"
 html = replace_once(html, old_switch, new_switch, "Admin switch readiness")
 old_mismatch = "const dataMismatch=!a.data_parity_ready||!b.data_parity_ready||!a.backup_ready||!b.backup_ready||!a.auth_parity_ready||!b.auth_parity_ready;"
 new_mismatch = "const dataMismatch=!a.data_parity_ready||!b.data_parity_ready||a.sync_in_progress===true||b.sync_in_progress===true;"
