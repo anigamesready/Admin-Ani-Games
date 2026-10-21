@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.22 Full Sync DB Cutover APK
+name: Build AniGames Admin V12.1.23 Final Full Sync DB Cutover APK
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.22 Full Sync DB Cutover Debug APK
+    name: Build AniGames Admin V12.1.23 Final Full Sync DB Cutover Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -60,6 +60,7 @@ jobs:
             "scripts/patch_admin_gateway_readiness.py"
             "scripts/patch_admin_cutover_without_sync.py"
             "scripts/patch_admin_v12_1_22_full_sync.py"
+            "scripts/patch_admin_v12_1_23_final_package.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -100,9 +101,14 @@ jobs:
           python3 patch_admin_gateway_readiness.py
           python3 patch_admin_cutover_without_sync.py
           python3 patch_admin_v12_1_22_full_sync.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py
-          grep -q "versionCode 50" android/app/build.gradle
-          grep -q "versionName '12.1.22'" android/app/build.gradle
+          python3 patch_admin_v12_1_23_final_package.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py
+          grep -q "versionCode 51" android/app/build.gradle
+          grep -q "versionName '12.1.23'" android/app/build.gradle
+          grep -q "applicationId 'com.anigames.billingadmin'" android/app/build.gradle
+          ! grep -q "com.anigames.billingadmin.v12test" android/app/build.gradle
+          grep -q 'android:label="AniGames Admin"' android/app/src/main/AndroidManifest.xml
+          ! grep -q "AniGames Admin V12 Test" android/app/src/main/AndroidManifest.xml
           ! grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
           grep -q "dbSyncCall('start')" android/app/src/main/assets/web/admin.html
           grep -q "dbSyncCall('apply-page'" android/app/src/main/assets/web/admin.html
@@ -114,6 +120,7 @@ jobs:
           grep -q "Verifikasi login" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.21-ROUTE-CUTOVER-WITHOUT-FORCED-SYNC" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.22-FULL-12-TABLE-INCREMENTAL-SYNC" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.23-FINAL-ADMIN-PACKAGE" android/app/src/main/assets/web/admin.html
           grep -q "TARGET_OWNER_LOGIN_TEST_REQUIRED" android/app/src/main/assets/web/admin.html
           grep -q "Perpindahan ini TIDAK menjalankan Sync" android/app/src/main/assets/web/admin.html
           grep -q "rental_sessions" android/app/src/main/assets/web/admin.html
@@ -149,13 +156,30 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build debug APK
-        run: gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
+      - name: Build and verify final APK package, version and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
+          APK="$ANDROID_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
+          test -n "$AAPT" && test -n "$APKSIGNER"
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.23-debug.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.23-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='51' versionName='12.1.23'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.23-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.23-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.23-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.23-debug.apk"
 
-      - name: Upload APK artifact
+      - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.22-full-sync-cutover-debug-apk
-          path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
+          name: AniGames-Admin-Android-v12.1.23-final-debug-apk
+          path: output/*
           if-no-files-found: error
           retention-days: 30
