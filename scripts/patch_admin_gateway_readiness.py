@@ -32,7 +32,7 @@ async function requestSharedDbRouteSwitch(target,reason){
  return data;
 }
 """
-    helper_anchor = "async function refreshGatewayReadiness(){"
+    helper_anchor = "async function verifyDb2OwnerLogin(){"
     if html.count(helper_anchor) != 1:
         raise SystemExit("Shared route switch helper anchor missing")
     html = html.replace(helper_anchor, route_switch_helper + "\n" + helper_anchor, 1)
