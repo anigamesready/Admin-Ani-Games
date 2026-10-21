@@ -266,7 +266,8 @@ jobs:
           for path in [files[0], files[0].parent/'admin-control.html']:
               text = path.read_text(encoding='utf-8')
               for marker in ('resolveResellerGlobalRoute','DB_ROUTE_NOT_FINALIZED','DB_ROUTE_STAMP_KEY',
-                             'CORE_PARITY_HASH_PASS','ACTIVE_SESSION_HASH_PASS','DB2_ROUTE_URL','DB2_ROUTE_KEY'):
+                             'DB_ROUTE_SPLIT_BRAIN','DB_SYNC_IN_PROGRESS','DB2_ROUTE_URL','DB2_ROUTE_KEY',
+                             'DB2_ROUTE_REF','fresh reseller login'):
                   if marker not in text:
                       raise SystemExit(f'Route guard marker {marker} missing in {path.name}')
               scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', text, re.I|re.S)
