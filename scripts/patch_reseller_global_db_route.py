@@ -182,8 +182,6 @@ if "versionCode 131" in gradle and "versionName '1.0.1'" in gradle:
 elif not ("versionCode 132" in gradle and "versionName '1.0.2'" in gradle):
     raise SystemExit("Expected v11.30.1 Gradle metadata; refusing unknown version")
 gradle_path.write_text(gradle, encoding="utf-8")
-if "DB2_URL" in route_constants if False else False:
-    raise SystemExit("Unused configuration alias")
 # Static post-patch checks for the route guard contract and destination-client configuration.
 for marker in ("DB_ROUTE_READINESS_NOT_READY", "CORE_PARITY_HASH_PASS", "ACTIVE_SESSION_HASH_PASS", "DB2_ROUTE_URL", "DB2_ROUTE_KEY", "DB2_ROUTE_REF"):
     if marker not in index_html or marker not in dashboard_html:
