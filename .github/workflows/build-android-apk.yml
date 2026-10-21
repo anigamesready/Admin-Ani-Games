@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.19 Global Route Continuity APK
+name: Build AniGames Admin V12.1.20 Auth + Gateway Readiness APK
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.19 Global Route Continuity Debug APK
+    name: Build AniGames Admin V12.1.20 Auth + Gateway Readiness Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -57,6 +57,7 @@ jobs:
             "scripts/patch_admin_copy_redirect.py"
             "scripts/patch_admin_report_exports.py"
             "scripts/patch_admin_v12_1_17_core_db.py"
+            "scripts/patch_admin_gateway_readiness.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -94,10 +95,14 @@ jobs:
           Path("/tmp/admin-inline-check.js").write_text(scripts[0], encoding="utf-8")
           PY
           python3 patch_admin_v12_1_17_core_db.py
-          grep -q "versionCode 47" android/app/build.gradle
-          grep -q "versionName '12.1.19'" android/app/build.gradle
+          python3 patch_admin_gateway_readiness.py
+          grep -q "versionCode 48" android/app/build.gradle
+          grep -q "versionName '12.1.20'" android/app/build.gradle
           grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
           grep -q "coreDbCall('switch-global'" android/app/src/main/assets/web/admin.html
+          grep -q "refreshGatewayReadiness" android/app/src/main/assets/web/admin.html
+          grep -q "db-route-readiness" android/app/src/main/assets/web/admin.html
+          grep -q "Verifikasi login DB tujuan" android/app/src/main/assets/web/admin.html
           grep -q "rental_accounts" android/app/src/main/assets/web/admin.html
           python3 - <<'PY'
           import re
@@ -109,7 +114,7 @@ jobs:
           Path("/tmp/admin-inline-check-v12-1-17.js").write_text(scripts[0], encoding="utf-8")
           PY
           node --check /tmp/admin-inline-check-v12-1-17.js
-          echo "PASS: V12.1.17 core-only sync + coordinated route switch + browser JS syntax."
+          echo "PASS: V12.1.20 account login verification + shared Gateway readiness + coordinated route switch + browser JS syntax."
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -137,7 +142,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.19-global-route-continuity-debug-apk
+          name: AniGames-Admin-Android-v12.1.20-auth-gateway-readiness-debug-apk
           path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
