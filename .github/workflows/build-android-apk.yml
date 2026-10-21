@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.18 Core DB Switch APK
+name: Build AniGames Admin V12.1.19 Global Route Continuity APK
 
 on:
   push:
@@ -9,6 +9,7 @@ on:
       - feature/admin-v12-dual-db-routing
       - feature/admin-v12.1.17-core-db-switch
       - feature/admin-v12.1.18-core-db-switch-usable-sync
+      - feature/admin-v12.1.19-global-route-continuity
   workflow_dispatch:
 
 permissions:
@@ -16,7 +17,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.18 Core DB Switch Debug APK
+    name: Build AniGames Admin V12.1.19 Global Route Continuity Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -93,8 +94,8 @@ jobs:
           Path("/tmp/admin-inline-check.js").write_text(scripts[0], encoding="utf-8")
           PY
           python3 patch_admin_v12_1_17_core_db.py
-          grep -q "versionCode 46" android/app/build.gradle
-          grep -q "versionName '12.1.18'" android/app/build.gradle
+          grep -q "versionCode 47" android/app/build.gradle
+          grep -q "versionName '12.1.19'" android/app/build.gradle
           grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
           grep -q "coreDbCall('switch-global'" android/app/src/main/assets/web/admin.html
           grep -q "rental_accounts" android/app/src/main/assets/web/admin.html
@@ -136,7 +137,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.18-core-db-switch-debug-apk
+          name: AniGames-Admin-Android-v12.1.19-global-route-continuity-debug-apk
           path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
