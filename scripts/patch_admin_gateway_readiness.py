@@ -17,6 +17,7 @@ if "async function refreshGatewayReadiness()" not in html:
     if html.count(anchor) != 1:
         raise SystemExit("Owner login-verification anchor missing or duplicated")
     helper = r"""
+// V12.1.20-DB-ROUTE-AUTH-GATEWAY-READINESS
 async function refreshGatewayReadiness(){
  if(!dualDbRouteReady)throw new Error('GLOBAL_ROUTE_NOT_VERIFIED');
  const token=await adminAccessToken();
@@ -70,17 +71,12 @@ if html.count(switch_anchor) != 1:
     raise SystemExit(f"Expected one post-sync global route gate; found {html.count(switch_anchor)}")
 html = html.replace(switch_anchor, switch_replacement, 1)
 
-# Put the exact gate failure into the status string so a blocked switch has a concrete reason.
-html = html.replace(
- "const verifiedGateway=readyGatewayAfterAuth;",
- "const verifiedGateway=readyGatewayAfterAuth;if(!verifiedGateway&&gatewayReadinessDetail)ready.gatewayReason=gatewayReadinessDetail;",
- 1
-)
-html = html.replace(
- "Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan.",
- "Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan. '+(ready.gatewayReason||'')+'",
- 1
-) if "Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan." in html else html
+# Display the actual Gateway/readiness rejection reason in the login-test status.
+old_status = "dbSyncStatus(ready.gatewayReady?'Database tujuan lolos hash/login/gateway. Penulisan ditahan agar perpindahan global dapat difinalisasi.':'Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan.',ready.gatewayReady!==true);"
+new_status = "dbSyncStatus(ready.gatewayReady?'Database tujuan lolos hash/login/gateway. Penulisan ditahan agar perpindahan global dapat difinalisasi.':'Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan. '+(gatewayReadinessDetail?' ('+gatewayReadinessDetail+')':''),ready.gatewayReady!==true);"
+if html.count(old_status) != 1:
+    raise SystemExit(f"Expected one deferred-login status line; found {html.count(old_status)}")
+html = html.replace(old_status, new_status, 1)
 
 if "async function refreshGatewayReadiness()" not in html or "await refreshGatewayReadiness();" not in html:
     raise SystemExit("Gateway readiness calls were not inserted")
