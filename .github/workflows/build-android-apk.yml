@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.20 Auth + Gateway Readiness APK
+name: Build AniGames Admin V12.1.21 Optional Sync DB Cutover APK
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.20 Auth + Gateway Readiness Debug APK
+    name: Build AniGames Admin V12.1.21 Optional Sync DB Cutover Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -96,13 +96,17 @@ jobs:
           PY
           python3 patch_admin_v12_1_17_core_db.py
           python3 patch_admin_gateway_readiness.py
-          grep -q "versionCode 48" android/app/build.gradle
-          grep -q "versionName '12.1.20'" android/app/build.gradle
+          python3 patch_admin_cutover_without_sync.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py
+          grep -q "versionCode 49" android/app/build.gradle
+          grep -q "versionName '12.1.21'" android/app/build.gradle
           grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
           grep -q "requestSharedDbRouteSwitch" android/app/src/main/assets/web/admin.html
           grep -q "refreshGatewayReadiness" android/app/src/main/assets/web/admin.html
           grep -q "db-route-readiness" android/app/src/main/assets/web/admin.html
           grep -q "Verifikasi login DB tujuan" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.21-ROUTE-CUTOVER-WITHOUT-FORCED-SYNC" android/app/src/main/assets/web/admin.html
+          grep -q "Perpindahan ini TIDAK menjalankan Sync" android/app/src/main/assets/web/admin.html
           grep -q "rental_accounts" android/app/src/main/assets/web/admin.html
           python3 - <<'PY'
           import re
@@ -142,7 +146,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.20-auth-gateway-readiness-debug-apk
+          name: AniGames-Admin-Android-v12.1.21-optional-sync-cutover-debug-apk
           path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
