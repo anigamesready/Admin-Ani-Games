@@ -310,15 +310,19 @@ jobs:
           cat output/apk-badging.txt | head -8
           grep -q "package: name='com.anigames.reseller' versionCode='132' versionName='1.0.2'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
           cp "$APK" output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
-          sha256sum output/Ani-Games-Reseller-v11.30.1-dual-db-route-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v11.30.1-dual-db-route-debug.apk
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
+          test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
+          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
+          unzip -t output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
+          sha256sum output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Ani-Games-Reseller-v11.30.2-final-dual-db-route-debug-apk
           path: |
-            output/Ani-Games-Reseller-v11.30.1-dual-db-route-debug.apk
+            output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
