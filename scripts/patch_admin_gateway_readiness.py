@@ -93,7 +93,7 @@ if html.count(sync_anchor) != 1:
     raise SystemExit(f"Expected one final sync anchor; found {html.count(sync_anchor)}")
 sync_pos = html.find(sync_anchor) + len(sync_anchor)
 tail = html[sync_pos:]
-switch_pattern = re.compile(r"a=d1\\.route;b=d2\\.route;\\s*if\\(a\\.active_target!==current\\|\\|b\\.active_target!==current")
+switch_pattern = re.compile(r"a=d1\.route;b=d2\.route;\s*if\(a\.active_target!==current\|\|b\.active_target!==current")
 switch_replacement = """a=d1.route;b=d2.route;
    await refreshGatewayReadiness();
    [d1,d2]=await Promise.all([
