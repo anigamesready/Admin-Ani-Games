@@ -20,7 +20,7 @@ const DB1_ROUTE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const DB2_ROUTE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhjZGJpcGdzdm9oZXN4aHh5ZGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNjI5ODUsImV4cCI6MjEwNzYzODk4NX0.kHymS-T8a_PcKk-oQBYMGhHy3SSW1kAKStOBJVzMoSI';
 const DB_ROUTE_STAMP_KEY='ani_games_reseller_db_route_stamp_v1';
 const DB_ROUTE_CACHE_MS=5000;
-const DB_ROUTE_POLL_MS=4000;
+const DB_ROUTE_POLL_MS=10000;
 let activeResellerRoute=null,resellerRouteCheckedAt=0,resellerRoutePromise=null,resellerRouteMonitorStarted=false;
 async function readResellerRouteProject(url,key,expectedRef){
  const response=await fetch(url+'/functions/v1/db-route-status',{method:'GET',headers:{apikey:key},cache:'no-store',signal:AbortSignal.timeout(7000)});
