@@ -174,7 +174,7 @@ elif not ("versionCode 132" in gradle and "versionName '1.0.2'" in gradle):
     raise SystemExit("Expected v11.30.1 Gradle metadata; refusing unknown version")
 gradle_path.write_text(gradle, encoding="utf-8")
 # Static post-patch checks for the route guard contract and destination-client configuration.
-for marker in ("DB_ROUTE_NOT_FINALIZED", "DB_SYNC_IN_PROGRESS", "CORE_PARITY_HASH_PASS", "ACTIVE_SESSION_HASH_PASS", "DB2_ROUTE_URL", "DB2_ROUTE_KEY", "DB2_ROUTE_REF"):
+for marker in ("DB_ROUTE_NOT_FINALIZED", "DB_SYNC_IN_PROGRESS", "DB_ROUTE_SPLIT_BRAIN", "DB2_ROUTE_URL", "DB2_ROUTE_KEY", "DB2_ROUTE_REF", "DB_ROUTE_CHANGED_LOGIN_REQUIRED"):
     if marker not in index_html or marker not in dashboard_html:
         raise SystemExit("Route readiness marker missing from reseller pages: " + marker)
 
