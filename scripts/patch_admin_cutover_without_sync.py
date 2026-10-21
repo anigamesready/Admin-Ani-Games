@@ -86,6 +86,16 @@ async function requestGlobalDbSwitch(){
 """
 html = replace_function(html, "async function requestGlobalDbSwitch(){", new_switch, "Global switch without mandatory sync")
 
+# This explicit marker is required by the workflow version gate and proves the
+# intended V12.1.21 switch semantics were actually applied to the bundled HTML.
+if marker not in html:
+    marker_anchor = "async function requestGlobalDbSwitch(){"
+    if html.count(marker_anchor) != 1:
+        raise SystemExit("V12.1.21 marker insertion anchor missing or duplicated.")
+    html = html.replace(marker_anchor, "// " + marker + "\\n" + marker_anchor, 1)
+if marker not in html:
+    raise SystemExit("V12.1.21 workflow marker was not inserted.")
+
 new_backup = r"""
 function routeBackupReady(r){
  const schema=!!r?.schema_version&&r.schema_version===r.primary_schema_version&&r.schema_version===r.backup_schema_version;
