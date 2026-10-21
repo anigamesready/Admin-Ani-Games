@@ -58,6 +58,7 @@ jobs:
             "scripts/patch_admin_report_exports.py"
             "scripts/patch_admin_v12_1_17_core_db.py"
             "scripts/patch_admin_gateway_readiness.py"
+            "scripts/patch_admin_cutover_without_sync.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
