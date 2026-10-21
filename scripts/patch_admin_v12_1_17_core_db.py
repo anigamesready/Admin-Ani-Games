@@ -91,6 +91,14 @@ new_sync = r"""async function requestDbSync(options={}){
 """
 html = replace_region(html, "async function requestDbSync(options={}){", "\nasync function verifyDb2OwnerLogin(){", new_sync, "Core-only incremental sync")
 
+route_ready = r"""function routeReadyForSwitch(r){
+ const t=Date.parse(r?.last_parity_check_at||''),fresh=Number.isFinite(t)&&Date.now()-t<=30*60*1000&&t<=Date.now()+60000;
+ const schema=!!r?.schema_version&&r.schema_version===r.primary_schema_version&&r.schema_version===r.backup_schema_version;
+ return !!r&&r.data_parity_ready===true&&r.sync_in_progress!==true&&fresh&&schema;
+}
+"""
+html = replace_region(html, "function routeReadyForSwitch(r){", "\nasync function requestGlobalDbSwitch(){", route_ready, "Minimal core route readiness")
+
 new_switch = r"""async function requestGlobalDbSwitch(){
  if(typeof ctx==='undefined'||ctx?.role!=='owner')return msg('Hanya owner yang dapat memindahkan seluruh sistem database.',true);
  const target=String($('globalDbTarget')?.value||''),button=$('globalDbSwitchButton');
