@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.16 Dual DB Final APK
+name: Build AniGames Admin V12.1.17 Core DB Switch APK
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - master
       - build/v12-admin-apk
       - feature/admin-v12-dual-db-routing
+      - feature/admin-v12.1.17-core-db-switch
   workflow_dispatch:
 
 permissions:
@@ -14,7 +15,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.16 Dual DB Debug APK
+    name: Build AniGames Admin V12.1.17 Core DB Switch Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -53,6 +54,7 @@ jobs:
             "scripts/patch_admin_final_readiness.py"
             "scripts/patch_admin_copy_redirect.py"
             "scripts/patch_admin_report_exports.py"
+            "scripts/patch_admin_v12_1_17_core_db.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -89,8 +91,23 @@ jobs:
               raise SystemExit(f"Expected one inline admin app script, found {len(scripts)}")
           Path("/tmp/admin-inline-check.js").write_text(scripts[0], encoding="utf-8")
           PY
-          node --check /tmp/admin-inline-check.js
-          echo "Dual-DB route guards and explicit report-save bridge verified in Admin HTML."
+          python3 patch_admin_v12_1_17_core_db.py
+          grep -q "versionCode 45" android/app/build.gradle
+          grep -q "versionName '12.1.17'" android/app/build.gradle
+          grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
+          grep -q "coreDbCall('switch-global'" android/app/src/main/assets/web/admin.html
+          grep -q "rental_accounts" android/app/src/main/assets/web/admin.html
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          scripts = re.findall(r'<script\\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          if len(scripts) != 1:
+              raise SystemExit(f"Expected one inline admin app script after V12.1.17 core patch, found {len(scripts)}")
+          Path("/tmp/admin-inline-check-v12-1-17.js").write_text(scripts[0], encoding="utf-8")
+          PY
+          node --check /tmp/admin-inline-check-v12-1-17.js
+          echo "PASS: V12.1.17 core-only sync + coordinated route switch + browser JS syntax."
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -118,7 +135,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.16-dual-db-final-debug-apk
+          name: AniGames-Admin-Android-v12.1.17-core-db-switch-debug-apk
           path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
