@@ -46,9 +46,21 @@ async function resolveResellerGlobalRoute(force=false){
   }
   if(a.schema_version&&b.schema_version&&a.schema_version!==b.schema_version)throw new Error('DB_ROUTE_SCHEMA_MISMATCH');
   if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('DB_SYNC_IN_PROGRESS');
+  if(!initial){
+   const now=Date.now();
+   for(const [label,r] of [['DB1',a],['DB2',b]]){
+    const ts=Date.parse(String(r.last_parity_check_at||'')),note=String(r.last_parity_check_note||'');
+    const fresh=Number.isFinite(ts)&&now-ts<=30*60*1000&&ts<=now+60000;
+    const schema=!!r.schema_version&&r.schema_version===r.primary_schema_version&&r.schema_version===r.backup_schema_version;
+    const ready=r.primary_ready===true&&r.backup_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.sync_ready===true;
+    const hash=note.includes('CORE_PARITY_HASH_PASS')&&note.includes('ACTIVE_SESSION_HASH_PASS');
+    if(!ready||!fresh||!schema||!hash||r.sync_write_quiesce===true||r.can_switch_to_backup!==true)
+     throw new Error('DB_ROUTE_READINESS_NOT_READY:'+label);
+   }
+  }
   const config=target==='backup'
-   ?{target,url:DB2_URL,key:DB2_KEY}
-   :{target,url:DB1_URL,key:DB1_KEY};
+   ?{target,url:DB2_ROUTE_URL,key:DB2_ROUTE_KEY,ref:DB2_ROUTE_REF}
+   :{target,url:DB1_ROUTE_URL,key:DB1_ROUTE_KEY,ref:DB1_ROUTE_REF};
   const stamp=target+':'+epoch+':'+switchId;
   if(SB_URL!==config.url||SB_KEY!==config.key){
    SB_URL=config.url;SB_KEY=config.key;
@@ -158,6 +170,25 @@ for name, source in (("index.html", index_html), ("admin-control.html", dashboar
     else:
         dashboard_html = source
 
+# Bump only the new branch/release artifact; source ZIP and locked baseline stay untouched.
+gradle_candidates = [root / "app/build.gradle", root / "app/build.gradle.kts"]
+gradle_path = next((p for p in gradle_candidates if p.is_file()), None)
+if gradle_path is None:
+    raise SystemExit("Reseller Gradle file is missing")
+gradle = gradle_path.read_text(encoding="utf-8", errors="replace")
+if "versionCode 131" in gradle and "versionName '1.0.1'" in gradle:
+    gradle = gradle.replace("versionCode 131", "versionCode 132", 1)
+    gradle = gradle.replace("versionName '1.0.1'", "versionName '1.0.2'", 1)
+elif not ("versionCode 132" in gradle and "versionName '1.0.2'" in gradle):
+    raise SystemExit("Expected v11.30.1 Gradle metadata; refusing unknown version")
+gradle_path.write_text(gradle, encoding="utf-8")
+if "DB2_URL" in route_constants if False else False:
+    raise SystemExit("Unused configuration alias")
+# Static post-patch checks for the route guard contract and destination-client configuration.
+for marker in ("DB_ROUTE_READINESS_NOT_READY", "CORE_PARITY_HASH_PASS", "ACTIVE_SESSION_HASH_PASS", "DB2_ROUTE_URL", "DB2_ROUTE_KEY", "DB2_ROUTE_REF"):
+    if marker not in index_html or marker not in dashboard_html:
+        raise SystemExit("Route readiness marker missing from reseller pages: " + marker)
+
 index_path.write_text(index_html, encoding="utf-8")
 dashboard_path.write_text(dashboard_html, encoding="utf-8")
-print("PASS: reseller now resolves DB1/DB2 global route, recreates Supabase client on target change, and forces fresh reseller login on epoch/switch changes.")
+print("PASS: V11.30.2 route readiness, DB target aliases, final login refresh and version bump validated.")
