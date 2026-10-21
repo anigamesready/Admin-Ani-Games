@@ -12,6 +12,31 @@ if marker in html:
 
 if "async function coreDbCall(action,payload={})" not in html:
     raise SystemExit("Expected Admin V12.1.19 core DB routing source")
+if "async function requestSharedDbRouteSwitch(" not in html:
+    route_switch_helper = r"""
+async function requestSharedDbRouteSwitch(target,reason){
+ if(!dualDbRouteReady)throw new Error('GLOBAL_ROUTE_NOT_VERIFIED');
+ const token=await adminAccessToken();
+ if(!token)throw new Error('OWNER_SESSION_REQUIRED');
+ const peerApiKey=DB_TARGET==='backup'?DB1_KEY:DB2_KEY;
+ const response=await fetch(SB_URL+'/functions/v1/db-route-readiness',{
+  method:'POST',
+  headers:{apikey:SB_KEY,'content-type':'application/json',authorization:'Bearer '+token},
+  body:JSON.stringify({action:'switch-global',target,reason,peerApiKey,gatewayApiKey:DB1_ROUTE_KEY}),
+  cache:'no-store'
+ });
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||data?.ok!==true||data?.finalized!==true){
+  throw new Error(String(data?.error||('GLOBAL_DB_SWITCH_HTTP_'+response.status)));
+ }
+ return data;
+}
+"""
+    helper_anchor = "async function refreshGatewayReadiness(){"
+    if html.count(helper_anchor) != 1:
+        raise SystemExit("Shared route switch helper anchor missing")
+    html = html.replace(helper_anchor, route_switch_helper + "\n" + helper_anchor, 1)
+
 if "async function refreshGatewayReadiness()" not in html:
     anchor = "async function verifyDb2OwnerLogin(){"
     if html.count(anchor) != 1:
@@ -56,6 +81,11 @@ new_auth = """const ready=await dbSyncCall('mark-ready',{runId});readyGatewayAft
      try{const gatewayProof=await refreshGatewayReadiness();readyGatewayAfterAuth=gatewayProof.gatewayReady===true;if(readyGatewayAfterAuth)ready.gatewayReady=true;}
      catch(gatewayError){readyGatewayAfterAuth=false;ready.gatewayReady=false;gatewayReadinessDetail=String(gatewayError?.message||gatewayError);ready.gatewayReason=gatewayReadinessDetail;}"""
 html = html.replace(old_auth, new_auth, 1)
+
+old_switch = "const switched=await coreDbCall('switch-global',{target,reason:'Admin V12.1.17 simple scoped DB switch'});"
+if html.count(old_switch) != 1:
+    raise SystemExit(f"Expected one global switch backend call; found {html.count(old_switch)}")
+html = html.replace(old_switch, "const switched=await requestSharedDbRouteSwitch(target,'Admin V12.1.20 Auth/Gateway guarded global switch');", 1)
 
 # Make the coordinated switch perform a fresh readiness probe and reload both route rows afterwards.
 switch_anchor = "a=d1.route;b=d2.route;\n   if(a.active_target!==current||b.active_target!==current"
