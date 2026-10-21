@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.21 Optional Sync DB Cutover APK
+name: Build AniGames Admin V12.1.22 Full Sync DB Cutover APK
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.21 Optional Sync DB Cutover Debug APK
+    name: Build AniGames Admin V12.1.22 Full Sync DB Cutover Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -59,6 +59,7 @@ jobs:
             "scripts/patch_admin_v12_1_17_core_db.py"
             "scripts/patch_admin_gateway_readiness.py"
             "scripts/patch_admin_cutover_without_sync.py"
+            "scripts/patch_admin_v12_1_22_full_sync.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -98,17 +99,24 @@ jobs:
           python3 patch_admin_v12_1_17_core_db.py
           python3 patch_admin_gateway_readiness.py
           python3 patch_admin_cutover_without_sync.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py
-          grep -q "versionCode 49" android/app/build.gradle
-          grep -q "versionName '12.1.21'" android/app/build.gradle
-          grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
+          python3 patch_admin_v12_1_22_full_sync.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py
+          grep -q "versionCode 50" android/app/build.gradle
+          grep -q "versionName '12.1.22'" android/app/build.gradle
+          ! grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
+          grep -q "dbSyncCall('start')" android/app/src/main/assets/web/admin.html
+          grep -q "dbSyncCall('apply-page'" android/app/src/main/assets/web/admin.html
+          grep -q "dbSyncCall('verify-table'" android/app/src/main/assets/web/admin.html
+          grep -q "dbSyncCall('mark-ready'" android/app/src/main/assets/web/admin.html
           grep -q "requestSharedDbRouteSwitch" android/app/src/main/assets/web/admin.html
           grep -q "refreshGatewayReadiness" android/app/src/main/assets/web/admin.html
           grep -q "db-route-readiness" android/app/src/main/assets/web/admin.html
-          grep -q "Verifikasi login DB tujuan" android/app/src/main/assets/web/admin.html
+          grep -q "Verifikasi login" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.21-ROUTE-CUTOVER-WITHOUT-FORCED-SYNC" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.22-FULL-12-TABLE-INCREMENTAL-SYNC" android/app/src/main/assets/web/admin.html
+          grep -q "TARGET_OWNER_LOGIN_TEST_REQUIRED" android/app/src/main/assets/web/admin.html
           grep -q "Perpindahan ini TIDAK menjalankan Sync" android/app/src/main/assets/web/admin.html
-          grep -q "rental_accounts" android/app/src/main/assets/web/admin.html
+          grep -q "rental_sessions" android/app/src/main/assets/web/admin.html
           python3 - <<'PY'
           import re
           from pathlib import Path
@@ -119,7 +127,7 @@ jobs:
           Path("/tmp/admin-inline-check-v12-1-17.js").write_text(scripts[0], encoding="utf-8")
           PY
           node --check /tmp/admin-inline-check-v12-1-17.js
-          echo "PASS: V12.1.20 account login verification + shared Gateway readiness + coordinated route switch + browser JS syntax."
+          echo "PASS: Admin V12.1.22 full 12-table incremental Sync + row/hash proofs + target Owner login + Gateway and coordinated route guards + browser JS syntax."
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -147,7 +155,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.21-optional-sync-cutover-debug-apk
+          name: AniGames-Admin-Android-v12.1.22-full-sync-cutover-debug-apk
           path: source-bundle/**/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
