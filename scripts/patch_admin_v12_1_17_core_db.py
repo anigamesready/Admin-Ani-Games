@@ -180,6 +180,21 @@ marker = "if(!a.dataParityReady||!b.dataParityReady)problems.push('Parity isi da
 if marker in html and "CORE_PARITY_STALE" not in html:
     html = html.replace(marker, marker + "\n const freshRoute=r=>{const t=Date.parse(r.last_parity_check_at||'');return Number.isFinite(t)&&Date.now()-t<=30*60*1000&&t<=Date.now()+60000;};\n if(!freshRoute(a)||!freshRoute(b))problems.push('Parity data sync inti belum diperbarui dalam 30 menit. Jalankan Sync sebelum pindah DB.');", 1)
 
+# Runtime route acceptance must follow a coordinated finalization, not unrelated Auth/gateway flags.
+route_backup_pattern = r"function routeBackupReady\(r\)\{.*?^\}"
+route_backup_replacement = r"""function routeBackupReady(r){
+ const parityAt=Date.parse(r?.last_parity_check_at||''),fresh=Number.isFinite(parityAt)&&Date.now()-parityAt<=30*60*1000&&parityAt<=Date.now()+60000;
+ const schema=!!r?.schema_version&&r.schema_version===r.primary_schema_version&&r.schema_version===r.backup_schema_version;
+ const epoch=Number(r?.epoch),switchId=String(r?.switch_id||''),note='Coordinated global route finalized: backup epoch '+epoch+' switch '+switchId;
+ const finalized=epoch>=2&&!!switchId&&String(r?.cutover_test_note||'')===note&&!!r?.last_cutover_test_at;
+ return !!r&&r.active_target==='backup'&&finalized&&r.data_parity_ready===true&&r.sync_in_progress!==true&&fresh&&schema;
+}"""
+html, route_backup_count = re.subn(route_backup_pattern, route_backup_replacement, html, count=1, flags=re.S | re.M)
+if route_backup_count != 1:
+    raise SystemExit("Admin runtime route still has a strict legacy backup/auth/gateway gate.")
+if "r.auth_parity_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.can_switch_to_backup===true" in html:
+    raise SystemExit("Strict legacy backup/auth/gateway gate remains after route patch.")
+
 # Simplify explanation but retain owner authorization and explicit cutover confirmation.
 html = html.replace('DB Sync memerlukan verifikasi login owner/admin di kedua project dan gateway bersama.',
                     'DB Sync hanya membawa rental dan user reseller. Auth Admin, secrets, fungsi/API, dan pairing tidak ikut dipindahkan.')
@@ -190,7 +205,7 @@ html = html.replace('Login owner/admin aktif belum diverifikasi pada kedua proje
 # Keep build/version contract isolated to the new branch.
 if "versionCode 44" not in gradle or "versionName '12.1.16'" not in gradle:
     raise SystemExit("Expected locked Admin V12.1.16 build inputs; refusing to patch a mismatched source.")
-gradle = gradle.replace("versionCode 44", "versionCode 46", 1).replace("versionName '12.1.16'", "versionName '12.1.18'", 1)
+gradle = gradle.replace("versionCode 44", "versionCode 47", 1).replace("versionName '12.1.16'", "versionName '12.1.19'", 1)
 if "async function coreDbCall(action,payload={})" not in html:
     raise SystemExit("Core backend caller was not inserted.")
 if "CORE_SYNC_ALREADY_IN_PROGRESS" not in html or "ROUTE_FINAL_CONFIRMATION_FAILED" not in html:
@@ -202,5 +217,5 @@ if "coreDbCall('sync-core')" not in html or "coreDbCall('switch-global'" not in 
     raise SystemExit("Admin is not wired to the scoped core DB backend.")
 html_path.write_text(html, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
-Path("VERSION.txt").write_text("AniGames Admin Android V12.1.18 — simple scoped sync + core global DB switch\n", encoding="utf-8")
-print("PASS: Admin V12.1.18 uses db-core-sync for incremental rental/reseller sync and coordinated route switch; no auth/gateway parity gate.")
+Path("VERSION.txt").write_text("AniGames Admin Android V12.1.19 — global route continuity + scoped sync\n", encoding="utf-8")
+print("PASS: Admin V12.1.19 accepts only coordinated global route finalization; auth/gateway flags are not runtime route gates.")
