@@ -92,7 +92,7 @@ if marker not in html:
     marker_anchor = "async function requestGlobalDbSwitch(){"
     if html.count(marker_anchor) != 1:
         raise SystemExit("V12.1.21 marker insertion anchor missing or duplicated.")
-    html = html.replace(marker_anchor, "// " + marker + "\\n" + marker_anchor, 1)
+    html = html.replace(marker_anchor, "// " + marker + "\n" + marker_anchor, 1)
 if marker not in html:
     raise SystemExit("V12.1.21 workflow marker was not inserted.")
 
