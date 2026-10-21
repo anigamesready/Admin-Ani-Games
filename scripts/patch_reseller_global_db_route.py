@@ -54,7 +54,7 @@ async function resolveResellerGlobalRoute(force=false){
    SB_URL=config.url;SB_KEY=config.key;
    sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
   }
-  activeResellerRoute={...config,epoch,switchId,stamp,initial};
+  activeResellerRoute={...config,epoch,switchId,stamp,initial,syncInProgress:a.sync_in_progress===true||b.sync_in_progress===true};
   resellerRouteCheckedAt=Date.now();
   return activeResellerRoute;
  })();
