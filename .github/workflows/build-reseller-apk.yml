@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - main
+      - feature/reseller-v11.30.1-global-db-route
     paths:
       - 'Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip'
+      - 'scripts/patch_reseller_global_db_route.py'
       - '.github/workflows/build-reseller-apk.yml'
   workflow_dispatch:
 
@@ -127,9 +129,9 @@ jobs:
               raise SystemExit("Cannot isolate Android namespace: Gradle namespace setting not found")
           if not app_count:
               raise SystemExit("Cannot isolate app install ID: applicationId setting not found")
-          text, _ = re.subn(r'\bversionCode\s+\d+', 'versionCode 130', text, count=1)
+          text, _ = re.subn(r'\bversionCode\s+\d+', 'versionCode 131', text, count=1)
           text, _ = re.subn(r'(\bversionName\s*=?\s*["\'])[^"\']+(["\'])',
-                            lambda m: m.group(1) + "1.0.0" + m.group(2), text, count=1)
+                            lambda m: m.group(1) + "1.0.1" + m.group(2), text, count=1)
           gradle.write_text(text)
           print("Configured namespace and applicationId as com.anigames.reseller")
 
@@ -249,6 +251,32 @@ jobs:
           print("Reseller identity, package, UI entry-point, restricted-action, logo and API-key audits passed.")
           PY
 
+      - name: Apply V11.30.1 global DB route runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_reseller_global_db_route.py "$ANDROID_DIR"
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          root = Path(__import__('os').environ['ANDROID_DIR'])
+          files = [p for p in root.rglob('index.html') if p.parent.name == 'web' and (p.parent/'admin-control.html').exists()]
+          if len(files) != 1:
+              raise SystemExit(f'Expected one patched reseller UI pair, found {len(files)}')
+          for path in [files[0], files[0].parent/'admin-control.html']:
+              text = path.read_text(encoding='utf-8')
+              if 'resolveResellerGlobalRoute' not in text or 'DB_ROUTE_NOT_FINALIZED' not in text or 'DB_ROUTE_STAMP_KEY' not in text:
+                  raise SystemExit(f'Route guards missing in {path.name}')
+              scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', text, re.I|re.S)
+              if len(scripts) != 1:
+                  raise SystemExit(f'Expected one inline script in {path.name}, got {len(scripts)}')
+              out = Path('/tmp') / (path.stem + '-reseller-route.js')
+              out.write_text(scripts[0], encoding='utf-8')
+          print('PASS: reseller resolves both DB route controls and forces a re-login after route/epoch change.')
+          PY
+          node --check /tmp/index-reseller-route.js
+          node --check /tmp/admin-control-reseller-route.js
+
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v6
         with:
@@ -278,16 +306,16 @@ jobs:
           "$AAPT" dump badging "$APK" > output/apk-badging.txt
           cat output/apk-badging.txt | head -8
           grep -q "package: name='[^']*reseller[^']*'" output/apk-badging.txt || { echo "::error::Built package ID is not reseller-specific"; exit 1; }
-          cp "$APK" output/Ani-Games-Reseller-v11.30.0-debug.apk
-          sha256sum output/Ani-Games-Reseller-v11.30.0-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v11.30.0-debug.apk
+          cp "$APK" output/Ani-Games-Reseller-v11.30.1-dual-db-route-debug.apk
+          sha256sum output/Ani-Games-Reseller-v11.30.1-dual-db-route-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v11.30.1-dual-db-route-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Reseller-v11.30.0-debug-apk
+          name: Ani-Games-Reseller-v11.30.1-dual-db-route-debug-apk
           path: |
-            output/Ani-Games-Reseller-v11.30.0-debug.apk
+            output/Ani-Games-Reseller-v11.30.1-dual-db-route-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
