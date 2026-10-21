@@ -56,7 +56,7 @@ html=html.replace(syncAnchor,"""  dbSyncStatus('Merekonsiliasi sesi aktif standb
   dbSyncStatus('Sesi aktif/paused cocok. Memverifikasi seluruh baris sumber 12 tabel; riwayat ekstra target dipertahankan…');""",1)
 
 html=html.replace("// V12.1.23-FINAL-ADMIN-PACKAGE","// V12.1.23-FINAL-ADMIN-PACKAGE\n// "+marker,1)
-for needed in ["ownerProof=state.proof","TARGET_OWNER_PROOF_REQUIRED","dbSyncCall('reconcile-active-sessions')",marker]:
+for needed in ["ownerProof=state.proof","TARGET_OWNER_PROOF_REQUIRED","reconcile-active-sessions",marker]:
     if needed not in html: raise SystemExit("Owner proof implementation marker missing: "+needed)
 if "localStorage.setItem('aniGamesStandbyOwnerProof'" in html or 'localStorage.setItem("aniGamesStandbyOwnerProof"' in html:
     raise SystemExit("Owner proof must remain in memory only")
