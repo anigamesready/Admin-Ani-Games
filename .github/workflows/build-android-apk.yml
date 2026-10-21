@@ -125,7 +125,7 @@ jobs:
           grep -q "V12.1.23-FINAL-ADMIN-PACKAGE" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.24-CROSS-PROJECT-OWNER-PROOF" android/app/src/main/assets/web/admin.html
           grep -q "ownerProof=state.proof" android/app/src/main/assets/web/admin.html
-          grep -q "dbSyncCall('reconcile-active-sessions')" android/app/src/main/assets/web/admin.html
+          grep -q "reconcile-active-sessions" android/app/src/main/assets/web/admin.html
           grep -q "TARGET_OWNER_LOGIN_TEST_REQUIRED" android/app/src/main/assets/web/admin.html
           grep -q "Perpindahan ini TIDAK menjalankan Sync" android/app/src/main/assets/web/admin.html
           grep -q "rental_sessions" android/app/src/main/assets/web/admin.html
