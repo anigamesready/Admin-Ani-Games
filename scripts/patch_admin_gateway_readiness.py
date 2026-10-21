@@ -87,8 +87,13 @@ if html.count(old_switch) != 1:
     raise SystemExit(f"Expected one global switch backend call; found {html.count(old_switch)}")
 html = html.replace(old_switch, "const switched=await requestSharedDbRouteSwitch(target,'Admin V12.1.20 Auth/Gateway guarded global switch');", 1)
 
-# Make the coordinated switch perform a fresh readiness probe and reload both route rows afterwards.
-switch_anchor = "a=d1.route;b=d2.route;\n   if(a.active_target!==current||b.active_target!==current"
+# Make the coordinated switch perform a fresh readiness probe and refresh both route rows.
+sync_anchor = "const sync=await coreDbCall('sync-core');"
+if html.count(sync_anchor) != 1:
+    raise SystemExit(f"Expected one final sync anchor; found {html.count(sync_anchor)}")
+sync_pos = html.find(sync_anchor) + len(sync_anchor)
+tail = html[sync_pos:]
+switch_pattern = re.compile(r"a=d1\\.route;b=d2\\.route;\\s*if\\(a\\.active_target!==current\\|\\|b\\.active_target!==current")
 switch_replacement = """a=d1.route;b=d2.route;
    await refreshGatewayReadiness();
    [d1,d2]=await Promise.all([
@@ -97,9 +102,10 @@ switch_replacement = """a=d1.route;b=d2.route;
    ]);
    a=d1.route;b=d2.route;
    if(a.active_target!==current||b.active_target!==current"""
-if html.count(switch_anchor) != 1:
-    raise SystemExit(f"Expected one post-sync global route gate; found {html.count(switch_anchor)}")
-html = html.replace(switch_anchor, switch_replacement, 1)
+tail, switch_count = switch_pattern.subn(switch_replacement, tail, count=1)
+if switch_count != 1:
+    raise SystemExit(f"Expected one post-sync global route gate; found {switch_count}")
+html = html[:sync_pos] + tail
 
 # Display the actual Gateway/readiness rejection reason in the login-test status.
 old_status = "dbSyncStatus(ready.gatewayReady?'Database tujuan lolos hash/login/gateway. Penulisan ditahan agar perpindahan global dapat difinalisasi.':'Data/schema/auth parity lolos, tetapi gateway bersama belum terverifikasi. Database tujuan TIDAK boleh diaktifkan.',ready.gatewayReady!==true);"
