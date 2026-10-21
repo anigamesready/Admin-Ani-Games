@@ -40,9 +40,9 @@ html=replace_fn(html,"async function dbSyncCall(action,payload={}){",sync_fn,"Ow
 
 # The backend returns a signed, 30-minute proof only after validating the source Owner and target-project password.
 # Store that proof in runtime memory; never put the password, proof or access token into localStorage.
-anchor="  window.__dbTargetLoginVerifiedAt=Date.now();window.__dbTargetLoginProjectRef=ref;"
-if html.split(anchor).count(anchor)!=1: raise SystemExit("Owner proof storage anchor mismatch")
-html=html.replace(anchor, """  if(!result?.ownerProof||!Number.isFinite(Number(result.expiresAt))||Number(result.expiresAt)<=Date.now())throw new Error('TARGET_OWNER_PROOF_NOT_ISSUED');
+anchor="  window.__dbTargetLoginVerifiedAt=Date.now();\n  window.__dbTargetLoginProjectRef=ref;"
+if html.count(anchor)!=1: raise SystemExit("Owner proof storage anchor mismatch")
+html=html.replace(anchor, """  if(!result?.ownerProof||!Number.isFinite(Number(result.expiresAt))||Number(result.expiresAt)<=Date.now()||result.targetProjectRef!==ref)throw new Error('TARGET_OWNER_PROOF_NOT_ISSUED');
   window.__aniGamesStandbyOwnerProof={projectRef:ref,proof:String(result.ownerProof),expiresAt:Number(result.expiresAt)};
 """+anchor,1)
 html=html.replace("window.__dbTargetLoginVerifiedAt=0;window.__dbTargetLoginProjectRef='';",
