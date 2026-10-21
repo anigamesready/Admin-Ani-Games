@@ -46,18 +46,9 @@ async function resolveResellerGlobalRoute(force=false){
   }
   if(a.schema_version&&b.schema_version&&a.schema_version!==b.schema_version)throw new Error('DB_ROUTE_SCHEMA_MISMATCH');
   if(a.sync_in_progress===true||b.sync_in_progress===true)throw new Error('DB_SYNC_IN_PROGRESS');
-  if(!initial){
-   const now=Date.now();
-   for(const [label,r] of [['DB1',a],['DB2',b]]){
-    const ts=Date.parse(String(r.last_parity_check_at||'')),note=String(r.last_parity_check_note||'');
-    const fresh=Number.isFinite(ts)&&now-ts<=30*60*1000&&ts<=now+60000;
-    const schema=!!r.schema_version&&r.schema_version===r.primary_schema_version&&r.schema_version===r.backup_schema_version;
-    const ready=r.primary_ready===true&&r.backup_ready===true&&r.data_parity_ready===true&&r.routing_gateway_ready===true&&r.sync_ready===true;
-    const hash=note.includes('CORE_PARITY_HASH_PASS')&&note.includes('ACTIVE_SESSION_HASH_PASS');
-    if(!ready||!fresh||!schema||!hash||r.sync_write_quiesce===true||r.can_switch_to_backup!==true)
-     throw new Error('DB_ROUTE_READINESS_NOT_READY:'+label);
-   }
-  }
+  // Readiness freshness gates a new cutover, not ordinary operation on a route that
+  // already has matching, authoritative finalization proof. The active DB must stay usable
+  // after the 30-minute parity window expires; DB-route-switch endpoints remain strict.
   const config=target==='backup'
    ?{target,url:DB2_ROUTE_URL,key:DB2_ROUTE_KEY,ref:DB2_ROUTE_REF}
    :{target,url:DB1_ROUTE_URL,key:DB1_ROUTE_KEY,ref:DB1_ROUTE_REF};
@@ -183,7 +174,7 @@ elif not ("versionCode 132" in gradle and "versionName '1.0.2'" in gradle):
     raise SystemExit("Expected v11.30.1 Gradle metadata; refusing unknown version")
 gradle_path.write_text(gradle, encoding="utf-8")
 # Static post-patch checks for the route guard contract and destination-client configuration.
-for marker in ("DB_ROUTE_READINESS_NOT_READY", "CORE_PARITY_HASH_PASS", "ACTIVE_SESSION_HASH_PASS", "DB2_ROUTE_URL", "DB2_ROUTE_KEY", "DB2_ROUTE_REF"):
+for marker in ("DB_ROUTE_NOT_FINALIZED", "DB_SYNC_IN_PROGRESS", "CORE_PARITY_HASH_PASS", "ACTIVE_SESSION_HASH_PASS", "DB2_ROUTE_URL", "DB2_ROUTE_KEY", "DB2_ROUTE_REF"):
     if marker not in index_html or marker not in dashboard_html:
         raise SystemExit("Route readiness marker missing from reseller pages: " + marker)
 
