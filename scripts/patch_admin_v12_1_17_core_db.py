@@ -145,7 +145,10 @@ new_switch = r"""async function requestGlobalDbSwitch(){
  finally{if(button){button.disabled=false;button.textContent='Pindah seluruh sistem'}}
 }
 """
-html = replace_region(html, "async function requestGlobalDbSwitch(){", "\nfunction updateDbSyncDirection(){", new_switch, "Direct core-db global route switch")
+switch_pattern = r"async function requestGlobalDbSwitch\(\)\{.*?^\}"
+html, switch_count = re.subn(switch_pattern, new_switch.rstrip(), html, count=1, flags=re.S | re.M)
+if switch_count != 1:
+    raise SystemExit("Direct core-db global route switch: function boundary not found")
 
 # Remove outdated manual Auth-verification UI. Auth identities are separate-project concerns,
 # not part of the business-data sync action.
