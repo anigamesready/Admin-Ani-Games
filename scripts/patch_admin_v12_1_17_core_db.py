@@ -91,6 +91,13 @@ new_sync = r"""async function requestDbSync(options={}){
 """
 html = replace_region(html, "async function requestDbSync(options={}){", "\nasync function verifyDb2OwnerLogin(){", new_sync, "Core-only incremental sync")
 
+# The ordinary data-sync button must remain available when parity is stale; syncing is what refreshes parity.
+mode_pattern = re.compile(r"function updateDbSyncDirection\(\)\{[^\n]*\}")
+mode_replacement = r"""function updateDbSyncDirection(){const source=DB_TARGET==='backup'?'DB2':'DB1',target=DB_TARGET==='backup'?'DB1':'DB2',sourceLabel=$('dbSyncSourceLabel'),targetLabel=$('dbSyncTargetLabel'),button=$('dbSyncExecute'),verify=$('dbSyncVerifyOwner'),passwordLabel=$('dbSyncOwnerPasswordLabel'),state=$('dbSyncRouteState'),route=dualDbRouteState?.route,syncing=route?.sync_in_progress===true;if(sourceLabel)sourceLabel.textContent=source+' • Sumber aktif';if(targetLabel)targetLabel.textContent=target+' • Standby tujuan (upsert, tanpa delete)';if(button){button.textContent='Sinkronkan '+source+' → '+target;button.disabled=!route||syncing||ctx?.role!=='owner'}if(verify)verify.disabled=true;if(passwordLabel)passwordLabel.textContent='Auth Admin dikelola backend; tidak ikut Sync';if(state)state.textContent='Route global aktif: '+source+' • standby: '+target+' • epoch '+DB_ROUTE_EPOCH+(syncing?' • SYNC BERJALAN':'');}"""
+html, mode_count = mode_pattern.subn(mode_replacement, html, count=1)
+if mode_count != 1:
+    raise SystemExit("Sync button enablement patch anchor mismatch")
+
 route_ready = r"""function routeReadyForSwitch(r){
  const t=Date.parse(r?.last_parity_check_at||''),fresh=Number.isFinite(t)&&Date.now()-t<=30*60*1000&&t<=Date.now()+60000;
  const schema=!!r?.schema_version&&r.schema_version===r.primary_schema_version&&r.schema_version===r.backup_schema_version;
@@ -183,7 +190,7 @@ html = html.replace('Login owner/admin aktif belum diverifikasi pada kedua proje
 # Keep build/version contract isolated to the new branch.
 if "versionCode 44" not in gradle or "versionName '12.1.16'" not in gradle:
     raise SystemExit("Expected locked Admin V12.1.16 build inputs; refusing to patch a mismatched source.")
-gradle = gradle.replace("versionCode 44", "versionCode 45", 1).replace("versionName '12.1.16'", "versionName '12.1.17'", 1)
+gradle = gradle.replace("versionCode 44", "versionCode 46", 1).replace("versionName '12.1.16'", "versionName '12.1.18'", 1)
 if "async function coreDbCall(action,payload={})" not in html:
     raise SystemExit("Core backend caller was not inserted.")
 if "CORE_SYNC_ALREADY_IN_PROGRESS" not in html or "ROUTE_FINAL_CONFIRMATION_FAILED" not in html:
@@ -195,5 +202,5 @@ if "coreDbCall('sync-core')" not in html or "coreDbCall('switch-global'" not in 
     raise SystemExit("Admin is not wired to the scoped core DB backend.")
 html_path.write_text(html, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
-Path("VERSION.txt").write_text("AniGames Admin Android V12.1.17 — simple scoped sync + core global DB switch\n", encoding="utf-8")
-print("PASS: Admin V12.1.17 uses db-core-sync for incremental rental/reseller sync and coordinated route switch; no auth/gateway parity gate.")
+Path("VERSION.txt").write_text("AniGames Admin Android V12.1.18 — simple scoped sync + core global DB switch\n", encoding="utf-8")
+print("PASS: Admin V12.1.18 uses db-core-sync for incremental rental/reseller sync and coordinated route switch; no auth/gateway parity gate.")
