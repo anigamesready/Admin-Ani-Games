@@ -145,7 +145,7 @@ new_switch = r"""async function requestGlobalDbSwitch(){
  finally{if(button){button.disabled=false;button.textContent='Pindah seluruh sistem'}}
 }
 """
-html = replace_region(html, "async function requestGlobalDbSwitch(){", "async function abortDbSync()", new_switch, "Direct core-db global route switch")
+html = replace_region(html, "async function requestGlobalDbSwitch(){", "\nfunction updateDbSyncDirection(){", new_switch, "Direct core-db global route switch")
 
 # Remove outdated manual Auth-verification UI. Auth identities are separate-project concerns,
 # not part of the business-data sync action.
