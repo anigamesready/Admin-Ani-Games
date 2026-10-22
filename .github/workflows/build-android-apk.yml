@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.26 Primary Login Authority Fix APK
+name: Build AniGames Admin V12.1.27 Login Route Refresh Fix APK
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.26 Primary Login Authority Fix Debug APK
+    name: Build AniGames Admin V12.1.27 Login Route Refresh Fix Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -64,6 +64,7 @@ jobs:
             "scripts/patch_admin_v12_1_24_owner_proof.py"
             "scripts/patch_admin_v12_1_25_login_route_boot_fix.py"
             "scripts/patch_admin_v12_1_26_primary_login_authority.py"
+            "scripts/patch_admin_v12_1_27_login_click_route_refresh.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -108,12 +109,15 @@ jobs:
           python3 patch_admin_v12_1_24_owner_proof.py
           python3 patch_admin_v12_1_25_login_route_boot_fix.py
           python3 patch_admin_v12_1_26_primary_login_authority.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py
-          grep -q "versionCode 54" android/app/build.gradle
-          grep -q "versionName '12.1.26'" android/app/build.gradle
+          python3 patch_admin_v12_1_27_login_click_route_refresh.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py
+          grep -q "versionCode 55" android/app/build.gradle
+          grep -q "versionName '12.1.27'" android/app/build.gradle
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
           grep -q "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.27-LOGIN-CLICK-ROUTE-RESOLVE" android/app/src/main/assets/web/admin.html
+          grep -q "ensureActiveDbRouteForAuth" android/app/src/main/assets/web/admin.html
           grep -q "applicationId 'com.anigames.billingadmin'" android/app/build.gradle
           ! grep -q "com.anigames.billingadmin.v12test" android/app/build.gradle
           grep -q 'android:label="AniGames Admin"' android/app/src/main/AndroidManifest.xml
@@ -146,7 +150,7 @@ jobs:
           Path("/tmp/admin-inline-check-v12-1-17.js").write_text(scripts[0], encoding="utf-8")
           PY
           node --check /tmp/admin-inline-check-v12-1-17.js
-          echo "PASS: Admin V12.1.26 primary DB1 login authority + strict DB2 cutover guards + 12-table Sync + browser JS syntax."
+          echo "PASS: Admin V12.1.27 refreshes active route on auth actions; DB1 login independent of DB2 readiness; DB2 cutover remains strictly guarded; browser JS syntax passes."
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -179,19 +183,19 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.26-debug.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.26-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='54' versionName='12.1.26'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.27-debug.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.27-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='55' versionName='12.1.27'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.26-debug.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.26-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.26-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.26-debug.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.27-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.27-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.27-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.27-debug.apk"
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.26-final-debug-apk
+          name: AniGames-Admin-Android-v12.1.27-final-debug-apk
           path: output/*
           if-no-files-found: error
           retention-days: 30
