@@ -59,18 +59,22 @@ if len(matches) != 1:
     raise SystemExit(f"Expected exactly one resolveDualDbRoute function, found {len(matches)}")
 html = html[:matches[0].start()] + new_resolver + html[matches[0].end():]
 
-# Reflect the trust boundary accurately in the visible badge without changing the selected DB.
-old_badge = "if(system){system.textContent='RUTE GLOBAL TERVERIFIKASI';system.style.color='var(--ok)';system.style.borderColor='var(--ok)'}"
-new_badge = "if(system){system.textContent=DB_TARGET==='backup'?'RUTE GLOBAL TERVERIFIKASI':'DB1 PRIMARY TERVERIFIKASI';system.style.color='var(--ok)';system.style.borderColor='var(--ok)'}"
-if html.count(old_badge) != 1:
-    raise SystemExit(f"Expected exactly one route badge assignment, found {html.count(old_badge)}")
-html = html.replace(old_badge, new_badge, 1)
-
-old_hint = "if(hint)hint.textContent='Target mengikuti route-control Supabase • epoch '+DB_ROUTE_EPOCH+' • switch '+(DB_ROUTE_SWITCH_ID||'awal')"
-new_hint = "if(hint)hint.textContent=(DB_TARGET==='backup'?'Target DB2 dikonfirmasi kedua route-control':'Login utama mengikuti route-control DB1; kesiapan DB2 hanya memblokir cutover')+' • epoch '+DB_ROUTE_EPOCH+' • switch '+(DB_ROUTE_SWITCH_ID||'awal')"
-if html.count(old_hint) != 1:
-    raise SystemExit(f"Expected exactly one route hint assignment, found {html.count(old_hint)}")
-html = html.replace(old_hint, new_hint, 1)
+# Reflect the trust boundary accurately by replacing the complete route target configurator.
+configure_fn = r"""function configureDbTarget(target,route){
+ const config=target==='backup'?{url:DB2_URL,key:DB2_KEY}:{url:DB1_URL,key:DB1_KEY};
+ const changed=DB_TARGET!==target;DB_TARGET=target;SB_URL=config.url;SB_KEY=config.key;SB_FUNCTION_URL=SB_URL+'/functions/v1/ani-games-api';DB_ROUTE_EPOCH=Number(route?.epoch)||0;DB_ROUTE_SWITCH_ID=route?.switch_id||null;
+ if(changed||!sb)sb=supabase.createClient(SB_URL,SB_KEY);
+ try{localStorage.setItem(DB_CONFIG_KEY,JSON.stringify({target:DB_TARGET,epoch:DB_ROUTE_EPOCH,switchId:DB_ROUTE_SWITCH_ID,routedAt:new Date().toISOString()}))}catch(_){}
+ const badge=$('dbActiveBadge'),system=$('dbSystemStatusBadge'),hint=$('dbRouteStatusHint');
+ if(badge)badge.textContent=DB_TARGET==='backup'?'DB2 • Rute aktif':'DB1 • Rute aktif';
+ if(system){system.textContent=DB_TARGET==='backup'?'RUTE GLOBAL TERVERIFIKASI':'DB1 PRIMARY TERVERIFIKASI';system.style.color='var(--ok)';system.style.borderColor='var(--ok)'}
+ if(hint)hint.textContent=(DB_TARGET==='backup'?'Target DB2 dikonfirmasi kedua route-control':'Login utama mengikuti route-control DB1; kesiapan DB2 hanya memblokir cutover')+' • epoch '+DB_ROUTE_EPOCH+' • switch '+(DB_ROUTE_SWITCH_ID||'awal')
+}""";
+configure_pattern = re.compile(r"(?ms)^function configureDbTarget\(target,route\)\{.*?^\}")
+configure_matches = list(configure_pattern.finditer(html))
+if len(configure_matches) != 1:
+    raise SystemExit(f"Expected exactly one configureDbTarget function, found {len(configure_matches)}")
+html = html[:configure_matches[0].start()] + configure_fn + html[configure_matches[0].end():]
 
 # Static safety contract: preserve strict DB2 cutover checks, avoid toggling readiness flags in DB data.
 for required in [
