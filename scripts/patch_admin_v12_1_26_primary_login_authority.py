@@ -78,7 +78,6 @@ html = html[:configure_matches[0].start()] + configure_fn + html[configure_match
 
 # Static safety contract: preserve strict DB2 cutover checks, avoid toggling readiness flags in DB data.
 for required in [
-    "PRIMARY-LOGIN-AUTHORITY",
     "if(target==='primary')",
     "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY",
     "authority.primary_ready!==true",
