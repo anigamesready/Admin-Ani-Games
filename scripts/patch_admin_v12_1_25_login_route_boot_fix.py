@@ -42,7 +42,7 @@ async function startDualDbAdmin(){
   const system=$('dbSystemStatusBadge'),hint=$('dbRouteStatusHint');
   if(system){system.textContent='ROUTE BELUM TERVERIFIKASI';system.style.color='var(--bad)';system.style.borderColor='var(--bad)';}
   if(hint)hint.textContent=routeFailureText(e)+' • detail: '+String(e?.message||e).slice(0,120);
-  loginMsg(routeFailureText(e));
+  loginMsg(routeFailureText(e)+' ['+String(e?.message||e).slice(0,120)+']');
   setAdminAuthEnabled(false);
   if(!dualDbRouteMonitorStarted){
    dualDbRouteMonitorStarted=true;
