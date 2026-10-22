@@ -62,6 +62,7 @@ jobs:
             "scripts/patch_admin_v12_1_22_full_sync.py"
             "scripts/patch_admin_v12_1_23_final_package.py"
             "scripts/patch_admin_v12_1_24_owner_proof.py"
+            "scripts/patch_admin_v12_1_25_login_route_boot_fix.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -105,7 +106,7 @@ jobs:
           python3 patch_admin_v12_1_23_final_package.py
           python3 patch_admin_v12_1_24_owner_proof.py
           python3 patch_admin_v12_1_25_login_route_boot_fix.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py
           grep -q "versionCode 53" android/app/build.gradle
           grep -q "versionName '12.1.25'" android/app/build.gradle
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
