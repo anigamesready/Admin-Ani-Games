@@ -32,6 +32,7 @@ new_resolver = r"""async function resolveDualDbRoute(force=false){
   const target=String(authority.active_target||'');
   if(!['primary','backup'].includes(target))throw new Error('DB_ROUTE_INVALID_TARGET: DB1 returned an unknown active target');
   if(target==='primary'){
+   // PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY
    if(authority.primary_ready!==true)throw new Error('DB_ROUTE_PRIMARY_NOT_READY: DB1 is selected but primary_ready is false');
    // Important: primary login/operations stay on DB1 even when DB2 is not yet ready,
    // has no parity proof, or its read-only status endpoint is temporarily unavailable.
@@ -75,6 +76,7 @@ html = html.replace(old_hint, new_hint, 1)
 for required in [
     "PRIMARY-LOGIN-AUTHORITY",
     "if(target==='primary')",
+    "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY",
     "authority.primary_ready!==true",
     "if(!routeBackupReady(authority))",
     "readDualDbRoute('backup')",
