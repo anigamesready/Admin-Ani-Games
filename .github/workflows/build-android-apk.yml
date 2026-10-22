@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.24 Final Cross-Project Sync APK
+name: Build AniGames Admin V12.1.25 Final Login Route Fix APK
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.24 Final Cross-Project Sync Debug APK
+    name: Build AniGames Admin V12.1.25 Final Login Route Fix Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -104,9 +104,11 @@ jobs:
           python3 patch_admin_v12_1_22_full_sync.py
           python3 patch_admin_v12_1_23_final_package.py
           python3 patch_admin_v12_1_24_owner_proof.py
+          python3 patch_admin_v12_1_25_login_route_boot_fix.py
           python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py
-          grep -q "versionCode 52" android/app/build.gradle
-          grep -q "versionName '12.1.24'" android/app/build.gradle
+          grep -q "versionCode 53" android/app/build.gradle
+          grep -q "versionName '12.1.25'" android/app/build.gradle
+          grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "applicationId 'com.anigames.billingadmin'" android/app/build.gradle
           ! grep -q "com.anigames.billingadmin.v12test" android/app/build.gradle
           grep -q 'android:label="AniGames Admin"' android/app/src/main/AndroidManifest.xml
@@ -172,19 +174,19 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.24-debug.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.24-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='52' versionName='12.1.24'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.25-debug.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.25-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='53' versionName='12.1.25'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.24-debug.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.24-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.24-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.24-debug.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.25-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.25-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.25-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.25-debug.apk"
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.24-final-debug-apk
+          name: AniGames-Admin-Android-v12.1.25-final-debug-apk
           path: output/*
           if-no-files-found: error
           retention-days: 30
