@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.12 Foreground-Only Low-Noise Alerts + DB1 IoT Mapping Fix
+name: Build AniGames Admin V12.1.13 Shutdown Timer + DB1 IoT Mapping Fix
 
 on:
   push:
@@ -75,7 +75,7 @@ jobs:
           cd "$ANDROID_PROJECT_DIR"
           python3 - <<'PY'
           from pathlib import Path
-          import re, subprocess
+          import os, re, subprocess
           root = Path(".")
           html = (root / "android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
           scripts = [x for x in re.findall(r'<script\b[^>]*>([\s\S]*?)</script>', html, re.I) if x.strip()]
@@ -98,6 +98,11 @@ jobs:
           if "android.permission.POST_NOTIFICATIONS" not in manifest:
               raise SystemExit("POST_NOTIFICATIONS manifest permission missing")
           edge = (root / "supabase/functions/ani-games-api/index.ts").read_text(encoding="utf-8")
+          migration_path = Path(os.environ["GITHUB_WORKSPACE"]) / "docs/PC-SHUTDOWN-TIMER-MIGRATION.sql"
+          migration = migration_path.read_text(encoding="utf-8")
+          for token in ["shutdown_timer_set", "shutdown_timer_cancel", "shutdown_timer_status", "ACTIVE_RENTAL_SHUTDOWN_BLOCKED", "private.is_owner_access"]:
+              if token not in migration:
+                  raise SystemExit("Shutdown timer migration guard missing: " + token)
           for token in ["validateIoTTarget", "BLYNK_DEVICE_MAPPING_REQUIRED", "BLYNK_DEVICE_MAPPING_CONFLICT", "blynkPowerTarget", "pairingDuplicateArchivedAt"]:
               if token not in edge:
                   raise SystemExit("IoT mapping regression check missing: " + token)
@@ -113,7 +118,7 @@ jobs:
           gradle = (root / "android/app/build.gradle").read_text()
           if "versionCode 41" not in gradle or "versionName '12.1.13'" not in gradle:
               raise SystemExit("Version bump check failed")
-          print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, Android notification bridge + foreground-only low-noise alert polling present")
+          print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, Admin shutdown timer + Android notification bridge + low-noise alerts present")
           PY
           python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py patch_admin_rental_identity_rpc.py patch_admin_notification_reliability.py patch_admin_shutdown_timer.py
           unzip -t "$GITHUB_WORKSPACE/AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip"
