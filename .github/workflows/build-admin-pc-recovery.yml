@@ -168,6 +168,6 @@ jobs:
           name: AniGames-Admin-V12.1.13-SHUTDOWN-TIMER-DB1-IOT-FIX
           path: |
             ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
-            AniGames-Admin-V12.1.12-FOREGROUND-LOW-NOISE-ALERT-SOURCE.zip
+            AniGames-Admin-V12.1.13-SHUTDOWN-TIMER-SOURCE.zip
           if-no-files-found: error
           retention-days: 14
