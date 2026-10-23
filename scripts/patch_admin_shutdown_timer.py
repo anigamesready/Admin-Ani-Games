@@ -248,16 +248,22 @@ async function cancelPcShutdown() {
    targetName:target.device_name || 'PC', updatedAt:new Date().toISOString(), commandId:commandId, message:'Permintaan pembatalan menunggu PC.'};
   saveAdminShutdownStates(stateMap);
   updateShutdownTimerStatus();
-  if (commandId && typeof waitDeviceCommand === 'function') {
-   const ack = await waitDeviceCommand(commandId, 15000);
-   if (ack?.status === 'failed' || ack?.status === 'expired') throw new Error(String(ack?.result?.message || ack?.result?.error || 'PC tidak mengonfirmasi pembatalan.'));
+  if (!commandId || typeof waitDeviceCommand !== 'function') {
+   msg('Permintaan pembatalan sudah dikirim, tetapi ID perintah belum tersedia. Status belum dianggap selesai.', true);
+   return;
+  }
+  const ack = await waitDeviceCommand(commandId, 15000);
+  if (ack?.status === 'failed' || ack?.status === 'expired') throw new Error(String(ack?.result?.message || ack?.result?.error || 'PC tidak mengonfirmasi pembatalan.'));
+  if (ack?.status !== 'completed') {
+   msg('Permintaan pembatalan masih menunggu konfirmasi PC. Timer belum ditandai selesai.', true);
+   return;
   }
   const latest = readAdminShutdownStates();
   latest[String(target.id)] = {state:'canceled', scheduleId:old?.scheduleId || null, deadlineAt:old?.deadlineAt || null,
    targetName:target.device_name || 'PC', updatedAt:new Date().toISOString(), message:'Timer shutdown dibatalkan oleh Admin.'};
   saveAdminShutdownStates(latest);
   updateShutdownTimerStatus();
-  msg('Permintaan pembatalan timer shutdown diproses untuk ' + target.device_name + '.');
+  msg('Timer shutdown berhasil dibatalkan oleh PC ' + target.device_name + '.');
  } catch (e) {
   msg('Pembatalan timer shutdown gagal: ' + (e?.message || e), true);
  }
