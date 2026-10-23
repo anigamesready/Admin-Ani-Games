@@ -36,6 +36,11 @@ if html.count(section_anchor) != 1:
     raise SystemExit("Device section insertion anchor mismatch; refusing to patch the wrong page.")
 html = html.replace(section_anchor, timer_card + '\n</section>\n\n<section id="pairing"', 1)
 
+nav_anchor = '<button data-tab="databaseTools"'
+if html.count(nav_anchor) != 1:
+    raise SystemExit("Admin navigation insertion anchor mismatch; refusing to patch.")
+html = html.replace(nav_anchor, '<button id="shutdownTimerNav" onclick="openShutdownTimerMenu()">⏱️ Timer Shutdown PC</button>' + nav_anchor, 1)
+
 helpers = r"""
 const ADMIN_PC_SHUTDOWN_STATE_KEY = 'ani_games_admin_shutdown_timer_v1';
 function readAdminShutdownStates() {
@@ -276,7 +281,19 @@ if (!window.__aniShutdownTimerStatusInterval) {
 load_anchor = "async function loadDevices(){"
 if html.count(load_anchor) != 1:
     raise SystemExit("loadDevices anchor mismatch; refusing to patch.")
-html = html.replace(load_anchor, helpers + "\n" + load_anchor, 1)
+timer_nav_helper = r"""
+function openShutdownTimerMenu() {
+ try { if (typeof closeMobileNav === 'function') closeMobileNav(); } catch (_) {}
+ tab('devices');
+ document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active'));
+ const btn = $('shutdownTimerNav');
+ if (btn) btn.classList.add('active');
+ document.querySelectorAll('#mobileBottomNav button').forEach(x => x.classList.toggle('active', x.dataset.mobileTab === 'devices'));
+ const card = $('pcShutdownTimerCard');
+ if (card) card.scrollIntoView({behavior:'smooth', block:'center'});
+}
+"""
+html = html.replace(load_anchor, timer_nav_helper + "\n" + helpers + "\n" + load_anchor, 1)
 
 device_rows_anchor = "devicesCache=rows;"
 if html.count(device_rows_anchor) != 1:
@@ -284,7 +301,7 @@ if html.count(device_rows_anchor) != 1:
 html = html.replace(device_rows_anchor, "devicesCache=rows;refreshShutdownTargetOptions(rows);", 1)
 
 required = [
- "id=\"shutdownTargetDevice\"",
+ "id=\"shutdownTargetDevice\"", "id=\"shutdownTimerNav\"", "function openShutdownTimerMenu()",
  "function previewPcShutdown()",
  "function schedulePcShutdown()",
  "function cancelPcShutdown()",
