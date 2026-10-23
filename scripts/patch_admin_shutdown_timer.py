@@ -198,7 +198,7 @@ async function schedulePcShutdown() {
   const result = await rpc('admin_command', {
    p_org_id: currentOrg.id,
    p_device_id: target.id,
-   p_command: 'shutdown',
+   p_command: 'schedule_shutdown',
    p_payload: {scheduled:true, scheduleId:scheduleId, deadlineAt:deadlineAt, delayMs:delayMs,
     targetDeviceId:target.id, targetDeviceName:target.device_name || target.client_id || 'PC', source:'admin-shutdown-timer'}
   });
@@ -243,7 +243,7 @@ async function cancelPcShutdown() {
   const result = await rpc('admin_command', {
    p_org_id: currentOrg.id,
    p_device_id: target.id,
-   p_command: 'shutdown',
+   p_command: 'cancel_shutdown_timer',
    p_payload: {cancelScheduled:true, scheduleId:old?.scheduleId || null, targetDeviceId:target.id,
     targetDeviceName:target.device_name || target.client_id || 'PC', source:'admin-shutdown-timer-cancel'}
   });
@@ -305,7 +305,7 @@ required = [
  "function previewPcShutdown()",
  "function schedulePcShutdown()",
  "function cancelPcShutdown()",
- "p_command: 'shutdown'",
+ "p_command: 'schedule_shutdown'", "p_command: 'cancel_shutdown_timer'",
  "p_payload: {scheduled:true",
  "p_payload: {cancelScheduled:true",
  "metadata.activeCode",
