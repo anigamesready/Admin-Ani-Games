@@ -197,7 +197,7 @@ async function schedulePcShutdown() {
    p_payload: {scheduled:true, scheduleId:scheduleId, deadlineAt:deadlineAt, delayMs:delayMs,
     targetDeviceId:target.id, targetDeviceName:target.device_name || target.client_id || 'PC', source:'admin-shutdown-timer'}
   });
-  commandId = result?.command_id || result?.id || null;
+  commandId = typeof result === 'string' ? result : (result?.command_id || result?.id || null);
   const stateMap = readAdminShutdownStates();
   stateMap[String(target.id)] = {state:'pending', scheduleId:scheduleId, deadlineAt:deadlineAt,
    targetName:target.device_name || target.client_id || 'PC', updatedAt:new Date().toISOString(), commandId:commandId};
