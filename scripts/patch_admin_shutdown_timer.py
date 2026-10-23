@@ -211,7 +211,7 @@ async function schedulePcShutdown() {
   msg('Permintaan timer shutdown dikirim ke ' + target.device_name + '. Menunggu konfirmasi PC.');
   if (commandId && typeof waitDeviceCommand === 'function') {
    const ack = await waitDeviceCommand(commandId, 15000);
-   if (ack?.status === 'failed' || ack?.status === 'expired') {
+   if (ack?.status === 'failed' || ack?.status === 'expired' || ack?.result?.ok === false) {
     const current = readAdminShutdownStates();
     current[String(target.id)] = {state:'blocked_active_session', scheduleId:scheduleId, deadlineAt:deadlineAt,
      targetName:target.device_name || 'PC', updatedAt:new Date().toISOString(),
@@ -237,7 +237,7 @@ async function cancelPcShutdown() {
   const target = selectedShutdownTarget();
   if (!target) throw new Error('Pilih PC target terlebih dahulu.');
   if (target.uiStatus !== 'online') throw new Error('PC target sedang offline. Pembatalan tidak dapat dikirim.');
-  const old = readAdminShutdownStates()[String(target.id)] || effectiveShutdownTimerState(target);
+  const old = effectiveShutdownTimerState(target) || readAdminShutdownStates()[String(target.id)];
   const ok = confirm('Batalkan timer shutdown pada ' + target.device_name + '?\n\nTidak ada perintah shutdown baru yang akan dijalankan.');
   if (!ok) return;
   const result = await rpc('admin_command', {
@@ -258,7 +258,7 @@ async function cancelPcShutdown() {
    return;
   }
   const ack = await waitDeviceCommand(commandId, 15000);
-  if (ack?.status === 'failed' || ack?.status === 'expired') throw new Error(String(ack?.result?.message || ack?.result?.error || 'PC tidak mengonfirmasi pembatalan.'));
+  if (ack?.status === 'failed' || ack?.status === 'expired' || ack?.result?.ok === false) throw new Error(String(ack?.result?.message || ack?.result?.error || 'PC tidak mengonfirmasi pembatalan.'));
   if (ack?.status !== 'completed') {
    msg('Permintaan pembatalan masih menunggu konfirmasi PC. Timer belum ditandai selesai.', true);
    return;
