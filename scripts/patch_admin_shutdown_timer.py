@@ -105,7 +105,7 @@ function effectiveShutdownTimerState(device) {
  if (remote && typeof remote === 'object' && remote.state) {
   const remoteAt = Date.parse(remote.updatedAt || '') || 0;
   const localAt = Date.parse(local?.updatedAt || '') || 0;
-  if (!local || remote.scheduleId === local.scheduleId || remoteAt > localAt) return remote;
+  if (!local || remoteAt > localAt || (remote.scheduleId === local.scheduleId && remoteAt >= localAt)) return remote;
  }
  return local || (remote && typeof remote === 'object' ? remote : null);
 }
@@ -129,7 +129,7 @@ function updateShutdownTimerStatus() {
    countdown.textContent = shutdownFormatRemaining(deadline - Date.now());
    if (state.state === 'pending') {
     badge.textContent = 'MENUNGGU PC';
-    status.textContent = 'Permintaan timer untuk ' + target.device_name + ' sedang menunggu konfirmasi PC.';
+    status.textContent = state.message || ('Permintaan timer untuk ' + target.device_name + ' sedang menunggu konfirmasi PC.');
    } else {
     badge.textContent = 'TIMER AKTIF';
     status.textContent = 'Target: ' + target.device_name + ' • shutdown terjadwal ' + new Date(deadline).toLocaleString('id-ID') + '.';
