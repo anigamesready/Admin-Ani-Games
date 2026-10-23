@@ -288,7 +288,7 @@ function openShutdownTimerMenu() {
  document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active'));
  const btn = $('shutdownTimerNav');
  if (btn) btn.classList.add('active');
- document.querySelectorAll('#mobileBottomNav button').forEach(x => x.classList.toggle('active', x.dataset.mobileTab === 'devices'));
+ document.querySelectorAll('#mobileBottomNav button').forEach(x => x.classList.toggle('active', (x.dataset.tab === 'devices' || x.dataset.mobileTab === 'devices')));
  const card = $('pcShutdownTimerCard');
  if (card) card.scrollIntoView({behavior:'smooth', block:'center'});
 }
