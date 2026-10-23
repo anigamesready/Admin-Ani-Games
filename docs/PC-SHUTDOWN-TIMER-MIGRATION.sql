@@ -5,19 +5,30 @@
 
 begin;
 
-alter table public.device_commands
-  drop constraint if exists device_commands_command_check;
+ -- Preserve the current command constraint verbatim and only add the three timer commands.
+-- Fail closed if the expected constraint is absent; do not guess the live allowlist.
+do $migration$
+declare
+  prior_check text;
+begin
+  select pg_get_expr(conbin, conrelid)
+    into prior_check
+  from pg_constraint
+  where conrelid = 'public.device_commands'::regclass
+    and conname = 'device_commands_command_check'
+    and contype = 'c';
 
-alter table public.device_commands
-  add constraint device_commands_command_check
-  check (command = any (array[
-    'restart_billing'::text, 'restart_pc'::text, 'restart'::text,
-    'logoff'::text, 'logout'::text, 'pause'::text, 'resume'::text,
-    'stop'::text, 'shutdown'::text, 'add_time'::text, 'set_theme'::text,
-    'refresh'::text, 'wake'::text, 'upsert_rental'::text, 'start_trial'::text,
-    'delete_rental'::text, 'show_admin_message'::text,
-    'shutdown_timer_set'::text, 'shutdown_timer_cancel'::text, 'shutdown_timer_status'::text
-  ]));
+  if prior_check is null then
+    raise exception 'DEVICE_COMMAND_CHECK_NOT_FOUND: inspect schema before applying timer migration';
+  end if;
+
+  alter table public.device_commands drop constraint device_commands_command_check;
+  execute format(
+    'alter table public.device_commands add constraint device_commands_command_check check ((%s) or command = any (array[%L::text, %L::text, %L::text]))',
+    prior_check, 'shutdown_timer_set', 'shutdown_timer_cancel', 'shutdown_timer_status'
+  );
+end;
+$migration$;
 
 create or replace function api.admin_command(
   p_org_id uuid,
