@@ -83,8 +83,8 @@ function refreshShutdownTargetOptions(rows) {
   '<option value="' + esc(d.id) + '">' + esc(d.device_name || d.client_id || 'PC') + ' • ' + (d.uiStatus === 'online' ? 'ONLINE' : 'OFFLINE') + '</option>'
  ).join('');
  const target = list.find(d => d.id === previous)
-  || list.find(d => d.id === selectedDeviceId)
   || list.find(d => /galtys/i.test(String(d.device_name || '')))
+  || list.find(d => d.id === selectedDeviceId)
   || list.find(d => d.uiStatus === 'online')
   || list[0];
  select.value = target?.id || '';
