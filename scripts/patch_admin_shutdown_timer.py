@@ -79,9 +79,13 @@ function refreshShutdownTargetOptions(rows) {
  if (!select) return;
  const previous = select.value;
  const list = Array.isArray(rows) ? rows : [];
- select.innerHTML = '<option value="">Pilih PC target</option>' + list.map(d =>
-  '<option value="' + esc(d.id) + '">' + esc(d.device_name || d.client_id || 'PC') + ' • ' + (d.uiStatus === 'online' ? 'ONLINE' : 'OFFLINE') + '</option>'
- ).join('');
+ select.innerHTML = '<option value="">Pilih PC target</option>' + list.map(d => {
+  const timer = d.metadata?.shutdownTimer || {};
+  const expected = timer.expectedDisconnect === true &&
+   ['admin_shutdown_requested','shutdown_requested'].includes(String(timer.state || ''));
+  const label = d.uiStatus === 'online' ? 'ONLINE' : (expected ? 'MATI VIA ADMIN' : 'OFFLINE DI LUAR PERINTAH ADMIN');
+  return '<option value="' + esc(d.id) + '">' + esc(d.device_name || d.client_id || 'PC') + ' • ' + label + '</option>';
+ }).join('');
  const target = list.find(d => d.id === previous)
   || list.find(d => /galtys/i.test(String(d.device_name || '')))
   || list.find(d => d.id === selectedDeviceId)
@@ -145,6 +149,12 @@ function updateShutdownTimerStatus() {
  } else if (state?.state === 'canceled') {
   badge.textContent = 'DIBATALKAN';
   status.textContent = state.message || 'Timer shutdown telah dibatalkan pada PC.';
+ } else if (state?.state === 'admin_shutdown_requested' && state.expectedDisconnect === true) {
+  badge.textContent = target.uiStatus === 'online' ? 'SHUTDOWN ADMIN' : 'MATI VIA ADMIN';
+  status.textContent = 'Shutdown langsung diminta dari Admin APK. Timer telah dihentikan lebih dahulu; koneksi terputus setelah perintah ini diklasifikasikan sebagai shutdown terencana.';
+ } else if (state?.state === 'shutdown_requested' && state.expectedDisconnect === true) {
+  badge.textContent = target.uiStatus === 'online' ? 'SHUTDOWN TERJADWAL' : 'MATI VIA TIMER ADMIN';
+  status.textContent = state.message || 'Countdown shutdown terjadwal selesai; PC menerima perintah dari timer Admin.';
  } else if (state?.state === 'shutdown_requested') {
   badge.textContent = 'SELESAI';
   status.textContent = 'Countdown selesai. PC telah menerima permintaan shutdown; status akhir bergantung pada Windows.';
@@ -155,8 +165,11 @@ function updateShutdownTimerStatus() {
   badge.textContent = 'DIBLOKIR';
   status.textContent = target.device_name + ' • ' + blocker;
  } else if (target.uiStatus !== 'online') {
-  badge.textContent = 'OFFLINE';
-  status.textContent = target.device_name + ' sedang offline. Perintah tidak akan dikirim.';
+  badge.textContent = 'OFFLINE DI LUAR PERINTAH ADMIN';
+  status.textContent = target.device_name + ' offline tanpa penanda shutdown terencana dari Admin APK. Penyebab putus koneksi belum terkonfirmasi; jangan dianggap sebagai shutdown yang diperintahkan Admin.';
+ } else if (state?.state === 'previous_admin_shutdown') {
+  badge.textContent = 'ONLINE • RIWAYAT ADMIN';
+  status.textContent = target.device_name + ' sudah online kembali. Riwayat terakhir mencatat shutdown yang diminta Admin, tetapi penanda itu tidak berlaku untuk putus koneksi berikutnya.';
  } else {
   badge.textContent = 'SIAP';
   status.textContent = target.device_name + ' • online • belum ada timer aktif.';
@@ -309,6 +322,11 @@ required = [
  "p_payload: {scheduled:true",
  "p_payload: {cancelScheduled:true",
  "metadata.activeCode",
+ "MATI VIA ADMIN",
+ "OFFLINE DI LUAR PERINTAH ADMIN",
+ "admin_shutdown_requested",
+ "expectedDisconnect",
+ "previous_admin_shutdown",
  "PRATINJAU SAJA"
 ]
 for token in required:
