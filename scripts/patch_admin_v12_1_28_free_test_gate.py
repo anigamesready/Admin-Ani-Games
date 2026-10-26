@@ -131,7 +131,12 @@ async function saveFreeTestPolicy() {
  }
 }
 """
-html = html.replace("</script>", helpers + "\n</script>", 1)
+inline_scripts = list(re.finditer(r'<script\b(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script\s*>', html, re.IGNORECASE | re.DOTALL))
+matches = [m for m in inline_scripts if "ensureActiveDbRouteForAuth" in m.group(1)]
+if len(matches) != 1:
+    raise SystemExit(f"Expected exactly one V12.1.27 inline Admin app script, found {len(matches)}")
+m = matches[0]
+html = html[:m.start(1)] + helpers + "\n" + html[m.start(1):]
 for token in [
  MARKER,
  "async function loadFreeTestPolicy()",
