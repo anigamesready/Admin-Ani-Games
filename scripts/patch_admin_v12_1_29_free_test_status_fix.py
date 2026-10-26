@@ -44,6 +44,13 @@ if html.count(minutes_span) != 1:
     raise SystemExit("Shutdown minutes input row anchor mismatch")
 html = html.replace(minutes_span, seconds_control, 1)
 
+# Never auto-select the first/online PC for a power action. Keep only a previously selected target;
+# when it disappears, force the Owner to choose again.
+auto_target_fallback = "  || list.find(d => d.uiStatus === 'online')\\n  || list[0]"
+if html.count(auto_target_fallback) != 1:
+    raise SystemExit("Automatic online/first-PC fallback anchor mismatch; refusing an unreviewed target change")
+html = html.replace(auto_target_fallback, "", 1)
+
 duration_pattern = re.compile(r"function shutdownDurationMs\(\) \{.*?\n\}\nfunction shutdownFormatRemaining", re.S)
 duration_replacement = """function shutdownDurationMs() {
  const h = Number($('shutdownHours')?.value);
@@ -80,6 +87,8 @@ for token in (
     "admin_set_free_test_policy",
     "082298316902",
     "function refreshShutdownTargetOptions",
+    "|| list.find(d => d.uiStatus === 'online')",
+    "|| list[0]",
 ):
     if token not in html:
         raise SystemExit("V12.1.29 regression token missing: " + token)
