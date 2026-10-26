@@ -46,7 +46,7 @@ html = html.replace(minutes_span, seconds_control, 1)
 
 # Never auto-select the first/online PC for a power action. Keep only a previously selected target;
 # when it disappears, force the Owner to choose again.
-auto_target_fallback = "  || list.find(d => d.uiStatus === 'online')\\n  || list[0]"
+auto_target_fallback = "  || list.find(d => d.uiStatus === 'online')\n  || list[0]"
 if html.count(auto_target_fallback) != 1:
     raise SystemExit("Automatic online/first-PC fallback anchor mismatch; refusing an unreviewed target change")
 html = html.replace(auto_target_fallback, "", 1)
@@ -87,11 +87,11 @@ for token in (
     "admin_set_free_test_policy",
     "082298316902",
     "function refreshShutdownTargetOptions",
-    "|| list.find(d => d.uiStatus === 'online')",
-    "|| list[0]",
 ):
     if token not in html:
         raise SystemExit("V12.1.29 regression token missing: " + token)
+if "|| list.find(d => d.uiStatus === 'online')" in html or "|| list[0]" in html:
+    raise SystemExit("Automatic PC target fallback remains; require explicit selection.")
 
 gradle, code_count = re.subn(r"versionCode 56", "versionCode 57", gradle, count=1)
 gradle, name_count = re.subn(r"versionName '12\.1\.28'", "versionName '12.1.29'", gradle, count=1)
