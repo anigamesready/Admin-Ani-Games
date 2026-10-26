@@ -15,6 +15,10 @@ gradle = gradle_path.read_text(encoding="utf-8")
 
 if "function schedulePcShutdown()" in html or "V12.1.28-SCHEDULED-SHUTDOWN-TIMER" in html:
     raise SystemExit("Shutdown timer patch already exists; refusing to apply it twice.")
+if "V12.1.27-LOGIN-CLICK-ROUTE-RESOLVE" not in html:
+    raise SystemExit("Expected exact Admin V12.1.27 base; refusing to patch another baseline")
+if "versionCode 55" not in gradle or "versionName '12.1.27'" not in gradle:
+    raise SystemExit("Expected Admin V12.1.27 Gradle version markers before timer patch.")
 
 timer_card = r"""
 <div class="card" id="pcShutdownTimerCard" style="margin-top:12px;border:1px solid var(--a)">
@@ -333,11 +337,12 @@ for token in required:
     if token not in html:
         raise SystemExit("Shutdown timer regression check failed: missing " + token)
 
-if "versionCode 40" not in gradle or "versionName '12.1.12'" not in gradle:
-    raise SystemExit("Unexpected Android baseline; expected version 12.1.12 / code 40 before shutdown timer patch.")
-gradle = gradle.replace("versionCode 40", "versionCode 41", 1).replace("versionName '12.1.12'", "versionName '12.1.28'", 1)
+if "versionCode 55" not in gradle or "versionName '12.1.27'" not in gradle:
+    raise SystemExit("Timer patch must preserve Admin V12.1.27 version metadata.")
+if "V12.1.27-LOGIN-CLICK-ROUTE-RESOLVE" not in html:
+    raise SystemExit("Timer patch changed or lost the selected Admin baseline marker.")
 
 html_path.write_text(html, encoding="utf-8")
-gradle_path.write_text(gradle, encoding="utf-8")
-version_path.write_text("v12.1.28-admin-pc-shutdown-timer\n", encoding="utf-8")
-print("Patched Admin PC selector, preview, confirmed schedule/cancel commands, countdown state, online/rental guards; version 12.1.28 / versionCode 41.")
+# Version bump is deliberately reserved for the final V12.1.28 feature patch.
+version_path.write_text("Admin V12.1.27 base + targeted shutdown timer (pre-final patch)\n", encoding="utf-8")
+print("PASS: Timer UI patched onto the exact Admin V12.1.27 base without changing baseline version metadata.")
