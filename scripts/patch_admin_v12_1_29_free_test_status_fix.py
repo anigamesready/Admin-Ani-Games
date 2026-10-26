@@ -51,6 +51,25 @@ if html.count(auto_target_fallback) != 1:
     raise SystemExit("Automatic online/first-PC fallback anchor mismatch; refusing an unreviewed target change")
 html = html.replace(auto_target_fallback, "", 1)
 
+# Distinguish a failed command ACK from a rental blocker so status never misreports why scheduling failed.
+old_schedule_failure = "current[String(target.id)] = {state:'blocked_active_session', scheduleId:scheduleId, deadlineAt:deadlineAt,"
+if html.count(old_schedule_failure) != 1:
+    raise SystemExit("Schedule command failure-state anchor mismatch")
+html = html.replace(old_schedule_failure, "current[String(target.id)] = {state:'command_failed', scheduleId:scheduleId, deadlineAt:deadlineAt,", 1)
+
+# Show that a PC identity change canceled the local timer, rather than showing a false READY state.
+status_anchor = "} else if (state?.state === 'canceled') {"
+status_replacement = """} else if (state?.state === 'target_mismatch') {
+  badge.textContent = 'TARGET BERUBAH';
+  status.textContent = state.message || 'Identitas PC berubah; timer dibatalkan dan shutdown tidak dijalankan.';
+ } else if (state?.state === 'command_failed') {
+  badge.textContent = 'PERINTAH GAGAL';
+  status.textContent = state.message || 'PC gagal mengonfirmasi perintah timer shutdown.';
+ } else if (state?.state === 'canceled') {"""
+if html.count(status_anchor) != 1:
+    raise SystemExit("Shutdown status rendering anchor mismatch")
+html = html.replace(status_anchor, status_replacement, 1)
+
 duration_pattern = re.compile(r"function shutdownDurationMs\(\) \{.*?\n\}\nfunction shutdownFormatRemaining", re.S)
 duration_replacement = """function shutdownDurationMs() {
  const h = Number($('shutdownHours')?.value);
@@ -87,6 +106,9 @@ for token in (
     "admin_set_free_test_policy",
     "082298316902",
     "function refreshShutdownTargetOptions",
+    "TARGET BERUBAH",
+    "PERINTAH GAGAL",
+    "state:'command_failed'",
 ):
     if token not in html:
         raise SystemExit("V12.1.29 regression token missing: " + token)
