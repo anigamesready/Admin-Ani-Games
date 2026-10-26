@@ -65,8 +65,8 @@ jobs:
             "scripts/patch_admin_v12_1_24_owner_proof.py"
             "scripts/patch_admin_v12_1_25_login_route_boot_fix.py"
             "scripts/patch_admin_v12_1_26_primary_login_authority.py"
-            "scripts/patch_admin_v12_1_27_login_click_route_refresh.py",
-            "scripts/patch_admin_shutdown_timer.py",
+            "scripts/patch_admin_v12_1_27_login_click_route_refresh.py"
+            "scripts/patch_admin_shutdown_timer.py"
             "scripts/patch_admin_v12_1_28_free_test_gate.py"
           )
           for patch in "${patches[@]}"; do
