@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.27 Login Route Refresh Fix APK
+name: Build AniGames Admin V12.1.28 Free-Test Gate + Shutdown Timer APK
 
 on:
   push:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.27 Login Route Refresh Fix Debug APK
+    name: Build AniGames Admin V12.1.28 Free-Test Gate + Shutdown Timer Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -195,7 +195,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.28-debug.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.28-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='55' versionName='12.1.27'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='56' versionName='12.1.28'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.28-debug.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.28-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
