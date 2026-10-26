@@ -33,6 +33,12 @@ policy_card = r"""
  <div id="freeTestPolicyMessage" class="msg" role="status" aria-live="polite" style="margin-top:10px">Muat status dari database untuk mengubah izin. Setting default adalah OFF sampai Owner mengaktifkan.</div>
 </div>
 """
+
+nav_anchor = '<button id="shutdownTimerNav"'
+if html.count(nav_anchor) != 1:
+    raise SystemExit("Shutdown timer navigation anchor mismatch; refusing to patch menu")
+html = html.replace(nav_anchor, '<button id="freeTestPolicyNav" onclick="openFreeTestPolicyMenu()">🛂 FREE TEST 10 MENIT</button>' + nav_anchor, 1)
+
 timer_anchor = '<div class="card" id="pcShutdownTimerCard"'
 if html.count(timer_anchor) != 1:
     raise SystemExit("Expected exactly one shutdown timer card for free-test panel insertion")
@@ -40,6 +46,17 @@ html = html.replace(timer_anchor, policy_card + "\n" + timer_anchor, 1)
 
 helpers = r"""
 // V12.1.28-FREE-TEST-GATE — UI only; server RPCs remain the authorization authority.
+function openFreeTestPolicyMenu() {
+ try { if (typeof closeMobileNav === 'function') closeMobileNav(); } catch (_) {}
+ tab('devices');
+ document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active'));
+ const btn = $('freeTestPolicyNav');
+ if (btn) btn.classList.add('active');
+ document.querySelectorAll('#mobileBottomNav button').forEach(x => x.classList.toggle('active', (x.dataset.tab === 'devices' || x.dataset.mobileTab === 'devices')));
+ const card = $('freeTestPolicyCard');
+ if (card) card.scrollIntoView({behavior:'smooth', block:'center'});
+ void loadFreeTestPolicy();
+}
 function freeTestPolicyIsOwner() {
  const role = String(ctx?.role || '').trim().toLowerCase();
  return role === 'owner' || role === 'super_admin';
