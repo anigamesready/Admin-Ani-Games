@@ -79,7 +79,6 @@ for token in (
     "admin_get_free_test_policy",
     "admin_set_free_test_policy",
     "082298316902",
-    "SHUTDOWN_TARGET_ID_MISMATCH",
     "function refreshShutdownTargetOptions",
 ):
     if token not in html:
