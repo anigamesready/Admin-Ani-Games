@@ -217,6 +217,47 @@ jobs:
           unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-debug.apk"
           ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-debug.apk"
 
+      - name: Build side-by-side safe test APK without replacing installed app
+        shell: bash
+        run: |
+          set -euo pipefail
+          GRADLE_FILE="$ANDROID_PROJECT_DIR/app/build.gradle"
+          MANIFEST_FILE="$ANDROID_PROJECT_DIR/app/src/main/AndroidManifest.xml"
+          cp "$GRADLE_FILE" /tmp/admin-v130-original-build.gradle
+          cp "$MANIFEST_FILE" /tmp/admin-v130-original-AndroidManifest.xml
+          restore_source() {
+            cp /tmp/admin-v130-original-build.gradle "$GRADLE_FILE"
+            cp /tmp/admin-v130-original-AndroidManifest.xml "$MANIFEST_FILE"
+          }
+          trap restore_source EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle = Path("$ANDROID_PROJECT_DIR/app/build.gradle")
+          manifest = Path("$ANDROID_PROJECT_DIR/app/src/main/AndroidManifest.xml")
+          g = gradle.read_text(encoding="utf-8")
+          m = manifest.read_text(encoding="utf-8")
+          if g.count("applicationId 'com.anigames.billingadmin'") != 1:
+              raise SystemExit("Safe-test package ID anchor mismatch")
+          if m.count('android:label="AniGames Admin"') != 1:
+              raise SystemExit("Safe-test app label anchor mismatch")
+          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v130test'", 1), encoding="utf-8")
+          manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.30 TEST"', 1), encoding="utf-8")
+          PY
+          gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
+          TEST_APK="$ANDROID_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$TEST_APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v130test' versionCode='58' versionName='12.1.30'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.30 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk"
+          echo "PASS: side-by-side test package verified; original application package source restored."
+
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
