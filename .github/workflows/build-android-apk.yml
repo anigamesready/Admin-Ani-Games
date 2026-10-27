@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.29 Free-Test Status Fix APK
+name: Build AniGames Admin V12.1.30 PC List Initialization Fix APK
 
 on:
   push:
@@ -12,6 +12,7 @@ on:
       - feature/admin-v12.1.19-global-route-continuity
       - feature/admin-v12.1.28-free-test-gate-shutdown
       - feature/admin-v12.1.29-free-test-status-fix
+      - feature/admin-v12.1.30-device-list-init-fix
   workflow_dispatch:
 
 permissions:
@@ -19,7 +20,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.28 Free-Test Gate + Shutdown Timer Debug APK
+    name: Build AniGames Admin V12.1.30 PC List Initialization Fix Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -70,6 +71,7 @@ jobs:
             "scripts/patch_admin_shutdown_timer.py"
             "scripts/patch_admin_v12_1_28_free_test_gate.py"
             "scripts/patch_admin_v12_1_29_free_test_status_fix.py"
+            "scripts/patch_admin_v12_1_30_device_list_init_fix.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -118,15 +120,19 @@ jobs:
           python3 patch_admin_shutdown_timer.py
           python3 patch_admin_v12_1_28_free_test_gate.py
           python3 patch_admin_v12_1_29_free_test_status_fix.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py
-          grep -q "versionCode 57" android/app/build.gradle
-          grep -q "versionName '12.1.29'" android/app/build.gradle
+          python3 patch_admin_v12_1_30_device_list_init_fix.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py
+          grep -q "versionCode 58" android/app/build.gradle
+          grep -q "versionName '12.1.30'" android/app/build.gradle
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
           grep -q "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.27-LOGIN-CLICK-ROUTE-RESOLVE" android/app/src/main/assets/web/admin.html
           grep -q "ensureActiveDbRouteForAuth" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.29-FREE-TEST-STATUS-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.30-DEVICE-LIST-INIT-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "selectedDevice=rows.find(x=>x.id===selectedDeviceId)||null;refreshShutdownTargetOptions(rows)" android/app/src/main/assets/web/admin.html
+          ! grep -q "devicesCache=rows;refreshShutdownTargetOptions(rows);renderRecoveryDeviceOptions();" android/app/src/main/assets/web/admin.html
 
           grep -q "shutdownSeconds" android/app/src/main/assets/web/admin.html
           grep -q 'value="30"' android/app/src/main/assets/web/admin.html
