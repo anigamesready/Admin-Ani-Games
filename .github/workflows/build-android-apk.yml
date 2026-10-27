@@ -140,15 +140,16 @@ jobs:
           grep -q "V12.1.31-AUTH-ROUTE-FAST-CACHE" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.32-ROUTE-GET-NO-PREFLIGHT" android/app/src/main/assets/web/admin.html
           python3 - <<'PY'
-          import re
           from pathlib import Path
           page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
-          match = re.search(r"(?ms)^async function readDualDbRoute\\(target\\)\\{.*?^\\}", page)
-          if not match:
+          start = page.find("async function readDualDbRoute(target){")
+          end = page.find("\\nfunction rememberDualDbRoute", start)
+          if start < 0 or end < 0:
               raise SystemExit("Missing route-status reader")
-          if "headers:{apikey:cfg.key}" in match.group(0):
+          route_fn = page[start:end]
+          if "headers:{apikey:cfg.key}" in route_fn:
               raise SystemExit("Route status still sends apikey and triggers CORS preflight")
-          if "data?.projectRef!==cfg.ref" not in match.group(0):
+          if "data?.projectRef!==cfg.ref" not in route_fn:
               raise SystemExit("Route project identity validation missing")
           PY
           grep -q "const DB_ROUTE_CACHE_MS=15000;" android/app/src/main/assets/web/admin.html
