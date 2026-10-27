@@ -62,7 +62,7 @@ if auth_fn.count("resolveDualDbRoute(true)") != 1:
     raise SystemExit("Expected one forced route read in auth handler")
 auth_fn = auth_fn.replace(
     "async function ensureActiveDbRouteForAuth(){",
-    "// " + MARKER + " — use recent verified active-route state for fast login; stale/missing state still revalidates.\\nasync function ensureActiveDbRouteForAuth(){",
+    "// " + MARKER + " — use recent verified active-route state for fast login; stale/missing state still revalidates.\nasync function ensureActiveDbRouteForAuth(){",
     1,
 )
 auth_fn = auth_fn.replace("resolveDualDbRoute(true)", "resolveDualDbRoute(false)", 1)
