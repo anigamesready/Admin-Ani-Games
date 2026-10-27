@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.30 PC List Initialization Fix APK
+name: Build AniGames Admin V12.1.31 Fast Active-Route Login APK
 
 on:
   push:
@@ -13,6 +13,7 @@ on:
       - feature/admin-v12.1.28-free-test-gate-shutdown
       - feature/admin-v12.1.29-free-test-status-fix
       - feature/admin-v12.1.30-device-list-init-fix
+      - feature/admin-v12.1.31-route-auth-fast-cache
   workflow_dispatch:
 
 permissions:
@@ -20,7 +21,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.30 PC List Initialization Fix Debug APK
+    name: Build AniGames Admin V12.1.31 Fast Active-Route Login Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -72,6 +73,7 @@ jobs:
             "scripts/patch_admin_v12_1_28_free_test_gate.py"
             "scripts/patch_admin_v12_1_29_free_test_status_fix.py"
             "scripts/patch_admin_v12_1_30_device_list_init_fix.py"
+            "scripts/patch_admin_v12_1_31_route_auth_fast_cache.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -121,9 +123,10 @@ jobs:
           python3 patch_admin_v12_1_28_free_test_gate.py
           python3 patch_admin_v12_1_29_free_test_status_fix.py
           python3 patch_admin_v12_1_30_device_list_init_fix.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py
-          grep -q "versionCode 58" android/app/build.gradle
-          grep -q "versionName '12.1.30'" android/app/build.gradle
+          python3 patch_admin_v12_1_31_route_auth_fast_cache.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py
+          grep -q "versionCode 59" android/app/build.gradle
+          grep -q "versionName '12.1.31'" android/app/build.gradle
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
           grep -q "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY" android/app/src/main/assets/web/admin.html
@@ -131,6 +134,9 @@ jobs:
           grep -q "ensureActiveDbRouteForAuth" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.29-FREE-TEST-STATUS-FIX" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.30-DEVICE-LIST-INIT-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.31-AUTH-ROUTE-FAST-CACHE" android/app/src/main/assets/web/admin.html
+          grep -q "const DB_ROUTE_CACHE_MS=15000;" android/app/src/main/assets/web/admin.html
+          grep -q "DB_ROUTE_STATUS_TIMEOUT:" android/app/src/main/assets/web/admin.html
           grep -q "selectedDevice=rows.find(x=>x.id===selectedDeviceId)||null;refreshShutdownTargetOptions(rows)" android/app/src/main/assets/web/admin.html
           ! grep -q "devicesCache=rows;refreshShutdownTargetOptions(rows);renderRecoveryDeviceOptions();" android/app/src/main/assets/web/admin.html
 
@@ -208,14 +214,14 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-debug.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='58' versionName='12.1.30'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-debug.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='59' versionName='12.1.31'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-debug.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-debug.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-debug.apk"
 
       - name: Build side-by-side safe test APK without replacing installed app
         shell: bash
@@ -242,8 +248,8 @@ jobs:
               raise SystemExit("Safe-test package ID anchor mismatch")
           if m.count('android:label="AniGames Admin"') != 1:
               raise SystemExit("Safe-test app label anchor mismatch")
-          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v130test'", 1), encoding="utf-8")
-          manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.30 TEST"', 1), encoding="utf-8")
+          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v131test'", 1), encoding="utf-8")
+          manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.31 TEST"', 1), encoding="utf-8")
           PY
           gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
           TEST_APK="$ANDROID_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
@@ -251,19 +257,19 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v130test' versionCode='58' versionName='12.1.30'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.30 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.30-PC-LIST-FIX-SAFE-TEST.apk"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-ROUTE-FAST-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-ROUTE-FAST-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v131test' versionCode='59' versionName='12.1.31'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.31 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-ROUTE-FAST-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-ROUTE-FAST-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.31-ROUTE-FAST-SAFE-TEST.apk"
           echo "PASS: side-by-side test package verified; original application package source restored."
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.30-final-debug-apk
+          name: AniGames-Admin-Android-v12.1.31-final-debug-apk
           path: output/*
           if-no-files-found: error
           retention-days: 30
