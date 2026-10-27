@@ -143,7 +143,7 @@ jobs:
           from pathlib import Path
           page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
           start = page.find("async function readDualDbRoute(target){")
-          end = page.find("\\nfunction rememberDualDbRoute", start)
+          end = page.find("\nfunction rememberDualDbRoute", start)
           if start < 0 or end < 0:
               raise SystemExit("Missing route-status reader")
           route_fn = page[start:end]
