@@ -37,8 +37,8 @@ html = html.replace(
     1,
 )
 
-if html.count("refreshShutdownTargetOptions(rows)") != 1:
-    raise SystemExit("Device-list fix assertion failed: expected one deferred target refresh")
+if html.count(";refreshShutdownTargetOptions(rows);") != 1:
+    raise SystemExit("Device-list fix assertion failed: expected one deferred target refresh call")
 early = html.find("devicesCache=rows;renderRecoveryDeviceOptions();")
 resolved = html.find("selectedDevice=rows.find(x=>x.id===selectedDeviceId)||null;refreshShutdownTargetOptions(rows);")
 if early < 0 or resolved <= early:
