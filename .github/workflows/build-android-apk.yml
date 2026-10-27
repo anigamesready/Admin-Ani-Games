@@ -231,9 +231,11 @@ jobs:
           }
           trap restore_source EXIT
           python3 - <<'PY'
+          import os
           from pathlib import Path
-          gradle = Path("$ANDROID_PROJECT_DIR/app/build.gradle")
-          manifest = Path("$ANDROID_PROJECT_DIR/app/src/main/AndroidManifest.xml")
+          root = Path(os.environ["ANDROID_PROJECT_DIR"])
+          gradle = root / "app/build.gradle"
+          manifest = root / "app/src/main/AndroidManifest.xml"
           g = gradle.read_text(encoding="utf-8")
           m = manifest.read_text(encoding="utf-8")
           if g.count("applicationId 'com.anigames.billingadmin'") != 1:
