@@ -75,7 +75,7 @@ jobs:
             "scripts/patch_admin_v12_1_29_free_test_status_fix.py"
             "scripts/patch_admin_v12_1_30_device_list_init_fix.py"
             "scripts/patch_admin_v12_1_31_route_auth_fast_cache.py"
-            "scripts/patch_admin_v12_1_32_route_no_preflight.py",
+            "scripts/patch_admin_v12_1_32_route_no_preflight.py"
             "scripts/patch_admin_v12_1_33_offline_restart_queue.py"
           )
           for patch in "${patches[@]}"; do
