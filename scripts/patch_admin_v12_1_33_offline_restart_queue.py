@@ -56,10 +56,16 @@ if MARKER not in admin or MARKER not in control:
     raise SystemExit("V12.1.33 markers were not added to both Admin views")
 if "offlineRestart=command==='restart_billing'" not in admin or "offlineRestart=command==='restart_billing'" not in control:
     raise SystemExit("Offline restart exception not present on both Admin views")
-if "if(target.uiStatus!=='online')return msg('PC terpilih sedang OFFLINE. Kontrol tidak dikirim.',true);" in admin:
-    raise SystemExit("Main dashboard still blocks all offline commands")
-if "if(!isOnline(d))return msg('PC OFFLINE — command tidak dikirim.',true);" in control:
-    raise SystemExit("Billing Control still blocks all offline commands")
+main_cmd_start = admin.find("async function cmd(device,command,seconds){")
+main_cmd_end = admin.find("async function ", main_cmd_start + len("async function cmd(device,command,seconds){"))
+main_cmd = admin[main_cmd_start:main_cmd_end if main_cmd_end >= 0 else len(admin)]
+control_cmd_start = control.find("async function sendCommand(command,payload={}){")
+control_cmd_end = control.find("async function sessionCommand(", control_cmd_start + len("async function sendCommand(command,payload={}){"))
+control_cmd = control[control_cmd_start:control_cmd_end if control_cmd_end >= 0 else len(control)]
+if "if(target.uiStatus!=='online')return msg('PC terpilih sedang OFFLINE. Kontrol tidak dikirim.',true);" in main_cmd:
+    raise SystemExit("Main dashboard still blocks offline restart")
+if "if(!isOnline(d))return msg('PC OFFLINE — command tidak dikirim.',true);" in control_cmd:
+    raise SystemExit("Billing Control still blocks offline restart")
 
 gradle = replace_once(gradle, "versionCode 60", "versionCode 61", "Admin versionCode")
 gradle = replace_once(gradle, "versionName '12.1.32'", "versionName '12.1.33'", "Admin versionName")
