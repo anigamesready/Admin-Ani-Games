@@ -17,6 +17,9 @@ on:
       - feature/admin-v12.1.32-route-no-preflight
       - feature/global-rental-admin-v12.1.34
       - feature/global-rental-admin-v12.1.35
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
