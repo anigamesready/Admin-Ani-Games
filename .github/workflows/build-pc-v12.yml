@@ -1,0 +1,65 @@
+name: Build AniGames PC V12.1.0 Popup Test
+
+on:
+  push:
+    branches:
+      - build/v12-admin-apk
+    paths:
+      - 'Ani-Games-Billing-Android-V12.1.zip'
+      - '.github/workflows/build-pc-v12.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-pc:
+    name: Build Windows portable test EXE
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Extract PC V12.1.0 source
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'Ani-Games-Billing-Android-V12.1.zip')) { throw 'Source ZIP missing' }
+          Expand-Archive -LiteralPath 'Ani-Games-Billing-Android-V12.1.zip' -DestinationPath 'source-bundle' -Force
+          $project = Get-ChildItem 'source-bundle' -Directory -Recurse | Where-Object { $_.Name -eq 'Ani-Games-Billing-PC-V12.1.0' } | Select-Object -First 1
+          if (!$project) { throw 'Ani-Games-Billing-PC-V12.1.0 folder not found in source ZIP' }
+          if (!(Test-Path (Join-Path $project.FullName 'index.html'))) { throw 'PC index.html missing' }
+          if (!(Select-String -Path (Join-Path $project.FullName 'index.html') -Pattern "cmd === 'show_admin_message'" -Quiet)) { throw 'Popup receiver handler missing' }
+          "PC_PROJECT_DIR=$($project.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Detected PC project: $($project.FullName)"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: npm ci --no-audit --no-fund
+        working-directory: ${{ env.PC_PROJECT_DIR }}
+
+      - name: Build Windows portable EXE
+        shell: pwsh
+        run: npm run build
+        working-directory: ${{ env.PC_PROJECT_DIR }}
+
+      - name: Verify EXE output
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem (Join-Path $env:PC_PROJECT_DIR 'dist') -Filter '*.exe' -File | Select-Object -First 1
+          if (!$exe) { throw 'No portable EXE produced' }
+          Get-FileHash $exe.FullName -Algorithm SHA256 | Format-List
+          Write-Host "Built EXE: $($exe.FullName)"
+
+      - name: Upload PC V12.1.0 popup test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: AniGames-PC-V12.1.0-Admin-Popup-Test-EXE
+          path: ${{ env.PC_PROJECT_DIR }}/dist/*.exe
+          if-no-files-found: error
+          retention-days: 30

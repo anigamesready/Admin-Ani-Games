@@ -1,0 +1,189 @@
+name: Build AniGames Admin V12.1.15 DB Sync + Global Route Switch
+
+on:
+  push:
+    branches:
+      - feature/admin-v12-pc-enrollment
+      - feature/admin-v12-dual-db-routing
+    paths:
+      - 'AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip'
+      - 'scripts/patch_admin_pc_recovery.py'
+      - 'scripts/patch_admin_android_notifications.py'
+      - 'scripts/patch_admin_dual_db_preflight.py'
+      - 'scripts/patch_admin_rental_identity_rpc.py'
+      - 'scripts/patch_admin_notification_reliability.py'
+      - 'scripts/patch_admin_dual_db_routing.py'
+      - 'scripts/patch_admin_db_sync_global_switch.py'
+      - 'supabase/functions/db-route-status/index.ts'
+      - 'supabase/functions/db-route-coordinator/index.ts'
+      - 'supabase/functions/db-sync-export/index.ts'
+      - 'supabase/functions/db-sync-apply/index.ts'
+      - 'supabase/functions/ani-games-api/index.ts'
+      - 'supabase/functions/ani-games-api/deno.json'
+      - 'docs/ADMIN-PC-RECOVERY-MIGRATION.sql'
+      - 'docs/ADMIN-ALERT-NOTIFICATIONS-MIGRATION.sql'
+      - '.github/workflows/build-admin-pc-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Patch, audit, and build Android APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout isolated feature branch
+        uses: actions/checkout@v4
+
+      - name: Extract Android source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP='AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip'
+          test -f "$ZIP"
+          mkdir -p source-bundle
+          unzip -q "$ZIP" -d source-bundle
+          PROJECT_DIR="$(find source-bundle -type f -path '*/android/app/build.gradle' -print -quit | sed 's#/android/app/build.gradle##')"
+          test -n "$PROJECT_DIR"
+          test -f "$PROJECT_DIR/android/app/src/main/assets/web/admin.html"
+          cp scripts/patch_admin_pc_recovery.py "$PROJECT_DIR/patch_admin_pc_recovery.py"
+          cp scripts/patch_admin_android_notifications.py "$PROJECT_DIR/patch_admin_android_notifications.py"
+          cp scripts/patch_admin_dual_db_preflight.py "$PROJECT_DIR/patch_admin_dual_db_preflight.py"
+          cp scripts/patch_admin_rental_identity_rpc.py "$PROJECT_DIR/patch_admin_rental_identity_rpc.py"
+          cp scripts/patch_admin_notification_reliability.py "$PROJECT_DIR/patch_admin_notification_reliability.py"
+          cp scripts/patch_admin_dual_db_routing.py "$PROJECT_DIR/patch_admin_dual_db_routing.py"
+          cp scripts/patch_admin_db_sync_global_switch.py "$PROJECT_DIR/patch_admin_db_sync_global_switch.py"
+          mkdir -p "$PROJECT_DIR/supabase/functions/ani-games-api"
+          cp supabase/functions/ani-games-api/index.ts "$PROJECT_DIR/supabase/functions/ani-games-api/index.ts"
+          cp supabase/functions/ani-games-api/deno.json "$PROJECT_DIR/supabase/functions/ani-games-api/deno.json"
+          for FUNCTION in db-route-status db-route-coordinator db-sync-export db-sync-apply; do
+            mkdir -p "$PROJECT_DIR/supabase/functions/$FUNCTION"
+            cp "supabase/functions/$FUNCTION/index.ts" "$PROJECT_DIR/supabase/functions/$FUNCTION/index.ts"
+            cp "supabase/functions/$FUNCTION/deno.json" "$PROJECT_DIR/supabase/functions/$FUNCTION/deno.json"
+          done
+          echo "ANDROID_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Detected source: $PROJECT_DIR"
+
+      - name: Apply deterministic feature patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ANDROID_PROJECT_DIR"
+          python3 patch_admin_pc_recovery.py
+          python3 patch_admin_android_notifications.py
+          python3 patch_admin_dual_db_preflight.py
+          python3 patch_admin_rental_identity_rpc.py
+          python3 patch_admin_notification_reliability.py
+          python3 patch_admin_dual_db_routing.py
+          python3 patch_admin_db_sync_global_switch.py
+
+      - name: Regression and static checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ANDROID_PROJECT_DIR"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          root = Path(".")
+          html = (root / "android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          scripts = [x for x in re.findall(r'<script\b[^>]*>([\s\S]*?)</script>', html, re.I) if x.strip()]
+          if not scripts:
+              raise SystemExit("No inline Admin JS found")
+          for i, js in enumerate(scripts):
+              tmp = Path(f"/tmp/admin-inline-{i}.js")
+              tmp.write_text(js, encoding="utf-8")
+              subprocess.run(["node", "--check", str(tmp)], check=True)
+          ids = re.findall(r'\bid=["\']([^"\']+)', html)
+          duplicates = sorted({x for x in ids if ids.count(x) > 1})
+          if duplicates:
+              raise SystemExit("Duplicate HTML IDs: " + ", ".join(duplicates))
+          required = ["recoverDeviceSelect", "createRecoveryEnrollment", "copyRecoveryCode", "create_device_recovery_enrollment", "adminAlertFeed", "enableAdminAlertSound", "playAdminAlertSound", "installAdminNotificationBridge", "showNativeAdminNotification", "pollPcAdminAlerts", "admin_recent_alerts", "AniAdminNative", "Pengaturan Notifikasi Android", "dualDbReadinessPanel", "fetchDbRouteStatus", "dbRouteBlockers", "checkBothDbApis", "DB_SYNC_RUN_KEY", "db-sync-apply", "ROUTE_FINAL_CONFIRMATION_FAILED", "Periksa Kesiapan DB1 & DB2", "admin_update_rental_identity", "ensureNativeNotificationPermission", "Notifikasi Android belum aktif", "NETWORK_FETCH_FAILED • ", "adminAlertPollRetryAt", "retry_ms=", "window.__aniAdminFetchNoticeAt", "resolveDualDbRoute", "routeBackupReady", "routeFinalizedActive", "DB_SYNC_HOLD_QUIESCE_KEY", "requestDbSync(options={})", "requestDbSync({holdQuiesce:true})", "routeStageStarted=true", "release_active_sync_quiesce", "DB_ROUTE_CUTOVER_INCOMPLETE", "requestGlobalDbSwitch", "previewDbSync", "verifyDb2OwnerLogin", "dbSyncCall", "dbSyncPreviewSummary", "globalDbTarget", "Pindah seluruh sistem", "Sinkronkan DB1 → DB2", "auth_parity_ready"]
+          activity = (root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
+          manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+          for token in ["NotificationChannel", "AdminNotificationBridge", "POST_NOTIFICATIONS", "openNotificationSettings"]:
+              if token not in activity:
+                  raise SystemExit("Native Android notification bridge missing: " + token)
+          if "android.permission.POST_NOTIFICATIONS" not in manifest:
+              raise SystemExit("POST_NOTIFICATIONS manifest permission missing")
+          edge = (root / "supabase/functions/ani-games-api/index.ts").read_text(encoding="utf-8")
+          for token in ["validateIoTTarget", "BLYNK_DEVICE_MAPPING_REQUIRED", "BLYNK_DEVICE_MAPPING_CONFLICT", "blynkPowerTarget", "pairingDuplicateArchivedAt"]:
+              if token not in edge:
+                  raise SystemExit("IoT mapping regression check missing: " + token)
+          if "configured!==deviceId" in edge:
+              raise SystemExit("Unsafe cross-domain BLYNK_DEVICE_ID vs Supabase UUID comparison remains")
+          sync_apply = (root / "supabase/functions/db-sync-apply/index.ts").read_text(encoding="utf-8")
+          sync_export = (root / "supabase/functions/db-sync-export/index.ts").read_text(encoding="utf-8")
+          for name, source in [("db-sync-apply", sync_apply), ("db-sync-export", sync_export)]:
+              for token in ["sharedGatewayProbe", "SHARED_GATEWAY_BASE_URL", "SHARED_GATEWAY_ROUTE_EPOCH_MISMATCH"]:
+                  if token not in source:
+                      raise SystemExit(f"{name} missing independent gateway readiness guard: {token}")
+              if "backup_ready:true,data_parity_ready:true,routing_gateway_ready:true,sync_ready:true" in source:
+                  raise SystemExit(f"{name} must not mark the shared gateway ready merely because data hashes match")
+          if "sourceReady?.gatewayReady===true" not in sync_apply:
+              raise SystemExit("Target sync must confirm the source-side gateway probe before route readiness")
+          missing = [x for x in required if x not in html]
+          if missing:
+              raise SystemExit("Recovery UI missing: " + ", ".join(missing))
+          if "sb.from('rental_accounts').update({code, status})" in html:
+              raise SystemExit("Direct rental code/status write remains")
+          if html.count("rpc('admin_update_rental_identity'") != 1:
+              raise SystemExit("Audited rental identity RPC call missing or duplicated")
+          gradle = (root / "android/app/build.gradle").read_text()
+          if "versionCode 43" not in gradle or "versionName '12.1.15'" not in gradle:
+              raise SystemExit("Version bump check failed")
+          print(f"PASS: {len(scripts)} inline script(s), {len(ids)} unique IDs, Android notification bridge + foreground-only low-noise alert polling present")
+          PY
+          python3 -m py_compile patch_admin_pc_recovery.py patch_admin_android_notifications.py patch_admin_dual_db_preflight.py patch_admin_rental_identity_rpc.py patch_admin_notification_reliability.py patch_admin_dual_db_routing.py patch_admin_db_sync_global_switch.py
+          unzip -t "$GITHUB_WORKSPACE/AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          accept-android-sdk-licenses: true
+
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ANDROID_PROJECT_DIR/android"
+          gradle --no-daemon --stacktrace assembleDebug
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Package patched source
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip -qr AniGames-Admin-V12.1.15-DB-SYNC-ROUTE-CONTINUITY-SOURCE.zip "$ANDROID_PROJECT_DIR"
+
+      - name: Upload APK and patched source
+        uses: actions/upload-artifact@v4
+        with:
+          name: AniGames-Admin-V12.1.15-DB-SYNC-ROUTE-CONTINUITY
+          path: |
+            ${{ env.ANDROID_PROJECT_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
+            AniGames-Admin-V12.1.15-DB-SYNC-ROUTE-CONTINUITY-SOURCE.zip
+          if-no-files-found: error
+          retention-days: 14
