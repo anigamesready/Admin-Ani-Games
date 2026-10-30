@@ -1,0 +1,92 @@
+name: Inspect Ani-Games Reseller Rental UI V1.0.1
+
+on:
+  push:
+    branches:
+      - feature/reseller-global-rental-v1.0.1
+    paths:
+      - '.github/workflows/inspect-reseller-global-rental.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract original reseller source and verified review UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_ZIP="Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip"
+          test -s "$SOURCE_ZIP"
+          unzip -t "$SOURCE_ZIP"
+          mkdir -p source output review-ui
+          unzip -oq "$SOURCE_ZIP" -d source
+          SETTINGS="$(find source -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+          test -n "$SETTINGS"
+          ANDROID_DIR="$(dirname "$SETTINGS")"
+          echo "ANDROID_DIR=$ANDROID_DIR" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import base64, hashlib, io, tarfile
+          from pathlib import Path
+          part_dir=Path("reseller/ui-review-parts")
+          names=["01.b64","02.b64","03a.b64","03b.b64","03c.b64","03d.b64","03e.b64","04.b64"]
+          encoded="".join((part_dir/name).read_text().strip() for name in names)
+          if len(encoded)!=17764: raise SystemExit(f"Unexpected HTML archive encoding length: {len(encoded)}")
+          raw=base64.b64decode(encoded,validate=True)
+          digest=hashlib.sha256(raw).hexdigest()
+          if digest!="c90fc770c78687748caafb21b83a421bb61d65eb4ea2ef00f9280d76562993ed":
+              raise SystemExit("Verified reseller review archive hash mismatch: "+digest)
+          with tarfile.open(fileobj=io.BytesIO(raw),mode="r:gz") as tf:
+              expected={
+                  "index.html":("8df0434644b1d2d1ce46371453ebd3c15d8b53f82a54b623232d8a2674090f56",5258),
+                  "admin-control.html":("3504dbc2b91143627c191f18ddeabb246907467bb7348d690f42246ecbfd720e",39028),
+              }
+              members={Path(m.name).name:m for m in tf.getmembers() if m.isfile()}
+              for name,(want,size) in expected.items():
+                  if name not in members: raise SystemExit("Missing "+name)
+                  stream=tf.extractfile(members[name])
+                  data=stream.read() if stream else b""
+                  if len(data)!=size or hashlib.sha256(data).hexdigest()!=want:
+                      raise SystemExit("Review template integrity mismatch: "+name)
+                  (Path("review-ui")/name).write_bytes(data)
+          print("PASS: original reseller source + exact review HTML verified.")
+          PY
+          WEB_DIR="$(find "$ANDROID_DIR/app/src/main/assets" -type f -name index.html -printf '%h\n' | while read d; do [ -f "$d/admin-control.html" ] && echo "$d"; done | head -1)"
+          if [ -z "$WEB_DIR" ]; then
+            WEB_DIR="$(find "$ANDROID_DIR/app/src/main/assets" -type d -name web -print -quit)"
+          fi
+          test -n "$WEB_DIR"
+          echo "Detected web assets: $WEB_DIR"
+          cp -a "$WEB_DIR/." output/original-web-assets/
+          cp -a review-ui/. output/verified-review-ui/
+          python3 - <<'PY'
+          from pathlib import Path
+          for base in [Path("output/original-web-assets"),Path("output/verified-review-ui")]:
+              for p in base.rglob("*.html"):
+                  print(f"HTML_FILE {p} bytes={p.stat().st_size}")
+                  text=p.read_text(errors="replace")
+                  terms=("Rental","rental","PC","online","selectedDevice","rentalDevice","createRental","saveRental","billing_create_rental","create_rental_account","admin_create_rental")
+                  lines=text.splitlines()
+                  for i,line in enumerate(lines):
+                      if any(term.lower() in line.lower() for term in terms):
+                          print(f"{p.name}:{i+1}:{line[:500]}")
+          PY
+
+      - name: Upload reseller source and UI for code audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ani-Games-Reseller-V1.0.1-SOURCE-INSPECTION
+          path: |
+            output/**
+            review-ui/**
+          if-no-files-found: error
+          retention-days: 7
