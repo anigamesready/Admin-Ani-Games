@@ -120,8 +120,7 @@ gradle = gradle.replace("versionCode 61", "versionCode 62", 1)
 gradle = gradle.replace("versionName '12.1.33'", "versionName '12.1.34'", 1)
 if "V12.1.33-OFFLINE-RESTART-QUEUE" not in html:
     raise SystemExit("Admin V12.1.33 marker missing; baseline patch not applied")
-# Keep the historical V12.1.33 marker because the build workflow uses it as a regression guard.
-# The new version is declared in Gradle/VERSION.txt and the new RPC assertions below.
+html = html.replace("V12.1.33-OFFLINE-RESTART-QUEUE", "V12.1.34-GLOBAL-RENTAL-DB-FIRST", 1)
 html_path.write_text(html, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
 version_path.write_text("v12.1.34-global-rental-db-first\n", encoding="utf-8")
