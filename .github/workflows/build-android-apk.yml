@@ -149,6 +149,34 @@ jobs:
           grep -q "admin_create_rental_global" android/app/src/main/assets/web/admin.html
           grep -q "admin_update_rental_global" android/app/src/main/assets/web/admin.html
           grep -q "admin_disable_rental_global" android/app/src/main/assets/web/admin.html
+          python3 - <<'PY'
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          accounts = page.find('<section id="accounts" class="section">')
+          devices = page.find('<section id="devices" class="section">')
+          if accounts < 0 or devices < 0:
+              raise SystemExit("Rental or PC tab section is missing")
+          accounts_end = page.find("</section>", accounts)
+          devices_end = page.find("</section>", devices)
+          if not (accounts < page.find("<h3>Tambah Data Rental</h3>") < accounts_end):
+              raise SystemExit("Rental creation form is not inside Rental tab")
+          if devices < page.find("<h3>Tambah Data Rental</h3>") < devices_end:
+              raise SystemExit("Rental creation form still belongs to PC tab")
+          for obsolete in ("rentalDevice", "PC wajib dipilih", "Buat & Kirim ke PC", "Rental di PC terpilih", "selectedRentalRows"):
+              if obsolete in page:
+                  raise SystemExit("Obsolete PC-specific rental UI remains: " + obsolete)
+          if "if(id==='accounts')loadGlobalRentalAccounts();" not in page:
+              raise SystemExit("Rental tab list loader still requires PC selection")
+          create_start = page.find("async function createGlobalRental(){")
+          create_end = page.find("async function loadReport(){", create_start)
+          create_fn = page[create_start:create_end]
+          if create_start < 0 or create_end < 0 or "admin_create_rental_global" not in create_fn:
+              raise SystemExit("Global DB create function missing")
+          for blocked in ("selectedDeviceId", "rentalDevice", "uiStatus", "waitDeviceCommand", "admin_command"):
+              if blocked in create_fn:
+                  raise SystemExit("Global rental create still depends on PC: " + blocked)
+          print("PASS: Rental form is in Rental tab, no PC selector remains, and global save does not wait for a PC.")
+          PY
           grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin.html
           grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin-control.html
           grep -q "Perintah Restart Billing masuk antrean" android/app/src/main/assets/web/admin.html
