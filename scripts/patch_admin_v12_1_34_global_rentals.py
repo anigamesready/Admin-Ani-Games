@@ -139,7 +139,6 @@ replacements = [
       '<div class="muted">Data rental disimpan langsung ke database bersama untuk seluruh PC dalam workspace ini. PC tidak perlu dipilih atau sedang online.</div>'
     ),
     ('<div class="field"><label>PC</label><select id="rentalDevice"></select></div>', ''),
-    ('Buat &amp; Kirim ke PC', 'Simpan Rental ke Database'),
     ('Buat & Kirim ke PC', 'Simpan Rental ke Database')
 ]
 for old, new in replacements:
