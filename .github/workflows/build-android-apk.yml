@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.33 Offline Restart Queue APK
+name: Build AniGames Admin V12.1.34 Global Rental DB-first APK
 
 on:
   push:
@@ -15,6 +15,7 @@ on:
       - feature/admin-v12.1.30-device-list-init-fix
       - feature/admin-v12.1.31-route-auth-fast-cache
       - feature/admin-v12.1.32-route-no-preflight
+      - feature/global-rental-admin-v12.1.34
   workflow_dispatch:
 
 permissions:
@@ -22,7 +23,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.33 Offline Restart Queue Debug APK
+    name: Build AniGames Admin V12.1.34 Global Rental DB-first Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -77,6 +78,7 @@ jobs:
             "scripts/patch_admin_v12_1_31_route_auth_fast_cache.py"
             "scripts/patch_admin_v12_1_32_route_no_preflight.py"
             "scripts/patch_admin_v12_1_33_offline_restart_queue.py"
+            "scripts/patch_admin_v12_1_34_global_rentals.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -129,9 +131,10 @@ jobs:
           python3 patch_admin_v12_1_31_route_auth_fast_cache.py
           python3 patch_admin_v12_1_32_route_no_preflight.py
           python3 patch_admin_v12_1_33_offline_restart_queue.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py
-          grep -q "versionCode 61" android/app/build.gradle
-          grep -q "versionName '12.1.33'" android/app/build.gradle
+          python3 patch_admin_v12_1_34_global_rentals.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py
+          grep -q "versionCode 62" android/app/build.gradle
+          grep -q "versionName '12.1.34'" android/app/build.gradle
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
           grep -q "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY" android/app/src/main/assets/web/admin.html
@@ -141,6 +144,10 @@ jobs:
           grep -q "V12.1.30-DEVICE-LIST-INIT-FIX" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.31-AUTH-ROUTE-FAST-CACHE" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.33-OFFLINE-RESTART-QUEUE" android/app/src/main/assets/web/admin.html
+          grep -q "admin_rental_accounts_global" android/app/src/main/assets/web/admin.html
+          grep -q "admin_create_rental_global" android/app/src/main/assets/web/admin.html
+          grep -q "admin_update_rental_global" android/app/src/main/assets/web/admin.html
+          grep -q "admin_disable_rental_global" android/app/src/main/assets/web/admin.html
           grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin.html
           grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin-control.html
           grep -q "Perintah Restart Billing masuk antrean" android/app/src/main/assets/web/admin.html
@@ -253,14 +260,14 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-debug.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='61' versionName='12.1.33'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-debug.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='62' versionName='12.1.34'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-debug.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-debug.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-debug.apk"
 
       - name: Build side-by-side safe test APK without replacing installed app
         shell: bash
@@ -288,7 +295,7 @@ jobs:
           if m.count('android:label="AniGames Admin"') != 1:
               raise SystemExit("Safe-test app label anchor mismatch")
           gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v133test'", 1), encoding="utf-8")
-          manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.33 TEST"', 1), encoding="utf-8")
+          manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.34 TEST"', 1), encoding="utf-8")
           PY
           gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
           TEST_APK="$ANDROID_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
@@ -296,19 +303,19 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-OFFLINE-RESTART-QUEUE-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-OFFLINE-RESTART-QUEUE-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v133test' versionCode='61' versionName='12.1.33'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.33 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-OFFLINE-RESTART-QUEUE-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-OFFLINE-RESTART-QUEUE-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.33-OFFLINE-RESTART-QUEUE-SAFE-TEST.apk"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-GLOBAL-RENTAL-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-GLOBAL-RENTAL-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v133test' versionCode='62' versionName='12.1.34'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.34 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-GLOBAL-RENTAL-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-GLOBAL-RENTAL-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.34-GLOBAL-RENTAL-SAFE-TEST.apk"
           echo "PASS: side-by-side test package verified; original application package source restored."
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.33-final-debug-apk
+          name: AniGames-Admin-Android-v12.1.34-global-rentals-test
           path: output/*
           if-no-files-found: error
           retention-days: 30
