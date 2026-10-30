@@ -116,12 +116,131 @@ if "selectedDeviceId" in create_section or "uiStatus!=='online'" in create_secti
 gradle = gradle_path.read_text(encoding="utf-8")
 if "versionCode 61" not in gradle or "versionName '12.1.33'" not in gradle:
     raise SystemExit("Unexpected Admin base version; expected V12.1.33 / code 61")
-gradle = gradle.replace("versionCode 61", "versionCode 62", 1)
-gradle = gradle.replace("versionName '12.1.33'", "versionName '12.1.34'", 1)
+gradle = gradle.replace("versionCode 61", "versionCode 63", 1)
+gradle = gradle.replace("versionName '12.1.33'", "versionName '12.1.35'", 1)
 if "V12.1.33-OFFLINE-RESTART-QUEUE" not in html:
     raise SystemExit("Admin V12.1.33 marker missing; baseline patch not applied")
-html = html.replace("V12.1.33-OFFLINE-RESTART-QUEUE", "V12.1.34-GLOBAL-RENTAL-DB-FIRST", 1)
+html = html.replace("V12.1.33-OFFLINE-RESTART-QUEUE", "V12.1.35-GLOBAL-RENTAL-DB-FIRST-NO-PC-RENTAL", 1)
+
+# V12.1.35: move global rental management into the Rental tab and remove PC coupling.
+# The device selector remains available only for remote PC controls.
+card_start = html.find('<div class="card" style="margin-top:12px"><h3>Tambah Data Rental ke PC</h3>')
+card_end_marker = '\n\n<div class="card" id="freeTestPolicyCard"'
+card_end = html.find(card_end_marker, card_start)
+if card_start < 0 or card_end < 0:
+    raise SystemExit("Global rental form block anchors not found; refusing to move the card")
+rental_card = html[card_start:card_end].strip()
+html = html[:card_start] + html[card_end:]
+
+replacements = [
+    ("<h3>Tambah Data Rental ke PC</h3>", "<h3>Tambah Data Rental</h3>"),
+    (
+      '<div class="muted"><b>PC wajib dipilih di baris PC Remote Aktif di bagian paling atas.</b> Data dibuat di cloud dan dikirim hanya ke PC tersebut melalui command queue.</div>',
+      '<div class="muted">Data rental disimpan langsung ke database bersama untuk seluruh PC dalam workspace ini. PC tidak perlu dipilih atau sedang online.</div>'
+    ),
+    ('<div class="field"><label>PC</label><select id="rentalDevice"></select></div>', ''),
+    ('Buat &amp; Kirim ke PC', 'Simpan Rental ke Database'),
+    ('Buat & Kirim ke PC', 'Simpan Rental ke Database')
+]
+for old, new in replacements:
+    if rental_card.count(old) != 1:
+        raise SystemExit("Rental form UI anchor mismatch: " + old[:90])
+    rental_card = rental_card.replace(old, new, 1)
+if "rentalDevice" in rental_card or "Pilih PC" in rental_card or "Kirim ke PC" in rental_card:
+    raise SystemExit("Rental form still contains a PC prerequisite")
+accounts_open = '<section id="accounts" class="section">'
+accounts_start = html.find(accounts_open)
+if accounts_start < 0:
+    raise SystemExit("Rental tab anchor not found")
+accounts_insert = accounts_start + len(accounts_open)
+html = html[:accounts_insert] + rental_card + html[accounts_insert:]
+accounts_end = html.find("</section>", accounts_insert)
+if accounts_end < 0 or not (accounts_insert < html.find("Tambah Data Rental") < accounts_end):
+    raise SystemExit("Rental form was not inserted inside the Rental tab")
+
+# Make the global account view load on its own, never through loadDevices().
+html = html.replace("loadAccountsForSelectedDevice", "loadGlobalRentalAccounts")
+html = html.replace("createRentalOnDevice", "createGlobalRental")
+old_accounts_tab = "if(id==='accounts'){if(!selectedDeviceId)loadDevices();else loadGlobalRentalAccounts()}"
+if html.count(old_accounts_tab) != 1:
+    raise SystemExit("Rental tab still uses PC selection to decide whether to load accounts")
+html = html.replace(old_accounts_tab, "if(id==='accounts')loadGlobalRentalAccounts()", 1)
+
+old_org_select = "function selectOrg(){currentOrg=orgs.find(o=>o.id===$('orgSelect').value)||null;selectedDeviceId=null;selectedDevice=null;localStorage.removeItem(GLOBAL_DEVICE_KEY);refresh()}"
+new_org_select = "function selectOrg(){currentOrg=orgs.find(o=>o.id===$('orgSelect').value)||null;selectedDeviceId=null;selectedDevice=null;localStorage.removeItem(GLOBAL_DEVICE_KEY);refresh();if($('accounts').classList.contains('active'))loadGlobalRentalAccounts()}"
+if html.count(old_org_select) != 1:
+    raise SystemExit("Workspace switch anchor mismatch")
+html = html.replace(old_org_select, new_org_select, 1)
+
+# Remove obsolete PC-specific rental dropdown population from device discovery.
+rental_device_start = html.find("$('rentalDevice').innerHTML=rows.map(", html.find("async function loadDevices(){"))
+rental_device_end_marker = "$('rentalDevice').value=selectedDeviceId||'';"
+rental_device_end = html.find(rental_device_end_marker, rental_device_start)
+if rental_device_start < 0 or rental_device_end < 0:
+    raise SystemExit("Obsolete rental PC selector population not found")
+html = html[:rental_device_start] + html[rental_device_end + len(rental_device_end_marker):]
+if "rentalDevice" in html:
+    raise SystemExit("PC-specific rental selector reference remains after patch")
+
+# Global rentals must not be shown as if they belong to one selected PC.
+old_pc_rental_table = '<h4>Rental di PC terpilih</h4><div class="table-wrap"><table class="table"><thead><tr><th>Kode</th><th>Kategori</th><th>Sisa</th><th>Status</th><th>Client</th></tr></thead><tbody id="selectedRentalRows"></tbody></table></div>'
+if html.count(old_pc_rental_table) != 1:
+    raise SystemExit("PC rental subtable anchor mismatch")
+html = html.replace(
+    old_pc_rental_table,
+    '<div class="muted">Data rental dikelola terpusat di menu Rental. Pemilihan PC di sini hanya untuk status dan kendali jarak jauh.</div>',
+    1
+)
+render_start = html.find("async function renderSelectedDevice(){")
+render_end = html.find("async function disconnectDevice", render_start)
+if render_start < 0 or render_end < 0:
+    raise SystemExit("Selected-PC renderer anchors not found")
+new_render = """async function renderSelectedDevice(){
+ if(!selectedDevice){
+  $('selectedDeviceMeta').textContent='Belum ada PC terpilih.';
+  $('selectedStatus').textContent='-';
+  $('selectedCode').textContent='-';
+  $('selectedRemaining').textContent='-';
+  $('selectedHeartbeat').textContent='-';
+  return;
+ }
+ const m=selectedDevice.metadata||{};
+ const active=selectedDevice.uiStatus==='online';
+ $('selectedDeviceMeta').innerHTML='<b>'+esc(selectedDevice.device_name)+'</b> • '+esc(selectedDevice.client_id)+' • App '+esc(selectedDevice.app_version||'-')+'<br>Last seen: '+(selectedDevice.last_seen_at?new Date(selectedDevice.last_seen_at).toLocaleString('id-ID'):'-');
+ const state=active?(m.activeCode?'RENTAL AKTIF':m.pausedCode?'RENTAL PAUSED':'STANDBY / BILLING SIAP'):'TERPUTUS';
+ $('selectedStatus').textContent=state;
+ $('selectedCode').textContent=m.activeCode||m.pausedCode||'-';
+ $('selectedRemaining').textContent=(m.activeCode||m.pausedCode)?Math.floor((Number(m.activeRemainingSeconds||m.pausedRemainingSeconds)||0)/60)+' m':'-';
+ $('selectedHeartbeat').textContent=selectedDevice.last_heartbeat_at?new Date(selectedDevice.last_heartbeat_at).toLocaleTimeString('id-ID'):'-';
+}
+"""
+html = html[:render_start] + new_render + html[render_end:]
+
+# Clarify that the global PC selector is for remote operations only.
+old_global_pc_help = '<div class="muted">Pilih PC terlebih dahulu. Semua rental, sesi, dan kontrol Windows di halaman ini mengikuti PC yang dipilih.</div>'
+new_global_pc_help = '<div class="muted">Pilihan PC hanya untuk status dan kendali jarak jauh. Data rental tersimpan bersama dan dapat dipakai dari PC mana saja.</div>'
+if html.count(old_global_pc_help) != 1:
+    raise SystemExit("Global PC selector helper-text anchor mismatch")
+html = html.replace(old_global_pc_help, new_global_pc_help, 1)
+if html.count("<h2 style=\"margin:0\">Akun Rental</h2>") != 1:
+    raise SystemExit("Rental tab title anchor mismatch")
+html = html.replace("<h2 style=\"margin:0\">Akun Rental</h2>", "<h2 style=\"margin:0\">Data Rental Bersama</h2>", 1)
+
+# No create/edit/list path is allowed to wait for a selected or online PC.
+create_start = html.find("async function createGlobalRental(){")
+create_end = html.find("async function loadReport(){", create_start)
+create_fn = html[create_start:create_end]
+if create_start < 0 or create_end < 0 or "admin_create_rental_global" not in create_fn:
+    raise SystemExit("Global create function missing after UI move")
+for forbidden in ("selectedDeviceId", "rentalDevice", "uiStatus", "waitDeviceCommand", "admin_command"):
+    if forbidden in create_fn:
+        raise SystemExit("Global create still depends on PC state: " + forbidden)
+if "admin_update_rental_global" not in html or "admin_disable_rental_global" not in html:
+    raise SystemExit("Global edit/disable RPC handlers are missing")
+if "function tab(id){if(id==='pairing'&&ctx?.role!=='owner')return;document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));if(id==='pairing')applyPairingRoleUI();if(id==='devices')loadDevices();if(id==='accounts')loadGlobalRentalAccounts();if(id==='reports')loadReport();if(id==='billingUsers'){loadBillingUsers().then(()=>bindBillingUserActions())}}" not in html:
+    raise SystemExit("Rental tab global loading assertion failed")
+
 html_path.write_text(html, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
-version_path.write_text("v12.1.34-global-rental-db-first\n", encoding="utf-8")
-print("PASS: Admin rental list/create/edit/disable now uses global DB RPCs without selected-PC/online prerequisites.")
+version_path.write_text("v12.1.35-global-rental-db-first-no-pc-form\n", encoding="utf-8")
+print("PASS: Admin rental UI is in the Rental tab; global list/create/edit/disable use DB RPCs without selected-PC/online prerequisites.")
