@@ -163,7 +163,7 @@ html = html.replace("createRentalOnDevice", "createGlobalRental")
 old_accounts_tab = "if(id==='accounts'){if(!selectedDeviceId)loadDevices();else loadGlobalRentalAccounts()}"
 if html.count(old_accounts_tab) != 1:
     raise SystemExit("Rental tab still uses PC selection to decide whether to load accounts")
-html = html.replace(old_accounts_tab, "if(id==='accounts')loadGlobalRentalAccounts()", 1)
+html = html.replace(old_accounts_tab, "if(id==='accounts')loadGlobalRentalAccounts();", 1)
 
 old_org_select = "function selectOrg(){currentOrg=orgs.find(o=>o.id===$('orgSelect').value)||null;selectedDeviceId=null;selectedDevice=null;localStorage.removeItem(GLOBAL_DEVICE_KEY);refresh()}"
 new_org_select = "function selectOrg(){currentOrg=orgs.find(o=>o.id===$('orgSelect').value)||null;selectedDeviceId=null;selectedDevice=null;localStorage.removeItem(GLOBAL_DEVICE_KEY);refresh();if($('accounts').classList.contains('active'))loadGlobalRentalAccounts()}"
