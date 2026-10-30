@@ -22,7 +22,7 @@ new_load = """async function loadAccountsForSelectedDevice(){
  try{
   const rows=await rpc('admin_rental_accounts_global',{p_org_id:currentOrg.id});
   if(!Array.isArray(rows))throw new Error('Respons daftar rental DB tidak valid.');
-  $('accountRows').innerHTML=rows.map(x=>'<tr><td><b>'+esc(x.code)+'</b></td><td>'+esc(x.category||'-')+'</td><td>'+Math.floor((Number(x.remaining_seconds)||0)/60)+' m</td><td>'+esc(x.status||'-')+'</td><td>'+esc(x.client_label||'-')+'</td><td>'+(x.expiry_at?new Date(x.expiry_at).toLocaleString('id-ID'):'Tanpa Batas')+'</td><td><button class="mini" data-rental-edit="'+encodeURIComponent(JSON.stringify(x))+'">Edit</button> <button class="mini danger" onclick="deleteRental(\\''+x.id+'\\',\\''+esc(x.code)+'\\')">Nonaktifkan</button></td></tr>').join('')||'<tr><td colspan="7" class="empty">Belum ada data rental untuk organisasi ini.</td></tr>';
+  $('accountRows').innerHTML=rows.map(x=>'<tr><td><b>'+esc(x.code)+'</b></td><td>'+esc(x.category||'-')+'</td><td>'+Math.floor((Number(x.remaining_seconds)||0)/60)+' m</td><td>'+esc(x.status||'-')+'</td><td>'+esc(x.client_label||'-')+'</td><td>'+(x.expiry_at?new Date(x.expiry_at).toLocaleString('id-ID'):'Tanpa Batas')+'</td><td><button class="mini" data-rental-edit="'+encodeURIComponent(JSON.stringify(x))+'">Edit</button> <button class="mini danger" data-rental-disable="'+encodeURIComponent(x.id)+'" data-rental-code="'+encodeURIComponent(x.code)+'">Nonaktifkan</button></td></tr>').join('')||'<tr><td colspan="7" class="empty">Belum ada data rental untuk organisasi ini.</td></tr>';
  }catch(e){msg('Gagal memuat rental dari DB: '+(e.message||'error'),true)}
 }
 """
@@ -82,6 +82,12 @@ new_edit = """async function saveAdminRentalEdit(){
 }
 """
 html = html[:edit_start] + new_edit + html[edit_end:]
+
+old_click_listener = "document.addEventListener('click',ev=>{const b=ev.target.closest('button[data-rental-edit]');"
+new_click_listener = "document.addEventListener('click',ev=>{const d=ev.target.closest('button[data-rental-disable]');if(d){void deleteRental(decodeURIComponent(d.dataset.rentalDisable||''),decodeURIComponent(d.dataset.rentalCode||''));return}const b=ev.target.closest('button[data-rental-edit]');"
+if html.count(old_click_listener) != 1:
+    raise SystemExit("Rental table delegated click listener anchor mismatch")
+html = html.replace(old_click_listener, new_click_listener, 1)
 
 # Delete UI becomes a soft-disable, preserving historical references.
 del_start = html.find("async function deleteRental(id,code){")
