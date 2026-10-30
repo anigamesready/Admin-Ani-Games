@@ -6,6 +6,12 @@ version_path = Path("VERSION.txt")
 
 html = html_path.read_text(encoding="utf-8")
 
+old_status_options = '<option value="active">active</option><option value="paused">paused</option><option value="expired">expired</option><option value="disabled">disabled</option><option value="inactive">inactive</option>'
+new_status_options = '<option value="active">active</option><option value="expired">expired</option><option value="disabled">disabled</option>'
+if html.count(old_status_options) != 1:
+    raise SystemExit("Rental status option anchor mismatch; refusing unsupported statuses")
+html = html.replace(old_status_options, new_status_options, 1)
+
 # Global rental list: organization-scoped DB data, independent of device selection/status.
 load_start = html.find("async function loadAccountsForSelectedDevice(){")
 load_end = html.find("async function selectDevice(){", load_start)
