@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.36 PC Wake-on-LAN Relay Debug APK
+    name: Build AniGames Admin V12.1.39 Target-only Auto Relay APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -186,7 +186,7 @@ jobs:
           ! grep -q "targetMac:mac" android/app/src/main/assets/web/admin.html
           grep -q "wake_on_lan_relay" android/app/src/main/assets/web/admin.html
           grep -q "p_command: 'wake'" android/app/src/main/assets/web/admin.html
-          grep -q "PC1 OFFLINE" android/app/src/main/assets/web/admin.html
+          grep -q "RELAY OFFLINE" android/app/src/main/assets/web/admin.html
           grep -q "TERKONFIRMASI" android/app/src/main/assets/web/admin.html
           grep -q "admin_rental_accounts_global" android/app/src/main/assets/web/admin.html
           grep -q "admin_create_rental_global" android/app/src/main/assets/web/admin.html
