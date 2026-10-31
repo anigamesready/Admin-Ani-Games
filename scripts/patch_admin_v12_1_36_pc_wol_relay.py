@@ -201,11 +201,21 @@ async function requestWakePc2() {
     source:'admin-apk-wol-relay-v12.1.36'
    }
   });
-  if (result?.ok !== true) throw new Error(result?.message || 'Server tidak mengonfirmasi antrean perintah.');
+  if (result?.ok === false) throw new Error(result?.message || 'Server menolak antrean perintah.');
+  const commandId = typeof result === 'string' ? result : (result?.command_id || result?.id || null);
+  if (!commandId) throw new Error('Server tidak mengembalikan ID antrean. Perintah tidak dianggap terkirim; periksa respons server.');
   updateWakeRelayStatus('Perintah masuk antrean PC1. Menunggu PC1 mengirim Magic Packet dan PC2 melakukan boot…');
   const targetId = String(target.id);
+  let packetConfirmed = false;
   for (let attempt = 0; attempt < 12 && Date.now() < Date.parse(expiresAt) + 60000; attempt++) {
    await new Promise(resolve => setTimeout(resolve, 5000));
+   const commandState = await waitDeviceCommand(commandId, 2500);
+   if (commandState?.status === 'failed' || commandState?.status === 'expired') {
+    const reason = commandState?.result?.message || commandState?.result?.error || commandState?.status;
+    updateWakeRelayStatus('PC1 gagal memproses perintah Wake-on-LAN: ' + String(reason).slice(0, 150));
+    return;
+   }
+   if (commandState?.status === 'completed') packetConfirmed = true;
    await loadDevices();
    const updatedTarget = (devicesCache || []).find(d => String(d.id) === targetId);
    const updatedSource = (devicesCache || []).find(d => String(d.id) === String(source.id));
@@ -218,7 +228,9 @@ async function requestWakePc2() {
     updateWakeRelayStatus('PC1 relay terputus sebelum PC2 terkonfirmasi. PC2 belum terdeteksi ONLINE; periksa status dan coba lagi ketika PC1 menyala.');
     return;
    }
-   updateWakeRelayStatus('Perintah sudah diterima PC1 atau masih diproses. PC2 belum mengirim heartbeat; memeriksa lagi…');
+   updateWakeRelayStatus(packetConfirmed
+    ? 'PC1 mengonfirmasi Magic Packet terkirim. Menunggu PC2 boot dan mengirim heartbeat…'
+    : 'Perintah masih menunggu PC1. PC2 belum mengirim heartbeat; memeriksa lagi…');
   }
   updateWakeRelayStatus('Magic Packet mungkin sudah dikirim, tetapi heartbeat PC2 belum terdeteksi. Periksa MAC LAN, kabel LAN, ErP/Wake-on-LAN BIOS, dan pengaturan NIC PC2. Status menyala belum terkonfirmasi.');
  } catch (e) {
