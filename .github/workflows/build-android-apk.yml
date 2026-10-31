@@ -159,6 +159,9 @@ jobs:
           grep -q "rpc('report_detailed_usage_page'" android/app/src/main/assets/web/admin.html
           grep -q "rpc('report_summary_compact'" android/app/src/main/assets/web/admin.html
           grep -q "async function loadReportRangeForExport()" android/app/src/main/assets/web/admin.html
+          grep -Fq "if(id==='reports')loadReport();" android/app/src/main/assets/web/admin.html
+          ! grep -Fq "await Promise.all([loadDevices(),loadReport()])" android/app/src/main/assets/web/admin.html
+          ! grep -Fq "await Promise.all([loadGlobalRentalAccounts(),loadReport()])" android/app/src/main/assets/web/admin.html
           ! grep -q "rpc('report_by_account_theme'" android/app/src/main/assets/web/admin.html
           ! grep -q "rpc('report_detailed_usage'," android/app/src/main/assets/web/admin.html
           ! grep -q 'id="kRevenue"' android/app/src/main/assets/web/admin.html
