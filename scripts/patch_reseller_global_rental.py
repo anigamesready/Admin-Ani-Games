@@ -179,9 +179,10 @@ text_replacements = {
 }
 for old, new in text_replacements.items():
     count = html.count(old)
-    if count != 1:
-        raise SystemExit(f"Expected one UI copy occurrence, found {count}: {old}")
-    html = html.replace(old, new, 1)
+    expected_count = 2 if old == "Pilih PC di atas untuk melihat status dan rental." else 1
+    if count != expected_count:
+        raise SystemExit(f"Expected {expected_count} UI copy occurrence(s), found {count}: {old}")
+    html = html.replace(old, new)
 
 for marker in (
     "billing_reseller_rental_accounts_global",
