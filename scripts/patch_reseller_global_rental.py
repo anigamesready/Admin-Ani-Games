@@ -233,3 +233,4 @@ Path("/tmp/reseller-global-rental-dashboard.js").write_text(scripts[0], encoding
 
 print("PASS: shared org-wide rental list, add/edit without PC online dependency, active-session edit guard, and APK version 1.0.4 patched.")
 # Android WebView login compatibility is patched by the preceding DB route patch.
+# Keep workflow rebuilds deterministic after quote-style-independent Gradle version validation.
