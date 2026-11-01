@@ -175,7 +175,7 @@ text_replacements = {
     "Masukkan data member untuk PC yang dipilih.": "Data rental disimpan bersama tanpa harus memilih PC.",
     '<span id="formPcBadge" class="pill">Belum ada PC</span>': '<span id="formPcBadge" class="pill">DATA GLOBAL</span>',
     "Rental baru akan disimpan ke Supabase dan dikirim ke antrean sinkronisasi PC. Hasil akhir akan menunjukkan apakah PC sudah mengonfirmasi penerimaan data.": "Data disimpan langsung ke database rental bersama. PC tidak harus online; pembaruan ke PC yang pernah memakai akun hanya masuk antrean dan tidak ditunggu.",
-    "Pilih PC di bagian atas untuk melihat status dan rental.": "Pilih PC hanya untuk melihat status perangkat dan sesi aktif; daftar member rental dikelola terpisah."
+    "Pilih PC di atas untuk melihat status dan rental.": "Pilih PC hanya untuk melihat status perangkat dan sesi aktif; daftar member rental dikelola terpisah."
 }
 for old, new in text_replacements.items():
     count = html.count(old)
