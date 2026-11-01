@@ -216,7 +216,7 @@ gradle = gradle_path.read_text(encoding="utf-8", errors="replace")
 gradle, code_count = re.subn(r"\bversionCode\s+133\b", "versionCode 134", gradle, count=1)
 gradle, name_count = re.subn(
     r"(\bversionName\s*=?\s*['\"])1\.0\.3(['\"])",
-    r"\g<1>1.0.3\2",
+    r"\g<1>1.0.4\2",
     gradle,
     count=1
 )
