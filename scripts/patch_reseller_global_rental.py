@@ -213,15 +213,15 @@ gradle_path = next((p for p in gradle_candidates if p.is_file()), None)
 if gradle_path is None:
     raise SystemExit("Reseller Gradle file is missing")
 gradle = gradle_path.read_text(encoding="utf-8", errors="replace")
-gradle, code_count = re.subn(r"\bversionCode\s+132\b", "versionCode 133", gradle, count=1)
+gradle, code_count = re.subn(r"\bversionCode\s+133\b", "versionCode 134", gradle, count=1)
 gradle, name_count = re.subn(
-    r"(\bversionName\s*=?\s*['\"])1\.0\.2(['\"])",
+    r"(\bversionName\s*=?\s*['\"])1\.0\.3(['\"])",
     r"\g<1>1.0.3\2",
     gradle,
     count=1
 )
 if code_count != 1 or name_count != 1:
-    raise SystemExit("Expected exact Reseller V11.30.2 version metadata; refusing unknown Gradle version")
+    raise SystemExit("Expected exact Reseller V11.30.3 version metadata; refusing unknown Gradle version")
 gradle_path.write_text(gradle, encoding="utf-8")
 dashboard_path.write_text(html, encoding="utf-8")
 
@@ -231,4 +231,4 @@ if len(scripts) != 1:
     raise SystemExit(f"Expected one inline Reseller dashboard script, found {len(scripts)}")
 Path("/tmp/reseller-global-rental-dashboard.js").write_text(scripts[0], encoding="utf-8")
 
-print("PASS: shared org-wide rental list, add/edit without PC online dependency, active-session edit guard, and APK version 1.0.3 patched.")
+print("PASS: shared org-wide rental list, add/edit without PC online dependency, active-session edit guard, and APK version 1.0.4 patched.")
