@@ -317,7 +317,8 @@ jobs:
               if old in html:
                   raise SystemExit('Legacy PC-dependent rental CRUD still present: ' + old)
           gradle = (root / 'app/build.gradle').read_text(encoding='utf-8')
-          if "versionCode 134" not in gradle or "versionName '1.0.4'" not in gradle:
+          if not re.search(r'\\bversionCode\\s+134\\b', gradle) or not re.search(r'\\bversionName\\s*=?\\s*["\\']1\\.0\\.4["\\']', gradle):
+              print(gradle)
               raise SystemExit('Expected Reseller version 1.0.4 / versionCode 134')
           print('PASS: global rental CRUD markers, no PC-wait path, and release version 1.0.4.')
           PY
