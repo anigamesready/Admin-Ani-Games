@@ -22,8 +22,17 @@ const DB_ROUTE_STAMP_KEY='ani_games_reseller_db_route_stamp_v1';
 const DB_ROUTE_CACHE_MS=5000;
 const DB_ROUTE_POLL_MS=10000;
 let activeResellerRoute=null,resellerRouteCheckedAt=0,resellerRoutePromise=null,resellerRouteMonitorStarted=false;
+async function fetchWithTimeout(url,options={},timeoutMs=7000){
+ let timer=null,controller=null;
+ const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{if(controller)controller.abort();reject(new Error('REQUEST_TIMEOUT'))},timeoutMs)});
+ try{
+  const requestOptions={...options};
+  if(typeof AbortController==='function'){controller=new AbortController();requestOptions.signal=controller.signal}
+  return await Promise.race([fetch(url,requestOptions),timeout]);
+ }finally{if(timer!==null)clearTimeout(timer)}
+}
 async function readResellerRouteProject(url,key,expectedRef){
- const response=await fetch(url+'/functions/v1/db-route-status',{method:'GET',headers:{apikey:key},cache:'no-store',signal:AbortSignal.timeout(7000)});
+ const response=await fetchWithTimeout(url+'/functions/v1/db-route-status',{method:'GET',headers:{apikey:key},cache:'no-store'},7000);
  const data=await response.json().catch(()=>({}));
  if(!response.ok||data?.ok!==true||data?.readOnly!==true||data?.projectRef!==expectedRef||!data?.route)throw new Error('DB_ROUTE_STATUS_UNAVAILABLE:'+expectedRef);
  return data;
