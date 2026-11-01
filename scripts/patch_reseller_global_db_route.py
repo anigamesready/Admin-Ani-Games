@@ -177,10 +177,10 @@ if gradle_path is None:
     raise SystemExit("Reseller Gradle file is missing")
 gradle = gradle_path.read_text(encoding="utf-8", errors="replace")
 if "versionCode 131" in gradle and "versionName '1.0.1'" in gradle:
-    gradle = gradle.replace("versionCode 131", "versionCode 132", 1)
-    gradle = gradle.replace("versionName '1.0.1'", "versionName '1.0.2'", 1)
-elif not ("versionCode 132" in gradle and "versionName '1.0.2'" in gradle):
-    raise SystemExit("Expected v11.30.1 Gradle metadata; refusing unknown version")
+    gradle = gradle.replace("versionCode 131", "versionCode 133", 1)
+    gradle = gradle.replace("versionName '1.0.1'", "versionName '1.0.3'", 1)
+elif not ("versionCode 133" in gradle and "versionName '1.0.3'" in gradle):
+    raise SystemExit("Expected exact Reseller V11.30.3 base metadata; refusing unknown version")
 gradle_path.write_text(gradle, encoding="utf-8")
 # Static post-patch checks for the route guard contract and destination-client configuration.
 for marker in ("DB_ROUTE_NOT_FINALIZED", "DB_SYNC_IN_PROGRESS", "DB_ROUTE_SPLIT_BRAIN", "DB2_ROUTE_URL", "DB2_ROUTE_KEY", "DB2_ROUTE_REF", "DB_ROUTE_CHANGED_LOGIN_REQUIRED"):
