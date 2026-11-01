@@ -235,3 +235,4 @@ print("PASS: shared org-wide rental list, add/edit without PC online dependency,
 # Android WebView login compatibility is patched by the preceding DB route patch.
 # Keep workflow rebuilds deterministic after quote-style-independent Gradle version validation.
 # Trigger build with corrected Gradle audit regex.
+# Rebuild against corrected workflow regex.
