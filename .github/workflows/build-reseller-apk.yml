@@ -1,4 +1,4 @@
-name: Build Ani-Games Reseller APK V11.30.3 Shared Global Rental
+name: Build Ani-Games Reseller APK V11.30.4 Android WebView Login Fix
 
 on:
   push:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   build:
-    name: Audit source and compile Reseller V11.30.3 APK
+    name: Audit source and compile Reseller V11.30.4 APK
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -281,6 +281,18 @@ jobs:
           PY
           node --check /tmp/index-reseller-route.js
           node --check /tmp/admin-control-reseller-route.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          root=Path(os.environ["ANDROID_DIR"])
+          pages=[p for p in root.rglob("index.html") if p.parent.name=="web" and (p.parent/"admin-control.html").is_file()]
+          if len(pages)!=1: raise SystemExit("Expected exactly one reseller login/dashboard pair")
+          for p in (pages[0],pages[0].parent/"admin-control.html"):
+              text=p.read_text(encoding="utf-8")
+              if "AbortSignal.timeout" in text: raise SystemExit("Unsupported AbortSignal.timeout remains in "+p.name)
+              if "fetchWithTimeout" not in text: raise SystemExit("WebView-compatible timeout helper missing in "+p.name)
+          print("PASS: no AbortSignal.timeout; route status uses WebView-compatible timeout helper.")
+          PY
 
       - name: Apply shared global rental CRUD
         shell: bash
@@ -305,9 +317,9 @@ jobs:
               if old in html:
                   raise SystemExit('Legacy PC-dependent rental CRUD still present: ' + old)
           gradle = (root / 'app/build.gradle').read_text(encoding='utf-8')
-          if "versionCode 133" not in gradle or "versionName '1.0.3'" not in gradle:
-              raise SystemExit('Expected Reseller version 1.0.3 / versionCode 133')
-          print('PASS: global rental CRUD markers, no PC-wait path, and release version 1.0.3.')
+          if "versionCode 134" not in gradle or "versionName '1.0.4'" not in gradle:
+              raise SystemExit('Expected Reseller version 1.0.4 / versionCode 134')
+          print('PASS: global rental CRUD markers, no PC-wait path, and release version 1.0.4.')
           PY
 
       - name: Set up Gradle 8.9
@@ -338,21 +350,21 @@ jobs:
           mkdir -p output
           "$AAPT" dump badging "$APK" > output/apk-badging.txt
           cat output/apk-badging.txt | head -8
-          grep -q "package: name='com.anigames.reseller' versionCode='133' versionName='1.0.3'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
-          cp "$APK" output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
+          grep -q "package: name='com.anigames.reseller' versionCode='134' versionName='1.0.4'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
+          cp "$APK" output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
-          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
-          unzip -t output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
-          sha256sum output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
+          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
+          unzip -t output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
+          sha256sum output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Reseller-v11.30.3-global-rental-debug-apk
+          name: Ani-Games-Reseller-v11.30.4-webview-login-fix-debug-apk
           path: |
-            output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
+            output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
