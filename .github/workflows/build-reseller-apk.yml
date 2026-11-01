@@ -1,13 +1,15 @@
-name: Build Ani-Games Reseller APK V11.30.2 Final Route Guard
+name: Build Ani-Games Reseller APK V11.30.3 Shared Global Rental
 
 on:
   push:
     branches:
       - main
       - feature/reseller-v11.30.1-global-db-route
+      - feature/reseller-global-rental-v1.1
     paths:
       - 'Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip'
       - 'scripts/patch_reseller_global_db_route.py'
+      - 'scripts/patch_reseller_global_rental.py'
       - '.github/workflows/build-reseller-apk.yml'
   workflow_dispatch:
 
@@ -16,7 +18,7 @@ permissions:
 
 jobs:
   build:
-    name: Audit source and compile reseller APK
+    name: Audit source and compile Reseller V11.30.3 APK
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -280,6 +282,34 @@ jobs:
           node --check /tmp/index-reseller-route.js
           node --check /tmp/admin-control-reseller-route.js
 
+      - name: Apply shared global rental CRUD
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_reseller_global_rental.py "$ANDROID_DIR"
+          node --check /tmp/reseller-global-rental-dashboard.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          root = Path(__import__('os').environ['ANDROID_DIR'])
+          paths = [p for p in root.rglob('admin-control.html') if p.parent.name == 'web']
+          if len(paths) != 1:
+              raise SystemExit(f'Expected one Reseller dashboard, found {len(paths)}')
+          html = paths[0].read_text(encoding='utf-8')
+          for marker in ('billing_reseller_rental_accounts_global',
+                         'billing_reseller_create_rental_global',
+                         'billing_reseller_edit_rental_global'):
+              if marker not in html:
+                  raise SystemExit(f'Missing global rental RPC marker: {marker}')
+          for old in ("billing_create_rental',{", "billing_edit_rental',{", "waitCommand(result?.command_id)"):
+              if old in html:
+                  raise SystemExit('Legacy PC-dependent rental CRUD still present: ' + old)
+          gradle = (root / 'app/build.gradle').read_text(encoding='utf-8')
+          if "versionCode 133" not in gradle or "versionName '1.0.3'" not in gradle:
+              raise SystemExit('Expected Reseller version 1.0.3 / versionCode 133')
+          print('PASS: global rental CRUD markers, no PC-wait path, and release version 1.0.3.')
+          PY
+
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v6
         with:
@@ -308,21 +338,21 @@ jobs:
           mkdir -p output
           "$AAPT" dump badging "$APK" > output/apk-badging.txt
           cat output/apk-badging.txt | head -8
-          grep -q "package: name='com.anigames.reseller' versionCode='132' versionName='1.0.2'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
-          cp "$APK" output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
+          grep -q "package: name='com.anigames.reseller' versionCode='133' versionName='1.0.3'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
+          cp "$APK" output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
-          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
-          unzip -t output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
-          sha256sum output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
+          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
+          unzip -t output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
+          sha256sum output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Reseller-v11.30.2-final-dual-db-route-debug-apk
+          name: Ani-Games-Reseller-v11.30.3-global-rental-debug-apk
           path: |
-            output/Ani-Games-Reseller-v11.30.2-dual-db-route-debug.apk
+            output/Ani-Games-Reseller-v11.30.3-global-rental-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
