@@ -79,7 +79,7 @@ def remove_js_function(source: str, signature: str) -> str:
 card_start = html.find('<div class="card" id="pcShutdownTimerCard"')
 if card_start < 0:
     raise SystemExit("Shutdown timer card start is missing.")
-div_tags = re.finditer(r"</?div\\b[^>]*>", html[card_start:], re.I)
+div_tags = re.finditer(r"</?div\b[^>]*>", html[card_start:], re.I)
 depth = 0
 card_end = -1
 for tag in div_tags:
