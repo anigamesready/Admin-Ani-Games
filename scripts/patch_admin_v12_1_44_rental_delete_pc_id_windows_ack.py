@@ -9,7 +9,7 @@ def once(s,o,n,label):
  k=s.count(o)
  if k!=1: raise SystemExit(f'{label} anchor mismatch: expected 1, found {k}')
  return s.replace(o,n,1)
-a=once(a,'data-rental-disable="\\'+encodeURIComponent(x.id)+\\'" data-rental-code="\\'+encodeURIComponent(x.code)+\\'">Nonaktifkan</button>','data-rental-delete="\\'+encodeURIComponent(x.id)+\\'" data-rental-code="\\'+encodeURIComponent(x.code)+\\'">Hapus</button>','Admin rental delete button')
+a=once(a,'data-rental-disable="\'+encodeURIComponent(x.id)+\'" data-rental-code="\'+encodeURIComponent(x.code)+\'">Nonaktifkan</button>','data-rental-delete="\'+encodeURIComponent(x.id)+\'" data-rental-code="\'+encodeURIComponent(x.code)+\'">Hapus</button>','Admin rental delete button')
 a=once(a,"document.addEventListener('click',ev=>{const d=ev.target.closest('button[data-rental-disable]');if(d){void deleteRental(decodeURIComponent(d.dataset.rentalDisable||''),decodeURIComponent(d.dataset.rentalCode||''));return}const b=ev.target.closest('button[data-rental-edit]');","document.addEventListener('click',ev=>{const d=ev.target.closest('button[data-rental-delete]');if(d){void deleteRental(decodeURIComponent(d.dataset.rentalDelete||''),decodeURIComponent(d.dataset.rentalCode||''));return}const b=ev.target.closest('button[data-rental-edit]');",'Admin delete click')
 old="""async function deleteRental(id,code){
  if(!confirm('Nonaktifkan rental '+code+'? Histori transaksi akan tetap tersimpan.'))return;
