@@ -59,6 +59,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          set -x
           patches=(
             "scripts/patch_admin_pc_recovery.py"
             "scripts/patch_admin_android_notifications.py"
