@@ -77,9 +77,21 @@ def remove_js_function(source: str, signature: str) -> str:
 
 # Remove only the timer UI card and dedicated navigation entry.
 card_start = html.find('<div class="card" id="pcShutdownTimerCard"')
-card_end = html.find("\n</section>\n\n<section id=\"pairing\"", card_start)
-if card_start < 0 or card_end < 0:
-    raise SystemExit("Shutdown timer card boundaries are missing or ambiguous.")
+if card_start < 0:
+    raise SystemExit("Shutdown timer card start is missing.")
+div_tags = re.finditer(r"</?div\\b[^>]*>", html[card_start:], re.I)
+depth = 0
+card_end = -1
+for tag in div_tags:
+    if tag.group(0).lower().startswith("</"):
+        depth -= 1
+    else:
+        depth += 1
+    if depth == 0:
+        card_end = card_start + tag.end()
+        break
+if card_end < 0:
+    raise SystemExit("Could not isolate the exact closing div of the shutdown timer card.")
 card = html[card_start:card_end]
 if "shutdownHours" not in card or "shutdownMinutes" not in card or "shutdownSeconds" not in card:
     raise SystemExit("Timer card does not match the expected hour/minute/second UI.")
@@ -165,7 +177,7 @@ for forbidden in (
 
 for required in (
     marker, "V12.1.39-AUTO-RELAY-TARGET-ONLY", "wakeRelayCard",
-    "wakeRelayVersionSupported", "wake_on_lan_relay", "admin_rental_accounts_global",
+    "wakeRelayVersionSupported", "wake_on_lan_relay", "wakeRelayCard", "Nyalakan PC yang Dipilih", "admin_rental_accounts_global",
     "admin_create_rental_global", "admin_update_rental_global", "admin_disable_rental_global",
     "V12.1.37-DAILY-REPORT-KEYSET-EXPORT", "report_detailed_usage_page",
     "report_summary_compact", "freeTestPolicyCard", "admin_get_free_test_policy",
