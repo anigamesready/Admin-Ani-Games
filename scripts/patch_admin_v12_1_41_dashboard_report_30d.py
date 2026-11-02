@@ -176,6 +176,12 @@ if html.count(load_anchor) != 1:
     raise SystemExit("Report loader insertion point mismatch.")
 html = html.replace(load_anchor, dashboard_js + "\n" + load_anchor, 1)
 
+# Add the release marker before checking the final required feature set.
+base_marker = "V12.1.40-ADMIN-NO-SHUTDOWN"
+if html.count(base_marker) != 1:
+    raise SystemExit("Expected exactly one V12.1.40 no-shutdown marker.")
+html = html.replace(base_marker, base_marker + " • " + marker, 1)
+
 # Verify the report table and 30-day loader are wired to the existing authorized paginated RPC.
 for required in (
     marker,
@@ -223,7 +229,6 @@ gradle, name_count = re.subn(r"versionName\s*'12\.1\.40'", "versionName '12.1.41
 if code_count != 1 or name_count != 1:
     raise SystemExit("Could not safely update V12.1.40 version metadata.")
 
-html = html.replace("V12.1.40-ADMIN-NO-SHUTDOWN", "V12.1.40-ADMIN-NO-SHUTDOWN • " + marker, 1)
 VERSION.write_text(
     "AniGames Admin Android V12.1.41 — adds 30-day dashboard report charts and daily table from authorized, cursor-paged rental sessions. Preserves no-shutdown timer removal, login, pairing, FREE TEST, PC/WoL, reseller, global rentals and dual-DB routing.\n",
     encoding="utf-8",
