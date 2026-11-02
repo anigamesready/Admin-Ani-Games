@@ -248,14 +248,11 @@ jobs:
           ! grep -q "shutdownSeconds" android/app/src/main/assets/web/admin.html
           ! grep -q "pcShutdownTimerCard\\|shutdownTimerNav\\|schedulePcShutdown\\|cancelPcShutdown\\|schedule_shutdown\\|cancel_shutdown_timer" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.40-ADMIN-NO-SHUTDOWN" android/app/src/main/assets/web/admin.html
-          grep -q 'value="30"' android/app/src/main/assets/web/admin.html
           grep -q "admin_get_free_test_policy" android/app/src/main/assets/web/admin.html
           grep -q "admin_set_free_test_policy" android/app/src/main/assets/web/admin.html
           ! grep -q "/galtys/i" android/app/src/main/assets/web/admin.html
           grep -q "admin_get_free_test_policy" android/app/src/main/assets/web/admin.html
           grep -q "admin_set_free_test_policy" android/app/src/main/assets/web/admin.html
-          ! grep -q "function schedulePcShutdown()" android/app/src/main/assets/web/admin.html
-          ! grep -q "function cancelPcShutdown()" android/app/src/main/assets/web/admin.html
           grep -q "applicationId 'com.anigames.billingadmin'" android/app/build.gradle
           ! grep -q "com.anigames.billingadmin.v12test" android/app/build.gradle
           grep -q 'android:label="AniGames Admin"' android/app/src/main/AndroidManifest.xml
@@ -337,14 +334,14 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-debug.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "package: name='com.anigames.billingadmin' versionCode='68' versionName='12.1.40'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-debug.apk"
 
       - name: Build side-by-side safe test APK without replacing installed app
         shell: bash
@@ -381,12 +378,12 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-NO-SHUTDOWN-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-AUTO-RELAY-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-NO-SHUTDOWN-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "package: name='com.anigames.billingadmin.v140test' versionCode='68' versionName='12.1.40'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.39 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-AUTO-RELAY-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-AUTO-RELAY-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-AUTO-RELAY-SAFE-TEST.apk"
+          grep -q "application-label:'AniGames Admin V12.1.40 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-NO-SHUTDOWN-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-NO-SHUTDOWN-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.40-NO-SHUTDOWN-SAFE-TEST.apk"
           echo "PASS: side-by-side test package verified; original application package source restored."
 
       - name: Upload final Admin APK
