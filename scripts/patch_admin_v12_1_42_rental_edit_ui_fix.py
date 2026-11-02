@@ -114,10 +114,7 @@ if html.count(old_create_catch) != 1:
     raise SystemExit("Create error handler anchor mismatch.")
 html = html.replace(old_create_catch, "catch(e){msg('Gagal menambahkan rental: '+rentalAdminFriendlyError(e),true)}", 1)
 
-# Use a more precise heading/helper on the global rental form.
-if html.count("<h3>Tambah Data Rental</h3>") != 1:
-    raise SystemExit("Global rental form heading anchor mismatch.")
-html = html.replace("<h3>Tambah Data Rental</h3>", "<h3>Tambah Data Rental Bersama</h3>", 1)
+# Keep the existing heading so the long-standing Rental-tab regression anchor remains stable.
 
 # Bump version and add an auditable marker.
 gradle, c = re.subn(r"\bversionCode\s+69\b", "versionCode 70", gradle, count=1)
