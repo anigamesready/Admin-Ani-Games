@@ -338,7 +338,7 @@ jobs:
           pages=[p for p in root.rglob("admin-control.html") if p.parent.name=="web"]
           if len(pages)!=1: raise SystemExit("Expected exactly one Reseller dashboard after V1.0.5 patch")
           page=pages[0].read_text(encoding="utf-8")
-          for token in ("billing_reseller_delete_rental_global","deleteRental('\${esc(r.id)}')","RENTAL_ACTIVE_TIMER_LOCKED","Hapus"):
+          for token in ("billing_reseller_delete_rental_global","deleteRental('${esc(r.id)}')","RENTAL_ACTIVE_TIMER_LOCKED","Hapus"):
               if token not in page: raise SystemExit("Missing Reseller hard-delete safeguard: "+token)
           for token in ('<option value="disabled">Nonaktif</option>',"billing_reseller_disable_rental_global"):
               if token in page: raise SystemExit("Old disabled-rental menu/action remains: "+token)
