@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.43 Rental Edit Fix
+name: Build AniGames Admin V12.1.43 Monthly Report Active Edit
 
 on:
   push:
@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.43 Rental Edit Fix APK
+    name: Build AniGames Admin V12.1.43 Monthly Report Active Edit APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -162,7 +162,7 @@ jobs:
           python3 patch_admin_v12_1_42_rental_edit_ui_fix.py
           python3 patch_admin_v12_1_43_monthly_report_active_edit.py
           python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py
-          grep -q "versionCode 70" android/app/build.gradle
+          grep -q "versionCode 71" android/app/build.gradle
           grep -q "versionName '12.1.43'" android/app/build.gradle
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
@@ -363,7 +363,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-debug.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='70' versionName='12.1.43'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='71' versionName='12.1.43'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-debug.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
@@ -404,19 +404,19 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-RENTAL-EDIT-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-RENTAL-EDIT-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v143test' versionCode='70' versionName='12.1.43'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-MONTHLY-REPORT-ACTIVE-EDIT-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-MONTHLY-REPORT-ACTIVE-EDIT-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v143test' versionCode='71' versionName='12.1.43'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "application-label:'AniGames Admin V12.1.43 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-RENTAL-EDIT-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-RENTAL-EDIT-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-RENTAL-EDIT-SAFE-TEST.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-MONTHLY-REPORT-ACTIVE-EDIT-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-MONTHLY-REPORT-ACTIVE-EDIT-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.43-MONTHLY-REPORT-ACTIVE-EDIT-SAFE-TEST.apk"
           echo "PASS: side-by-side test package verified; original application package source restored."
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.43-rental-edit-fix
+          name: AniGames-Admin-Android-v12.1.43-monthly-report-active-edit
           path: output/*
           if-no-files-found: error
           retention-days: 30
