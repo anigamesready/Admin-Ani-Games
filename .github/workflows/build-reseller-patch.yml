@@ -275,8 +275,8 @@ jobs:
               "member Nonaktif filter"
           )
 
-          old_button = """<button class="btn small secondary" $${busy?'disabled title="Sesi sedang aktif"':''} onclick="openEdit('$${esc(r.id)}')">Edit</button>"""
-          new_buttons = """<button class="btn small secondary" $${busy?'disabled title="Sesi sedang aktif"':''} onclick="openEdit('$${esc(r.id)}')">Edit</button> <button class="btn small secondary" $${busy?'disabled title="Sesi sedang aktif"':''} onclick="deleteRental('$${esc(r.id)}','$${esc(r.code)}')">Hapus Data Rental</button>"""
+          old_button = """<button class="btn small secondary" ${busy?'disabled title="Sesi sedang aktif"':''} onclick="openEdit('${esc(r.id)}')">Edit</button>"""
+          new_buttons = """<button class="btn small secondary" ${busy?'disabled title="Sesi sedang aktif"':''} onclick="openEdit('${esc(r.id)}')">Edit</button> <button class="btn small secondary" ${busy?'disabled title="Sesi sedang aktif"':''} onclick="deleteRental('${esc(r.id)}','${esc(r.code)}')">Hapus Data Rental</button>"""
           html = replace_once(html, old_button, new_buttons, "member row Edit action")
 
           if "function deleteRental(" in html or "async function deleteRental(" in html:
