@@ -22,9 +22,62 @@ if "V12.1.39-AUTO-RELAY-TARGET-ONLY" not in html:
 if "versionCode 67" not in gradle or "versionName '12.1.39'" not in gradle:
     raise SystemExit("Expected exact Admin V12.1.39 Gradle version metadata.")
 
-# Remove only the timer card; keep the rest of the PC/device section intact.
+def remove_js_function(source: str, signature: str) -> str:
+    if source.count(signature) != 1:
+        raise SystemExit("Expected exactly one timer function: " + signature)
+    start = source.find(signature)
+    brace = source.find("{", start + len(signature) - 1)
+    if brace < 0:
+        raise SystemExit("Missing opening brace for " + signature)
+
+    depth = 0
+    quote = None
+    escaped = False
+    line_comment = False
+    block_comment = False
+    i = brace
+    while i < len(source):
+        ch = source[i]
+        nxt = source[i + 1] if i + 1 < len(source) else ""
+        if line_comment:
+            if ch == "\n":
+                line_comment = False
+        elif block_comment:
+            if ch == "*" and nxt == "/":
+                block_comment = False
+                i += 1
+        elif quote:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                quote = None
+        elif ch == "/" and nxt == "/":
+            line_comment = True
+            i += 1
+        elif ch == "/" and nxt == "*":
+            block_comment = True
+            i += 1
+        elif ch in ("'", '"', "`"):
+            quote = ch
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                while end < len(source) and source[end] in " \t":
+                    end += 1
+                if end < len(source) and source[end] == "\n":
+                    end += 1
+                return source[:start] + source[end:]
+        i += 1
+    raise SystemExit("Unclosed JavaScript function: " + signature)
+
+# Remove only the timer UI card and dedicated navigation entry.
 card_start = html.find('<div class="card" id="pcShutdownTimerCard"')
-card_end = html.find('\n</section>\n\n<section id="pairing"', card_start)
+card_end = html.find("\n</section>\n\n<section id=\"pairing\"", card_start)
 if card_start < 0 or card_end < 0:
     raise SystemExit("Shutdown timer card boundaries are missing or ambiguous.")
 card = html[card_start:card_end]
@@ -32,27 +85,46 @@ if "shutdownHours" not in card or "shutdownMinutes" not in card or "shutdownSeco
     raise SystemExit("Timer card does not match the expected hour/minute/second UI.")
 html = html[:card_start] + html[card_end:]
 
-# Remove the dedicated navigation entry without affecting the database tools nav.
 nav = '<button id="shutdownTimerNav" onclick="openShutdownTimerMenu()">⏱️ Timer Shutdown PC</button>'
 if html.count(nav) != 1:
     raise SystemExit("Expected exactly one dedicated Timer Shutdown PC navigation entry.")
 html = html.replace(nav, "", 1)
 
-# Remove the timer controller and its menu navigation helper as one isolated block.
-helpers_start = html.find("function openShutdownTimerMenu() {")
-helpers_end = html.find("async function loadDevices(){", helpers_start)
-if helpers_start < 0 or helpers_end < 0:
-    raise SystemExit("Shutdown timer JavaScript block boundaries are missing.")
-helper_block = html[helpers_start:helpers_end]
-for required in ("function schedulePcShutdown()", "function cancelPcShutdown()",
-                 "p_command: 'schedule_shutdown'", "p_command: 'cancel_shutdown_timer'",
-                 "ADMIN_PC_SHUTDOWN_STATE_KEY", "setInterval(updateShutdownTimerStatus"):
-    if required not in helper_block:
-        raise SystemExit("Expected timer controller component not found: " + required)
-html = html[:helpers_start] + html[helpers_end:]
+# Remove timer-specific functions one at a time. Do not cut through adjacent
+# command, restart-queue or PC-list functions that may share the same script area.
+timer_functions = (
+    "function openShutdownTimerMenu() {",
+    "function readAdminShutdownStates() {",
+    "function saveAdminShutdownStates(value) {",
+    "function shutdownDurationMs() {",
+    "function shutdownFormatRemaining(ms) {",
+    "function selectedShutdownTarget() {",
+    "function refreshShutdownTargetOptions(rows) {",
+    "function activeRentalShutdownBlocker(device) {",
+    "function effectiveShutdownTimerState(device) {",
+    "function updateShutdownTimerStatus() {",
+    "function previewPcShutdown() {",
+    "async function schedulePcShutdown() {",
+    "async function cancelPcShutdown() {",
+)
+for signature in timer_functions:
+    html = remove_js_function(html, signature)
 
-# The V12.1.29 owner-only UI toggle included timer-only references. Remove those
-# two clauses while retaining the FREE TEST panel's role gating.
+state_key = "const ADMIN_PC_SHUTDOWN_STATE_KEY = 'ani_games_admin_shutdown_timer_v1';"
+if html.count(state_key) != 1:
+    raise SystemExit("Shutdown timer local state key anchor mismatch.")
+html = html.replace(state_key, "", 1)
+
+interval = re.compile(
+    r"if\s*\(!window\.__aniShutdownTimerStatusInterval\)\s*\{\s*"
+    r"window\.__aniShutdownTimerStatusInterval\s*=\s*window\.setInterval\(updateShutdownTimerStatus,\s*1000\);\s*\}",
+    re.S,
+)
+html, interval_count = interval.subn("", html, count=1)
+if interval_count != 1:
+    raise SystemExit("Shutdown countdown refresh interval anchor mismatch.")
+
+# Remove timer-only role toggles but preserve Owner gating for FREE TEST.
 for fragment in (
     "const shutdownNav=$('shutdownTimerNav');if(shutdownNav)shutdownNav.classList.toggle('hidden',!owner);",
     "const shutdownCard=$('pcShutdownTimerCard');if(shutdownCard)shutdownCard.classList.toggle('hidden',!owner);",
@@ -61,33 +133,32 @@ for fragment in (
         raise SystemExit("Timer-only role-gating fragment count mismatch.")
     html = html.replace(fragment, "", 1)
 
-# Device-list refresh must continue to populate global PC selector and recovery list;
-# timer-only dropdown initialization is no longer needed.
 call = "refreshShutdownTargetOptions(rows);"
 if html.count(call) != 1:
     raise SystemExit("Expected exactly one timer-only device dropdown refresh call.")
 html = html.replace(call, "", 1)
 
-# Update version metadata for this removal-only Admin release.
 gradle, c = re.subn(r"\bversionCode\s+67\b", "versionCode 68", gradle, count=1)
 gradle, n = re.subn(r"versionName\s*'12\.1\.39'", "versionName '12.1.40'", gradle, count=1)
 if c != 1 or n != 1:
     raise SystemExit("Could not safely update V12.1.39 Gradle version metadata.")
 
-# Add a verifiable marker and update VERSION.txt.
-needle = "V12.1.39-AUTO-RELAY-TARGET-ONLY"
-html = html.replace(needle, needle + " • " + marker, 1)
+html = html.replace(
+    "V12.1.39-AUTO-RELAY-TARGET-ONLY",
+    "V12.1.39-AUTO-RELAY-TARGET-ONLY • " + marker,
+    1,
+)
 VERSION.write_text(
-    "AniGames Admin Android V12.1.40 — removes all Admin PC shutdown countdown UI and scheduling/cancel command paths. Keeps login, pairing/recovery, rental, reseller, dashboard/report, WoL and dual-DB routing.\n",
-    encoding="utf-8"
+    "AniGames Admin Android V12.1.40 — removes Admin PC shutdown countdown UI and scheduling/cancel commands. Keeps login, pairing/recovery, PC controls, FREE TEST, reseller, global rental, reports, WoL and dual-DB routing.\n",
+    encoding="utf-8",
 )
 
-# Regression assertions: the timer feature is absent, while adjacent features remain.
 for forbidden in (
     "pcShutdownTimerCard", "shutdownTimerNav", "shutdownHours", "shutdownMinutes",
     "shutdownSeconds", "schedulePcShutdown", "cancelPcShutdown",
     "schedule_shutdown", "cancel_shutdown_timer", "refreshShutdownTargetOptions",
     "openShutdownTimerMenu", "ADMIN_PC_SHUTDOWN_STATE_KEY",
+    "__aniShutdownTimerStatusInterval",
 ):
     if forbidden in html:
         raise SystemExit("Shutdown timer remnant detected after removal: " + forbidden)
@@ -99,7 +170,8 @@ for required in (
     "V12.1.37-DAILY-REPORT-KEYSET-EXPORT", "report_detailed_usage_page",
     "report_summary_compact", "freeTestPolicyCard", "admin_get_free_test_policy",
     "admin_set_free_test_policy", "ensureActiveDbRouteForAuth", "dbSyncCall('start')",
-    "requestSharedDbRouteSwitch",
+    "requestSharedDbRouteSwitch", "offlineRestart=command==='restart_billing'",
+    "Perintah Restart Billing masuk antrean",
 ):
     if required not in html:
         raise SystemExit("Adjacent feature regression: missing " + required)
@@ -109,7 +181,6 @@ if "selectedDevice=rows.find(x=>x.id===selectedDeviceId)||null;renderGlobalDevic
 if 'id="pairingNav"' not in html or 'id="accounts"' not in html:
     raise SystemExit("Pairing or global rental tab was unexpectedly removed.")
 
-# Check duplicate HTML IDs after deleting the card and nav node.
 ids = re.findall(r'\bid=["\']([^"\']+)', html)
 duplicates = sorted({value for value in ids if ids.count(value) > 1})
 if duplicates:
@@ -117,6 +188,6 @@ if duplicates:
 
 HTML.write_text(html, encoding="utf-8")
 GRADLE.write_text(gradle, encoding="utf-8")
-print("PASS: Timer Shutdown PC menu/card and scheduling/cancel logic removed.")
-print("PASS: FREE TEST, login, pairing, global rental, reports, WoL and dual-DB markers preserved.")
+print("PASS: Timer Shutdown PC menu/card and only timer-specific JavaScript functions removed.")
+print("PASS: Restart queue, FREE TEST, login, pairing, PC controls, global rental, reports, WoL and dual-DB preserved.")
 print("PASS: PC list refresh retained; Admin V12.1.40 / versionCode 68.")
