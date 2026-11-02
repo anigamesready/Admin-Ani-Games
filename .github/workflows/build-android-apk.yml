@@ -261,7 +261,7 @@ jobs:
           ! grep -q "pcShutdownTimerCard\\|shutdownTimerNav\\|schedulePcShutdown\\|cancelPcShutdown\\|schedule_shutdown\\|cancel_shutdown_timer" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.40-ADMIN-NO-SHUTDOWN" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.41-DASHBOARD-30D-REPORT" android/app/src/main/assets/web/admin.html
-          grep -q "V12.1.43-RENTAL-LEASE-EDIT-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.42-RENTAL-LEASE-EDIT-FIX" android/app/src/main/assets/web/admin.html
           grep -q "rentalAdminFriendlyError" android/app/src/main/assets/web/admin.html
           grep -q "color-scheme:dark" android/app/src/main/assets/web/admin.html
           grep -q "Reservasi PC sebelumnya tetap dijaga" android/app/src/main/assets/web/admin.html
