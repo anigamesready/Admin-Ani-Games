@@ -253,7 +253,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import os, re
+          import os, re, subprocess, tempfile
           from pathlib import Path
 
           root = Path(os.environ["ANDROID_DIR"])
@@ -261,36 +261,52 @@ jobs:
           page = web / "admin-control.html"
           html = page.read_text(encoding="utf-8")
 
-          for begin, finish, label in (
-              ("function renderRentals(){", "function updateFormGuard(){", "RENDER RENTALS"),
-              ("$('rentalForm').addEventListener", "function openEdit(", "ADD RENTAL SUBMIT"),
-              ("$('editForm').addEventListener", "function loadAudio(", "EDIT RENTAL SUBMIT"),
-          ):
-              a = html.find(begin)
-              z = html.find(finish, a + len(begin)) if a >= 0 else -1
-              print("DEBUG BLOCK", label, "START", a, "END", z)
-              if a >= 0 and z > a:
-                  print(html[a:z])
-          if "async function deleteRental(" not in html:
-              raise SystemExit("Reseller delete rental handler is missing.")
-          if "billing_delete_rental" not in html:
-              raise SystemExit("Reseller delete RPC is missing.")
-          if "waitCommand(r.command_id)" not in html:
-              raise SystemExit("Reseller delete flow no longer waits for the PC acknowledgement.")
-          if "Data histori transaksi tidak dihapus" not in html:
-              raise SystemExit("Expected delete confirmation about retaining transaction history is missing.")
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
 
-          button = re.compile(
-              r'(<button class="mini danger" onclick="deleteRental\([^"]*\)">)(?:Hapus|Hapus Data Rental)(</button>)',
-              re.I
+          # Replace the old Nonaktif filter with a direct delete action per rental member.
+          html = replace_once(
+              html,
+              '<option value="disabled">Nonaktif</option>',
+              '',
+              "member Nonaktif filter"
           )
-          html, count = button.subn(r'\1Hapus Data Rental\2', html, count=1)
-          if count != 1 and "Hapus Data Rental" not in html:
-              raise SystemExit("Reseller rental row delete button was not found.")
-          if "Hapus Data Rental" not in html:
-              raise SystemExit("Explicit rental delete label was not applied.")
 
-          # Keep reseller permission boundaries unchanged: no PC power/Windows controls.
+          old_button = """<button class="btn small secondary" $${busy?'disabled title="Sesi sedang aktif"':''} onclick="openEdit('$${esc(r.id)}')">Edit</button>"""
+          new_buttons = """<button class="btn small secondary" $${busy?'disabled title="Sesi sedang aktif"':''} onclick="openEdit('$${esc(r.id)}')">Edit</button> <button class="btn small secondary" $${busy?'disabled title="Sesi sedang aktif"':''} onclick="deleteRental('$${esc(r.id)}','$${esc(r.code)}')">Hapus Data Rental</button>"""
+          html = replace_once(html, old_button, new_buttons, "member row Edit action")
+
+          if "function deleteRental(" in html or "async function deleteRental(" in html:
+              raise SystemExit("Unexpected duplicate rental deletion handler already exists.")
+
+          delete_handler = """async function deleteRental(id,code){
+          const d=currentDevice();
+          if(!d)return showMessage('Pilih PC terlebih dahulu.','bad');
+          const busy=sessions.some(s=>s.device_id===d.id&&(['active','paused'].includes(s.status))&&(s.rental_account_id===id||String(s.code||'').toUpperCase()===String(code||'').toUpperCase()));
+          if(busy)return showMessage('Rental '+code+' masih memiliki sesi aktif/paused. Hentikan sesi atau tunggu selesai sebelum menghapus.','bad');
+          if(!confirm('Hapus data rental '+code+'? Riwayat transaksi tidak ikut dihapus.'))return;
+          try{
+            const result=await rpc('billing_delete_rental',{p_session_token:token,p_org_id:org.id,p_rental_id:id});
+            const state=await waitCommand(result?.command_id);
+            if(state?.status==='failed'||state?.status==='expired')throw new Error(state.result?.message||'PC menolak penghapusan rental.');
+            if(state?.status==='completed')showMessage('Rental '+code+' berhasil dihapus dan PC sudah mengonfirmasi.','good');
+            else showMessage('Rental '+code+' terhapus di cloud, tetapi PC belum mengonfirmasi. Periksa PC setelah kembali online.','info');
+            await refreshAll(true);
+          }catch(err){showMessage('Gagal menghapus rental '+code+': '+(err.message||'error tidak diketahui'),'bad')}
+          }
+          """
+          html = replace_once(html, "function renderRentals(){", delete_handler + "function renderRentals(){", "insert rental deletion handler")
+          if "billing_delete_rental" not in html or "waitCommand(result?.command_id)" not in html:
+              raise SystemExit("Rental deletion RPC/acknowledgement was not connected.")
+          if 'value="disabled">Nonaktif' in html:
+              raise SystemExit("Old Nonaktif member filter still exists.")
+          if "Hapus Data Rental" not in html:
+              raise SystemExit("Member rental delete button was not added.")
+
+          # Preserve the reseller permission boundary; this patch adds no Windows/PC power commands.
           forbidden = re.compile(
               r"billing_command\s*\(|billing_start_trial|admin_disconnect_device|restart_pc|shutdown_pc|\blogoff\b|start_trial|queue_command",
               re.I
@@ -301,20 +317,27 @@ jobs:
                   if forbidden.search(line):
                       hits.append(f"{p.relative_to(web)}:{line_no}:{line.strip()[:180]}")
           if hits:
-              raise SystemExit("Restricted Windows/pairing command found after rental patch:\n" + "\n".join(hits[:20]))
+              raise SystemExit("Restricted Windows/pairing command found after reseller patch:\n" + "\n".join(hits[:20]))
 
+          # Parse all inline JS before moving on to the Android build.
+          scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, re.I | re.S)
+          for index, script in enumerate(scripts):
+              if not script.strip():
+                  continue
+              with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as handle:
+                  handle.write(script)
+                  temp_path = handle.name
+              subprocess.run(["node", "--check", temp_path], check=True)
           page.write_text(html, encoding="utf-8")
 
           gradle_candidates = [root / "app/build.gradle", root / "app/build.gradle.kts"]
           gradle = next((p for p in gradle_candidates if p.is_file()), None)
           if gradle is None:
               raise SystemExit("Gradle app file missing after reseller configuration.")
-          text = gradle.read_text(encoding="utf-8")
-          if "versionCode 131" not in text or 'versionName "11.30.1"' not in text:
-              # The existing configuration step may retain single quotes or Kotlin syntax.
-              if "versionCode 131" not in text or "11.30.1" not in text:
-                  raise SystemExit("Reseller APK version 11.30.1 was not set.")
-          print("Reseller delete UI and safety boundaries verified.")
+          gradle_text = gradle.read_text(encoding="utf-8")
+          if "versionCode 131" not in gradle_text or "11.30.1" not in gradle_text:
+              raise SystemExit("Reseller APK version 11.30.1 was not set.")
+          print("Reseller member delete action, session protection, acknowledgement, restricted commands and JavaScript syntax checks passed.")
           PY
 
       - name: Set up Gradle 8.9
