@@ -40,6 +40,7 @@ jobs:
       - name: Extract Android source bundle
         run: |
           set -euo pipefail
+          set -x
           test -f "AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip"
           mkdir -p source-bundle
           unzip -q "AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip" -d source-bundle
