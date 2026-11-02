@@ -1,4 +1,4 @@
-name: Build Ani-Games Reseller APK V11.30.4 Android WebView Login Fix
+name: Build Ani-Games Reseller APK V1.0.5 Global Rental Delete
 
 on:
   push:
@@ -6,10 +6,12 @@ on:
       - main
       - feature/reseller-v11.30.1-global-db-route
       - feature/reseller-global-rental-v1.1
+      - release/reseller-v1.0.5-global-rental-delete
     paths:
       - 'Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip'
       - 'scripts/patch_reseller_global_db_route.py'
       - 'scripts/patch_reseller_global_rental.py'
+      - 'scripts/patch_reseller_global_rental_delete.py'
       - '.github/workflows/build-reseller-apk.yml'
   workflow_dispatch:
 
@@ -323,6 +325,31 @@ jobs:
           print('PASS: global rental CRUD markers, no PC-wait path, and release version 1.0.4.')
           PY
 
+      - name: Apply Reseller V1.0.5 global rental hard delete
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_reseller_global_rental_delete.py "$ANDROID_DIR"
+          node --check /tmp/reseller-delete-dashboard.js
+          python3 - <<'PY'
+          import re, os
+          from pathlib import Path
+          root=Path(os.environ["ANDROID_DIR"])
+          pages=[p for p in root.rglob("admin-control.html") if p.parent.name=="web"]
+          if len(pages)!=1: raise SystemExit("Expected exactly one Reseller dashboard after V1.0.5 patch")
+          page=pages[0].read_text(encoding="utf-8")
+          for token in ("billing_reseller_delete_rental_global","deleteRental('\${esc(r.id)}')","RENTAL_ACTIVE_TIMER_LOCKED","Hapus"):
+              if token not in page: raise SystemExit("Missing Reseller hard-delete safeguard: "+token)
+          for token in ('<option value="disabled">Nonaktif</option>',"billing_reseller_disable_rental_global"):
+              if token in page: raise SystemExit("Old disabled-rental menu/action remains: "+token)
+          for token in ("billing_reseller_create_rental_global","billing_reseller_edit_rental_global"):
+              if token not in page: raise SystemExit("Existing Reseller CRUD regression: "+token)
+          gradle=(root/"app/build.gradle").read_text(encoding="utf-8")
+          if not re.search(r"\bversionCode\s+135\b",gradle) or not re.search(r"\bversionName\s*=?\s*['\"]1\.0\.5['\"]",gradle):
+              raise SystemExit("Expected Reseller versionCode 135 / versionName 1.0.5")
+          print("PASS: Reseller hard delete, active/paused safeguards, add/edit preserved and version 1.0.5.")
+          PY
+
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v6
         with:
@@ -351,21 +378,21 @@ jobs:
           mkdir -p output
           "$AAPT" dump badging "$APK" > output/apk-badging.txt
           cat output/apk-badging.txt | head -8
-          grep -q "package: name='com.anigames.reseller' versionCode='134' versionName='1.0.4'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
-          cp "$APK" output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
+          grep -q "package: name='com.anigames.reseller' versionCode='135' versionName='1.0.5'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
+          cp "$APK" output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
-          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
-          unzip -t output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
-          sha256sum output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
+          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
+          unzip -t output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
+          sha256sum output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Reseller-v11.30.4-webview-login-fix-debug-apk
+          name: Ani-Games-Reseller-Android-v1.0.5-global-rental-delete-debug
           path: |
-            output/Ani-Games-Reseller-v11.30.4-webview-login-fix-debug.apk
+            output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
