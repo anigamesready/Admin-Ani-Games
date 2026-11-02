@@ -1,0 +1,53 @@
+name: Audit Ani Games Reseller Source
+on:
+  push:
+    branches:
+      - "audit/**"
+    paths:
+      - ".github/workflows/inspect-source.yml"
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract and inventory reseller package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip"
+          test -s "$ZIP"
+          unzip -t "$ZIP"
+          mkdir -p inspect
+          unzip -oq "$ZIP" -d inspect
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("inspect")
+          files = sorted(p for p in root.rglob("*") if p.is_file())
+          Path("inventory.txt").write_text("\n".join([f"Total files: {len(files)}"] + [f"{p.stat().st_size:>10}  {p.relative_to(root)}" for p in files]))
+          settings = [p for p in root.rglob("*") if p.name in ("settings.gradle", "settings.gradle.kts")]
+          html = [p for p in root.rglob("*.html")]
+          js = [p for p in root.rglob("*.js")]
+          lines = ["SETTINGS_GRADLE:", *[str(p) for p in settings], "HTML_FILES:", *[str(p) for p in html], "JS_FILES_COUNT:", str(len(js)), "MATCHES:"]
+          terms = ("rental", "delete", "hapus", "nonaktif", "shutdown", "restart", "logoff", "windows", "device", "pc", "billing_command")
+          for p in html + js:
+              try: data = p.read_text(errors="replace")
+              except Exception: continue
+              for n, line in enumerate(data.splitlines(), 1):
+                  if any(t in line.lower() for t in terms):
+                      lines.append(f"{p}:{n}:{line.strip()[:240]}")
+          Path("source-analysis.txt").write_text("\n".join(lines))
+          PY
+          tar -czf extracted-reseller-source.tar.gz -C inspect .
+          ls -lh extracted-reseller-source.tar.gz inventory.txt source-analysis.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reseller-source-inspection
+          path: |
+            extracted-reseller-source.tar.gz
+            inventory.txt
+            source-analysis.txt
+          if-no-files-found: error
+          retention-days: 7
