@@ -39,7 +39,7 @@ handler="""async function deleteRental(id){
   }
   await loadRentals(true);
   showMessage('Rental '+r.code+' berhasil dihapus. Histori transaksi, sesi dan laporan tetap tersimpan.'+pcNote,'good');
- }catch(err){showMessage('Gagal menghapus rental: '+(err.message||'error tidak diketahui'),'bad')}
+ }catch(err){const code=String(err.message||'');if(code.includes('RENTAL_ACTIVE_TIMER_LOCKED'))showMessage('Rental masih memiliki sesi aktif/paused. Selesaikan sesi terlebih dahulu sebelum dihapus.','bad');else if(code.includes('RENTAL_ACTIVE_OFFLINE_LEASE'))showMessage('Rental masih memiliki reservasi offline yang berlaku. Coba lagi setelah reservasi berakhir.','bad');else showMessage('Gagal menghapus rental: '+(code||'error tidak diketahui'),'bad')}
 }
 """
 h=once(h,anchor,handler+anchor,'Reseller delete handler')
