@@ -43,10 +43,10 @@ handler="""async function deleteRental(id){
 }
 """
 h=once(h,anchor,handler+anchor,'Reseller delete handler')
-if not re.search(r'\bversionCode\s+134\b',g) or not re.search(r"\bversionName\s*=?\s*['"]1\.0\.4['"]",g):
+if not re.search(r'\bversionCode\s+134\b',g) or not re.search(r"""versionName\s*=?\s*['"]1\.0\.4['"]""",g):
  raise SystemExit('Unexpected Reseller baseline; expected versionCode 134 / versionName 1.0.4')
 g,c=re.subn(r'\bversionCode\s+134\b','versionCode 135',g,count=1)
-g,n=re.subn(r"(\bversionName\s*=?\s*['"])1\.0\.4(['"])",r'\g<1>1.0.5\2',g,count=1)
+g,n=re.subn(r"""(\bversionName\s*=?\s*['"])1\.0\.4(['"])""",r'\g<1>1.0.5\2',g,count=1)
 if c!=1 or n!=1: raise SystemExit('Reseller version metadata update failed')
 h+='\n<!-- V1.0.5-GLOBAL-RENTAL-HARD-DELETE -->\n'
 for m in ('billing_reseller_delete_rental_global',"deleteRental('${esc(r.id)}')",'Histori transaksi, sesi dan laporan tetap disimpan','V1.0.5-GLOBAL-RENTAL-HARD-DELETE'):
