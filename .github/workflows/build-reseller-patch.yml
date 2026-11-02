@@ -261,37 +261,16 @@ jobs:
           page = web / "admin-control.html"
           html = page.read_text(encoding="utf-8")
 
-          print("DEBUG HTML length:", len(html))
-          for term in ("memberRows", "renderRentals", "billing_", "members", "member", "Nonaktif", "disabled"):
-              pos = 0
-              count = 0
-              while count < 8:
-                  pos = html.lower().find(term.lower(), pos)
-                  if pos < 0:
-                      break
-                  print("DEBUG", term, pos, repr(html[max(0,pos-220):pos+520]))
-                  pos += len(term)
-                  count += 1
-          pos = 0
-          count = 0
-          while count < 80:
-              pos = html.find("<button", pos)
-              if pos < 0:
-                  break
-              end = html.find(">", pos)
-              print("DEBUG BUTTON", repr(html[pos:min(len(html),end+180)]))
-              pos = end + 1
-              count += 1
-          pos = 0
-          count = 0
-          while count < 100:
-              pos = html.find("function ", pos)
-              if pos < 0:
-                  break
-              print("DEBUG FUNCTION", repr(html[pos:pos+400]))
-              pos += len("function ")
-              count += 1
-
+          for begin, finish, label in (
+              ("function renderRentals(){", "function updateFormGuard(){", "RENDER RENTALS"),
+              ("$('rentalForm').addEventListener", "function openEdit(", "ADD RENTAL SUBMIT"),
+              ("$('editForm').addEventListener", "function loadAudio(", "EDIT RENTAL SUBMIT"),
+          ):
+              a = html.find(begin)
+              z = html.find(finish, a + len(begin)) if a >= 0 else -1
+              print("DEBUG BLOCK", label, "START", a, "END", z)
+              if a >= 0 and z > a:
+                  print(html[a:z])
           if "async function deleteRental(" not in html:
               raise SystemExit("Reseller delete rental handler is missing.")
           if "billing_delete_rental" not in html:
