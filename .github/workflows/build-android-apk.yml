@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.39 Target-only Auto Relay
+name: Build AniGames Admin V12.1.40 No Shutdown Timer
 
 on:
   push:
@@ -19,6 +19,7 @@ on:
       - feature/global-rental-admin-v12.1.35
       - feature/admin-pc-wol-relay-v12.1.36
       - feature/admin-report-daily-v12.1.37
+      - release/admin-v12.1.40-no-shutdown
   pull_request:
     branches:
       - main
@@ -29,7 +30,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.39 Target-only Auto Relay APK
+    name: Build AniGames Admin V12.1.40 No Shutdown Timer APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -89,6 +90,7 @@ jobs:
             "scripts/patch_admin_report_daily_v12_1_37.py"
             "scripts/patch_admin_v12_1_38_auto_wol_metadata.py"
             "scripts/patch_admin_v12_1_39_auto_relay_target_only.py"
+            "scripts/patch_admin_v12_1_40_remove_shutdown_timer.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -146,9 +148,10 @@ jobs:
           python3 patch_admin_report_daily_v12_1_37.py
           python3 patch_admin_v12_1_38_auto_wol_metadata.py
           python3 patch_admin_v12_1_39_auto_relay_target_only.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py
-          grep -q "versionCode 67" android/app/build.gradle
-          grep -q "versionName '12.1.39'" android/app/build.gradle
+          python3 patch_admin_v12_1_40_remove_shutdown_timer.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py
+          grep -q "versionCode 68" android/app/build.gradle
+          grep -q "versionName '12.1.40'" android/app/build.gradle
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
           grep -q "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY" android/app/src/main/assets/web/admin.html
@@ -239,18 +242,20 @@ jobs:
           PY
           grep -q "const DB_ROUTE_CACHE_MS=15000;" android/app/src/main/assets/web/admin.html
           grep -q "DB_ROUTE_STATUS_TIMEOUT:" android/app/src/main/assets/web/admin.html
-          grep -q "selectedDevice=rows.find(x=>x.id===selectedDeviceId)||null;refreshShutdownTargetOptions(rows)" android/app/src/main/assets/web/admin.html
+          grep -q "selectedDevice=rows.find(x=>x.id===selectedDeviceId)||null;renderGlobalDeviceSelector(rows);" android/app/src/main/assets/web/admin.html
           ! grep -q "devicesCache=rows;refreshShutdownTargetOptions(rows);renderRecoveryDeviceOptions();" android/app/src/main/assets/web/admin.html
 
-          grep -q "shutdownSeconds" android/app/src/main/assets/web/admin.html
+          ! grep -q "shutdownSeconds" android/app/src/main/assets/web/admin.html
+          ! grep -q "pcShutdownTimerCard\\|shutdownTimerNav\\|schedulePcShutdown\\|cancelPcShutdown\\|schedule_shutdown\\|cancel_shutdown_timer" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.40-ADMIN-NO-SHUTDOWN" android/app/src/main/assets/web/admin.html
           grep -q 'value="30"' android/app/src/main/assets/web/admin.html
           grep -q "admin_get_free_test_policy" android/app/src/main/assets/web/admin.html
           grep -q "admin_set_free_test_policy" android/app/src/main/assets/web/admin.html
           ! grep -q "/galtys/i" android/app/src/main/assets/web/admin.html
           grep -q "admin_get_free_test_policy" android/app/src/main/assets/web/admin.html
           grep -q "admin_set_free_test_policy" android/app/src/main/assets/web/admin.html
-          grep -q "function schedulePcShutdown()" android/app/src/main/assets/web/admin.html
-          grep -q "function cancelPcShutdown()" android/app/src/main/assets/web/admin.html
+          ! grep -q "function schedulePcShutdown()" android/app/src/main/assets/web/admin.html
+          ! grep -q "function cancelPcShutdown()" android/app/src/main/assets/web/admin.html
           grep -q "applicationId 'com.anigames.billingadmin'" android/app/build.gradle
           ! grep -q "com.anigames.billingadmin.v12test" android/app/build.gradle
           grep -q 'android:label="AniGames Admin"' android/app/src/main/AndroidManifest.xml
@@ -334,7 +339,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='67' versionName='12.1.39'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='68' versionName='12.1.39'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
@@ -366,7 +371,7 @@ jobs:
               raise SystemExit("Safe-test package ID anchor mismatch")
           if m.count('android:label="AniGames Admin"') != 1:
               raise SystemExit("Safe-test app label anchor mismatch")
-          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v139test'", 1), encoding="utf-8")
+          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v140test'", 1), encoding="utf-8")
           manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.39 TEST"', 1), encoding="utf-8")
           PY
           gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
@@ -375,9 +380,9 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-AUTO-RELAY-SAFE-TEST.apk"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-NO-SHUTDOWN-SAFE-TEST.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-AUTO-RELAY-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v139test' versionCode='67' versionName='12.1.39'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v140test' versionCode='67' versionName='12.1.39'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "application-label:'AniGames Admin V12.1.39 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-AUTO-RELAY-SAFE-TEST.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.39-AUTO-RELAY-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
@@ -387,7 +392,7 @@ jobs:
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.39-auto-relay-target-only
+          name: AniGames-Admin-Android-v12.1.39-no-shutdown
           path: output/*
           if-no-files-found: error
           retention-days: 30
