@@ -21,7 +21,6 @@ on:
       - feature/admin-report-daily-v12.1.37
       - release/admin-v12.1.40-no-shutdown
       - release/admin-v12.1.42-rental-edit-fix
-      - release/admin-v12.1.42-rental-edit-fix
   pull_request:
     branches:
       - main
@@ -394,13 +393,13 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-DASHBOARD-30D-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-DASHBOARD-30D-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-RENTAL-EDIT-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-RENTAL-EDIT-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "package: name='com.anigames.billingadmin.v142test' versionCode='70' versionName='12.1.42'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "application-label:'AniGames Admin V12.1.42 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-DASHBOARD-30D-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-DASHBOARD-30D-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-DASHBOARD-30D-SAFE-TEST.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-RENTAL-EDIT-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-RENTAL-EDIT-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.42-RENTAL-EDIT-SAFE-TEST.apk"
           echo "PASS: side-by-side test package verified; original application package source restored."
 
       - name: Upload final Admin APK
