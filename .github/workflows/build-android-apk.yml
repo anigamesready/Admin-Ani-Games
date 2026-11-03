@@ -248,7 +248,7 @@ jobs:
           PY
           grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin.html
           grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin-control.html
-          grep -q "Perintah Restart Billing masuk antrean" android/app/src/main/assets/web/admin.html
+          grep -q "Login Billing masuk antrean" android/app/src/main/assets/web/admin.html
           grep -q "Antrekan Restart Billing agar watchdog" android/app/src/main/assets/web/admin-control.html
           python3 - <<'PY'
           from pathlib import Path
