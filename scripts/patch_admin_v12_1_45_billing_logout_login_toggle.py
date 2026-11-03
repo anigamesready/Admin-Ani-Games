@@ -38,8 +38,8 @@ old_toolbar="<button onclick=\"selectedCmd('refresh')\">Refresh</button><button 
 new_toolbar="<button id=\"refreshBillingButton\" onclick=\"selectedCmd('refresh')\">Refresh</button><button id=\"restartBillingButton\" onclick=\"selectedCmd('restart_billing')\">Restart Billing</button><button id=\"pauseBillingButton\" onclick=\"selectedCmd('pause')\">Pause</button><button id=\"resumeBillingButton\" onclick=\"selectedCmd('resume')\">Resume</button><button id=\"billingUiToggleButton\" onclick=\"selectedBillingToggle()\">Logout Billing</button><button id=\"stopBillingButton\" class=\"danger\" onclick=\"selectedCmd('stop')\">Stop</button>"
 html=once(html,old_toolbar,new_toolbar,'Selected Billing toolbar')
 
-old_row="<button onclick=\"cmd('\${d.id}','logout')\">Logout</button>"
-new_row="<button onclick=\"toggleBillingUi('\${d.id}')\">\${d.billingUiState==='closed'?'Login Billing':d.billingUiState==='closing'?'Menutup…':d.billingUiState==='starting'?'Membuka…':'Logout Billing'}</button>"
+old_row="<button onclick=\"cmd('${d.id}','logout')\">Logout</button>"
+new_row="<button onclick=\"toggleBillingUi('${d.id}')\">${d.billingUiState==='closed'?'Login Billing':d.billingUiState==='closing'?'Menutup…':d.billingUiState==='starting'?'Membuka…':'Logout Billing'}</button>"
 html=once(html,old_row,new_row,'Device row Billing toggle')
 
 old_state="const state=active?(m.activeCode?'RENTAL AKTIF':m.pausedCode?'RENTAL PAUSED':'STANDBY / BILLING SIAP'):'TERPUTUS';"
