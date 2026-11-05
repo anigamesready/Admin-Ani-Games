@@ -137,14 +137,16 @@ if c1 != 1 or c2 != 1:
     raise SystemExit("Unable to bump Reseller metadata to V1.0.6")
 gradle_path.write_text(gradle, encoding="utf-8")
 
+# Write patched HTML before extracting JavaScript for syntax checks.
+login_path.write_text(login, encoding="utf-8")
+dashboard_path.write_text(dashboard, encoding="utf-8")
+
 # Extract inline JavaScript and require it to parse before the Android build starts.
 for path, stem in ((login_path, "reseller-login-v106"), (dashboard_path, "reseller-status-v106")):
     source = path.read_text(encoding="utf-8")
-    scripts = re.findall(r"<script\\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>", source, re.I | re.S)
+    scripts = re.findall(r"<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>", source, re.I | re.S)
     if len(scripts) != 1:
         raise SystemExit(f"{path.name}: expected one inline script, found {len(scripts)}")
     Path("/tmp/" + stem + ".js").write_text(scripts[0], encoding="utf-8")
 
-login_path.write_text(login, encoding="utf-8")
-dashboard_path.write_text(dashboard, encoding="utf-8")
 print("PASS: remembered login, explicit ACTIVE/DISABLE/EXPIRED editing, expired-date handling, session lock, and V1.0.6 metadata.")
