@@ -1,4 +1,4 @@
-name: Build Ani-Games Reseller APK V1.0.5 Global Rental Delete
+name: Build Ani-Games Reseller APK V1.0.6 Remember Login + Rental Status
 
 on:
   push:
@@ -7,11 +7,13 @@ on:
       - feature/reseller-v11.30.1-global-db-route
       - feature/reseller-global-rental-v1.1
       - release/reseller-v1.0.5-global-rental-delete
+      - release/reseller-v1.0.6-remember-login-rental-status
     paths:
       - 'Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip'
       - 'scripts/patch_reseller_global_db_route.py'
       - 'scripts/patch_reseller_global_rental.py'
       - 'scripts/patch_reseller_global_rental_delete.py'
+      - 'scripts/patch_reseller_login_status.py'
       - '.github/workflows/build-reseller-apk.yml'
   workflow_dispatch:
 
@@ -20,7 +22,7 @@ permissions:
 
 jobs:
   build:
-    name: Audit source and compile Reseller V11.30.4 APK
+    name: Audit source and compile Reseller V1.0.6 APK
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -350,6 +352,33 @@ jobs:
           print("PASS: Reseller hard delete, active/paused safeguards, add/edit preserved and version 1.0.5.")
           PY
 
+      - name: Apply Reseller V1.0.6 remembered login and editable rental status
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_reseller_login_status.py "$ANDROID_DIR"
+          node --check /tmp/reseller-login-v106.js
+          node --check /tmp/reseller-status-v106.js
+          python3 - <<'PY'
+          import re, os
+          from pathlib import Path
+          root=Path(os.environ["ANDROID_DIR"])
+          login_pages=[p for p in root.rglob("index.html") if p.parent.name=="web" and (p.parent/"admin-control.html").is_file()]
+          if len(login_pages)!=1: raise SystemExit("Expected exactly one reseller login/dashboard pair")
+          login=login_pages[0].read_text(encoding="utf-8")
+          page=(login_pages[0].parent/"admin-control.html").read_text(encoding="utf-8")
+          for token in ("ani_games_reseller_saved_login_v1","loadSavedResellerLogin","saveResellerLogin(username,password)","rememberLogin"):
+              if token not in login: raise SystemExit("Remember-login feature missing: "+token)
+          for token in ('id="editStatus"','value="active">ACTIVE','value="disabled">DISABLE','value="expired">EXPIRED',"p_status:status"):
+              if token not in page: raise SystemExit("Rental status editor missing: "+token)
+          if "DB_ROUTE_SPLIT_BRAIN" not in login or "DB_ROUTE_SPLIT_BRAIN" not in page:
+              raise SystemExit("Global DB route guard regression detected")
+          gradle=(root/"app/build.gradle").read_text(encoding="utf-8")
+          if not re.search(r"\bversionCode\s+136\b",gradle) or not re.search(r"""versionName\s*=?\s*['"]1\.0\.6['"]""",gradle):
+              raise SystemExit("Expected Reseller V1.0.6 / versionCode 136")
+          print("PASS: remembered credentials, editable ACTIVE/DISABLE/EXPIRED status, DB route guards and version 1.0.6.")
+          PY
+
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v6
         with:
@@ -378,8 +407,8 @@ jobs:
           mkdir -p output
           "$AAPT" dump badging "$APK" > output/apk-badging.txt
           cat output/apk-badging.txt | head -8
-          grep -q "package: name='com.anigames.reseller' versionCode='135' versionName='1.0.5'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
-          cp "$APK" output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
+          grep -q "package: name='com.anigames.reseller' versionCode='136' versionName='1.0.6'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
+          cp "$APK" output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
           "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
@@ -390,7 +419,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Reseller-Android-v1.0.5-global-rental-delete-debug
+          name: Ani-Games-Reseller-Android-v1.0.6-remember-login-rental-status-debug
           path: |
             output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
             output/SHA256SUMS.txt
