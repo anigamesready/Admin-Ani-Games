@@ -411,17 +411,17 @@ jobs:
           cp "$APK" output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
-          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
-          unzip -t output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
-          sha256sum output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
+          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
+          unzip -t output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
+          sha256sum output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Ani-Games-Reseller-Android-v1.0.6-remember-login-rental-status-debug
           path: |
-            output/Ani-Games-Reseller-v1.0.5-global-rental-delete-debug.apk
+            output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
