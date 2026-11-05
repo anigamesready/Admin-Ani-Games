@@ -91,12 +91,16 @@ dashboard = replace_once(
     "if(!Number.isFinite(minutes)||minutes<0)return showMessage('Sisa menit tidak valid.','bad');\n if(!['active','disabled','expired'].includes(status))return showMessage('Status rental tidak valid.','bad');\n if(status==='active'&&minutes<1)return showMessage('Status ACTIVE memerlukan sisa waktu minimal 1 menit.','bad');",
     "edit status validation"
 )
-dashboard = replace_once(
-    dashboard,
+edit_start = dashboard.index("$('editForm').addEventListener('submit',async e=>{")
+edit_end = dashboard.index("function loadAudio(){", edit_start)
+edit_block = dashboard[edit_start:edit_end]
+edit_block = replace_once(
+    edit_block,
     "if(expiry&&new Date(expiry).getTime()<=Date.now())throw new Error('Tanggal expired harus di masa depan.');",
     "if(status==='active'&&expiry&&new Date(expiry).getTime()<=Date.now())throw new Error('Status ACTIVE memerlukan tanggal expired di masa depan atau kosongkan tanggalnya.');",
     "past expiry handling"
 )
+dashboard = dashboard[:edit_start] + edit_block + dashboard[edit_end:]
 dashboard = replace_once(
     dashboard,
     "p_client_label:$('editClient').value.trim()||null,p_expiry_at:expiry",
