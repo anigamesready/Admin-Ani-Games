@@ -74,7 +74,7 @@ CREATE OR REPLACE FUNCTION api.wol_relay_create_enrollment()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public', 'api', 'extensions', 'pg_catalog'
+SET search_path TO 'public', 'pg_catalog'
 AS $function$
 DECLARE
   a public.admin_accounts%ROWTYPE;
@@ -143,7 +143,7 @@ CREATE OR REPLACE FUNCTION api.wol_relay_enqueue(p_target_device_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public', 'api', 'private', 'pg_catalog'
+SET search_path TO 'public', 'pg_catalog'
 AS $function$
 DECLARE
   a public.admin_accounts%ROWTYPE;
