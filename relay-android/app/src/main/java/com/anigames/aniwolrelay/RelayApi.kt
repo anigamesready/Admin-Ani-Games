@@ -15,7 +15,7 @@ object RelayApi {
 
     suspend fun register(code: String, installationId: String): RelayCredentials = withContext(Dispatchers.IO) {
         val body = JSONObject().put("code", code.trim().uppercase())
-            .put("relayName", "Ani WoL Relay - \${Build.MODEL.take(40)}")
+            .put("relayName", "Ani WoL Relay - ${Build.MODEL.take(40)}")
             .put("installationId", installationId).put("appVersion", APP_VERSION).put("model", Build.MODEL)
         val response = post("wol/relay/register", body)
         if (!response.optBoolean("ok")) throw IllegalStateException(response.optString("error", "Pairing ditolak"))
@@ -52,7 +52,7 @@ object RelayApi {
             val text = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
             val json = if (text.isBlank()) JSONObject() else JSONObject(text)
             if (c.responseCode !in 200..299) throw IllegalStateException(
-                json.optString("error", json.optString("message", "HTTP \${c.responseCode}")))
+                json.optString("error", json.optString("message", "HTTP ${c.responseCode}")))
             return json
         } finally { c.disconnect() }
     }
