@@ -80,6 +80,7 @@ new_helpers = r'''
 // V12.1.47-ANDROID-WOL-RELAY — separate relay identity; never masquerades as a billing PC.
 let aniAndroidWakeRelay = null;
 let aniAndroidWakeRelayBusy = false;
+let aniAndroidWakeRelayCheckedAt = 0;
 
 function openWakeRelayMenu() {
  const nav = document.querySelector('[data-tab="devices"]');
@@ -120,10 +121,12 @@ function saveWakeRelaySelection() {
  } catch (_) {}
 }
 
-async function loadWakeRelayStatus() {
+async function loadWakeRelayStatus(force = false) {
  const info = $('wakeRelaySourceInfo');
+ if (!force && Date.now() - aniAndroidWakeRelayCheckedAt < 15000) return aniAndroidWakeRelay;
  try {
   const result = await rpc('wol_relay_status', {});
+  aniAndroidWakeRelayCheckedAt = Date.now();
   const rows = Array.isArray(result?.relays) ? result.relays : [];
   aniAndroidWakeRelay = rows.find(r => r.status === 'online') || rows[0] || null;
   if (info) {
@@ -138,6 +141,7 @@ async function loadWakeRelayStatus() {
   }
  } catch (e) {
   aniAndroidWakeRelay = null;
+  aniAndroidWakeRelayCheckedAt = Date.now();
   if (info) info.textContent = 'Status HP relay tidak dapat dibaca: ' + String(e?.message || e).slice(0,120);
  }
  updateWakeRelayStatus();
@@ -188,7 +192,7 @@ async function createWakeRelayPairingCode() {
 
 async function refreshWakeRelayDevices() {
  try { await loadDevices(); } catch (_) {}
- await loadWakeRelayStatus();
+ await loadWakeRelayStatus(true);
  updateWakeRelayStatus();
 }
 
@@ -198,7 +202,7 @@ async function requestWakePc2() {
  if (!target) return updateWakeRelayStatus('Pilih PC target terlebih dahulu.');
  if (target.uiStatus === 'online') return updateWakeRelayStatus('PC target sudah ONLINE; perintah tidak dikirim.');
  if (!normalizeWakeRelayMac(target.metadata?.wolLanMac)) return updateWakeRelayStatus('MAC LAN PC target belum tersedia. Nyalakan PC sekali dengan Billing V12.3.8 atau lebih baru.');
- await loadWakeRelayStatus();
+ await loadWakeRelayStatus(true);
  if (aniAndroidWakeRelay?.status !== 'online') return updateWakeRelayStatus('HP relay OFFLINE. Tidak ada perintah yang dikirim.');
  if (!confirm('Kirim perintah Wake-on-LAN ke ' + wakeRelayLabel(target) + '?\\n\\nHP Android relay: ONLINE\\nPC target: OFFLINE\\nMAC LAN divalidasi ulang oleh database.\\n\\nPC hanya dianggap menyala setelah heartbeat Billing terdeteksi.')) return;
 
