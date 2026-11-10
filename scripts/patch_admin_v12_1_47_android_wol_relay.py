@@ -72,9 +72,9 @@ html = replace_div_block(html, '<div class="card" id="wakeRelayCard"')
 html = html.replace('⚡ Nyalakan PC Kedua', '⚡ WoL Android Relay', 1)
 
 # Override the legacy PC-to-PC relay helpers with the Android relay flow.
-anchor = 'function openShutdownTimerMenu()'
-if anchor not in html:
-    raise SystemExit('Admin PC control function insertion anchor missing.')
+script_close = html.rfind('</script>')
+if script_close < 0:
+    raise SystemExit('Admin main JavaScript closing script tag missing.')
 
 new_helpers = r'''
 // V12.1.47-ANDROID-WOL-RELAY — separate relay identity; never masquerades as a billing PC.
