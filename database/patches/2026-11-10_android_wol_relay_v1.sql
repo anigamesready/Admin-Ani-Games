@@ -318,7 +318,7 @@ BEGIN
     model = left(coalesce(p_metrics->>'model',model),100),
     battery_percent = CASE WHEN (p_metrics->>'batteryPercent') ~ '^[0-9]{1,3}$'
       THEN least(100,greatest(0,(p_metrics->>'batteryPercent')::integer)) ELSE battery_percent END,
-    battery_temp_c = CASE WHEN (p_metrics->>'batteryTemperatureC') ~ '^-?[0-9]{1,3}(\\.[0-9]{1,2})?$'
+    battery_temp_c = CASE WHEN (p_metrics->>'batteryTemperatureC') ~ '^-?[0-9]{1,3}(\.[0-9]{1,2})?$'
       THEN (p_metrics->>'batteryTemperatureC')::numeric ELSE battery_temp_c END,
     charging = CASE WHEN p_metrics ? 'charging' THEN (p_metrics->>'charging')::boolean ELSE charging END,
     battery_health = left(coalesce(p_metrics->>'batteryHealth',battery_health),40),
