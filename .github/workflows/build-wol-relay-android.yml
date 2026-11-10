@@ -52,8 +52,21 @@ jobs:
         run: gradle -p relay-android :app:assembleDebug --no-daemon
       - name: Verify APK
         run: |
-          test -s relay-android/app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging relay-android/app/build/outputs/apk/debug/app-debug.apk | grep -q "package: name='com.anigames.aniwolrelay' versionName='1.0.0'"
+          APK=relay-android/app/build/outputs/apk/debug/app-debug.apk
+          META=relay-android/app/build/outputs/apk/debug/output-metadata.json
+          test -s "$APK"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          meta = json.loads(Path("relay-android/app/build/outputs/apk/debug/output-metadata.json").read_text())
+          assert meta["applicationId"] == "com.anigames.aniwolrelay", meta
+          assert meta["variantName"] == "debug", meta
+          assert meta["elements"][0]["versionName"] == "1.0.0", meta
+          assert meta["elements"][0]["versionCode"] == 1, meta
+          print("APK metadata verified:", meta["applicationId"], meta["elements"][0]["versionName"])
+          PY
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          unzip -t "$APK" >/dev/null
       - name: Upload relay APK
         uses: actions/upload-artifact@v4
         with:
