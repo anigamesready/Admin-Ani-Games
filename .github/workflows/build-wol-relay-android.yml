@@ -38,6 +38,16 @@ jobs:
           test -f relay-android/app/src/main/AndroidManifest.xml
           grep -q 'wol/relay/poll' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt
           grep -q 'MagicPacketSender' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
+      - name: Smoke-test live relay API with an invalid one-time code
+        run: |
+          ANON_KEY=$(sed -n 's/.*ANON_KEY = "\([^"]*\)".*/\1/p' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt)
+          test -n "$ANON_KEY"
+          HTTP_CODE=$(curl -sS -X POST "https://wzkjpycjizexxcxrfdvr.supabase.co/functions/v1/ani-games-api/wol/relay/register" \
+            -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+            -d '{"code":"000000000000","relayName":"CI smoke test","installationId":"ci-smoke-test-0001","appVersion":"ci","model":"GitHub Actions"}' \
+            -o /tmp/ani-wol-relay-smoke.json -w "%{http_code}")
+          test "$HTTP_CODE" = "401"
+          grep -q '"error":"WOL_RELAY_ENROLLMENT_INVALID"' /tmp/ani-wol-relay-smoke.json
       - name: Build debug APK
         run: gradle -p relay-android :app:assembleDebug --no-daemon
       - name: Verify APK
