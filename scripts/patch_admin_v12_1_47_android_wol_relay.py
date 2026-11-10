@@ -77,7 +77,7 @@ if script_close < 0:
     raise SystemExit('Admin main JavaScript closing script tag missing.')
 
 new_helpers = r'''
-// V12.1.47-ANDROID-WOL-RELAY — separate relay identity; never masquerades as a billing PC.
+// ANI-WOL-RELAY V12.1.47-ANDROID-WOL-RELAY — separate relay identity; never masquerades as a billing PC.
 let aniAndroidWakeRelay = null;
 let aniAndroidWakeRelayBusy = false;
 let aniAndroidWakeRelayCheckedAt = 0;
