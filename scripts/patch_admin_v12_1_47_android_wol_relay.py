@@ -73,8 +73,8 @@ html = html.replace('⚡ Nyalakan PC Kedua', '⚡ WoL Android Relay', 1)
 
 # Override the legacy PC-to-PC relay helpers with the Android relay flow.
 anchor = 'function openShutdownTimerMenu()'
-if html.count(anchor) != 1:
-    raise SystemExit('Admin PC control function insertion anchor mismatch.')
+if anchor not in html:
+    raise SystemExit('Admin PC control function insertion anchor missing.')
 
 new_helpers = r'''
 // V12.1.47-ANDROID-WOL-RELAY — separate relay identity; never masquerades as a billing PC.
