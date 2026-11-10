@@ -22,9 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
+import java.time.OffsetDateTime
 
 class RelayService : Service() {
     companion object {
@@ -106,9 +104,7 @@ class RelayService : Service() {
         val name = command.optString("targetDeviceName", "PC target")
         val expiryText = command.optString("expiresAt")
         val expires = try {
-            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX", Locale.US)
-                .apply { timeZone = TimeZone.getTimeZone("UTC") }
-            parser.parse(expiryText)?.time ?: 0L
+            OffsetDateTime.parse(expiryText).toInstant().toEpochMilli()
         } catch (_: Exception) { 0L }
         if (expires <= System.currentTimeMillis()) {
             withNetworkWakeLock { RelayApi.acknowledge(credentials, id, "failed", JSONObject().put("error", "COMMAND_EXPIRED")) }
