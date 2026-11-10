@@ -192,6 +192,10 @@ jobs:
           grep -q "wol_relay_create_enrollment" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_enqueue" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_command_status" android/app/src/main/assets/web/admin.html
+          grep -q "id=\"wakeRelayTarget\"" android/app/src/main/assets/web/admin.html
+          grep -q "createWakeRelayPairingCode" android/app/src/main/assets/web/admin.html
+          ! grep -q "id=\"wakeRelaySource\"" android/app/src/main/assets/web/admin.html
+          ! grep -q "id=\"wakeRelayMac\"" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.37-DAILY-REPORT-KEYSET-EXPORT" android/app/src/main/assets/web/admin.html
           grep -q "rpc('report_detailed_usage_page'" android/app/src/main/assets/web/admin.html
           grep -q "rpc('report_summary_compact'" android/app/src/main/assets/web/admin.html
