@@ -25,8 +25,8 @@ jobs:
         with:
           gradle-version: '8.9'
       - uses: android-actions/setup-android@v3
-      - name: Install Android SDK 35
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        with:
+          packages: 'platform-tools,platforms;android-35,build-tools;35.0.0'
       - name: Verify source
         run: |
           test -f relay-android/app/src/main/AndroidManifest.xml
