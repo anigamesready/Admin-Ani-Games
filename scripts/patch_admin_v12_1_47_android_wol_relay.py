@@ -242,7 +242,7 @@ async function requestWakePc2() {
 }
 
 '''
-html = html.replace(anchor, new_helpers + '\n' + anchor, 1)
+html = html[:script_close] + new_helpers + '\n' + html[script_close:]
 
 # Version and package metadata.
 gradle, code_count = re.subn(r'\bversionCode\s+74\b', 'versionCode 75', gradle, count=1)
