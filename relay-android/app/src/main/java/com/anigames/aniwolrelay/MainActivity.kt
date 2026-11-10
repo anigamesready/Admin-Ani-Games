@@ -61,7 +61,7 @@ class MainActivity : AppCompatActivity() {
         root.addView(relayInfo)
         root.addView(TextView(this).apply { text = "PAIRING DARI ADMIN APK"; textSize = 13f; setTextColor(0xFF176B55.toInt()) })
         code = EditText(this).apply {
-            hint = "Masukkan kode pairing 12 karakter"; singleLine = true; textSize = 17f
+            hint = "Masukkan kode pairing 12 karakter"; setSingleLine(true); textSize = 17f
             filters = arrayOf(InputFilter.AllCaps(), InputFilter.LengthFilter(12))
         }
         root.addView(code, matchWidth())
