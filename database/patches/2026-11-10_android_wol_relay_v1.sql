@@ -346,7 +346,14 @@ BEGIN
   IF n <> 1 THEN RAISE EXCEPTION 'INVALID_WOL_RELAY_TOKEN'; END IF;
 
   UPDATE public.wol_relay_commands SET status='expired'
-   WHERE relay_id=p_relay_id AND status='queued' AND expires_at <= now();
+   WHERE relay_id=p_relay_id AND status IN ('queued','delivered') AND expires_at <= now();
+
+  -- Re-lease a delivered command if the relay crashed before acknowledging it.
+  -- Duplicate Magic Packets are harmless; the 90-second expiry and 120-second
+  -- Admin duplicate guard prevent uncontrolled repeated wake requests.
+  UPDATE public.wol_relay_commands SET status='queued', delivered_at=NULL
+   WHERE relay_id=p_relay_id AND status='delivered'
+     AND delivered_at < now() - interval '30 seconds' AND expires_at > now();
 
   SELECT * INTO c FROM public.wol_relay_commands
    WHERE relay_id=p_relay_id AND status='queued' AND expires_at > now()
