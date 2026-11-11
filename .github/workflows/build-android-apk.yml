@@ -27,6 +27,7 @@ on:
       - feature/admin-v12.1.46-monthly-yearly-member-rankings
       - feature/ani-wol-relay-android-v1
       - fix/ani-wol-relay-reliability-20261112
+      - fix/ani-wol-master-pairing-guard-20261112
   pull_request:
     branches:
       - main
