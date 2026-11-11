@@ -181,10 +181,33 @@ jobs:
           python3 patch_admin_v12_1_47_android_wol_relay.py
           python3 patch_admin_v12_1_48_android_wol_relay_fix.py
           python3 patch_admin_v12_1_49_wol_master_role.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py patch_admin_v12_1_45_billing_logout_login_toggle.py patch_admin_v12_1_46_monthly_yearly_report_pc.py patch_admin_v12_1_46_rank_period_alignment.py patch_admin_v12_1_47_android_wol_relay.py patch_admin_v12_1_48_android_wol_relay_fix.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py patch_admin_v12_1_45_billing_logout_login_toggle.py patch_admin_v12_1_46_monthly_yearly_report_pc.py patch_admin_v12_1_46_rank_period_alignment.py patch_admin_v12_1_47_android_wol_relay.py patch_admin_v12_1_48_android_wol_relay_fix.py patch_admin_v12_1_49_wol_master_role.py
           grep -q "versionCode 77" android/app/build.gradle
           grep -q "versionName '12.1.49'" android/app/build.gradle
           grep -q "Akses pairing WoL hanya untuk Master/Owner" android/app/src/main/assets/web/admin.html
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          pairings = list(re.finditer(r"(?ms)^async function createWakeRelayPairingCode\\(\\) \\{.*?^\\}", page))
+          if len(pairings) != 1:
+              raise SystemExit(f"Expected exactly one pairing handler, found {len(pairings)}")
+          pair_fn = pairings[0].group(0)
+          if "if (!isWakeRelayOwner()) return msg('Akses pairing WoL hanya untuk Master/Owner.', true);" not in pair_fn:
+              raise SystemExit("Pairing handler does not use the shared Master/Owner guard")
+          if "return msg('Pairing WoL hanya tersedia untuk Master/Owner.', true);" in pair_fn:
+              raise SystemExit("Unconditional legacy pairing denial remains")
+          requests = list(re.finditer(r"(?ms)^async function requestWakePc2\\(\\) \\{.*?^\\}", page))
+          if len(requests) < 2:
+              raise SystemExit(f"Expected duplicate legacy request handlers to be normalized, found {len(requests)}")
+          if any("if (!isWakeRelayOwner())" not in m.group(0) for m in requests):
+              raise SystemExit("A WoL request handler still uses a stale role check")
+          owner = re.search(r"(?ms)^function isWakeRelayOwner\\(\\) \\{.*?^\\}", page)
+          if not owner or "master_owner" not in owner.group(0) or "master_admin" not in owner.group(0):
+              raise SystemExit("Normalized Master/Owner role aliases are missing")
+          print("PASS: pairing denial is conditional only; every WoL action uses the shared role resolver.")
+          PY
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
           grep -q "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY" android/app/src/main/assets/web/admin.html
