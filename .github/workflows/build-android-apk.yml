@@ -196,7 +196,9 @@ jobs:
           grep -q "V12.1.36-GLOBAL-RENTAL-DB-FIRST-NO-PC-RENTAL-WOL-RELAY" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.36-PC-WOL-RELAY" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.47-ANDROID-WOL-RELAY" android/app/src/main/assets/web/admin.html
-          grep -q "V12.1.49-ANDROID-WOL-RELAY-RELIABILITY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.48-ANDROID-WOL-RELAY-RELIABILITY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.49-ANDROID-WOL-PAIRING-ROLE-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "function isWakeRelayOwner()" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_create_enrollment" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_enqueue" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_command_status" android/app/src/main/assets/web/admin.html
