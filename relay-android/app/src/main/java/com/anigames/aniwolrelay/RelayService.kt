@@ -1,4 +1,5 @@
 package com.anigames.aniwolrelay
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -12,6 +13,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -30,13 +32,14 @@ class RelayService : Service() {
         const val ACTION_STOP = "com.anigames.aniwolrelay.STOP"
         private const val CHANNEL_ID = "ani_wol_relay"
         private const val NOTIFICATION_ID = 4701
+        private const val HEARTBEAT_INTERVAL_MS = 45_000L
+        private const val POLL_INTERVAL_MS = 15_000L
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var loopStarted = false
     private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onCreate() { super.onCreate(); createChannel(); ensureWifiLock() }
-
     private fun ensureWifiLock() {
         try {
             val wifi = getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -49,7 +52,6 @@ class RelayService : Service() {
             }
         } catch (_: Exception) { }
     }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             RelayStore.setEnabled(this, false); stopSelf(); return START_NOT_STICKY
@@ -61,51 +63,61 @@ class RelayService : Service() {
         if (!loopStarted) { loopStarted = true; scope.launch { runRelayLoop() } }
         return START_STICKY
     }
-
     private suspend fun runRelayLoop() {
-        var lastHeartbeat = 0L
+        var lastHeartbeatAttempt = 0L
         var lastWarning = 0L
         while (scope.isActive) {
-            val credentials = RelayStore.credentials(this) ?: break
+            val credentials = RelayStore.credentials(this)
+            if (credentials == null || !RelayStore.enabled(this)) break
             try {
                 ensureWifiLock()
                 val metrics = batteryMetrics()
                 val now = System.currentTimeMillis()
-                if (now - lastHeartbeat >= 60_000L) {
-                    withNetworkWakeLock { RelayApi.heartbeat(credentials, metrics) }
-                    lastHeartbeat = now
+                // Heartbeat and polling are isolated; heartbeat failure must not block WoL commands.
+                if (now - lastHeartbeatAttempt >= HEARTBEAT_INTERVAL_MS) {
+                    lastHeartbeatAttempt = now
+                    try {
+                        withNetworkWakeLock { RelayApi.heartbeat(credentials, metrics) }
+                        RelayStore.recordNetworkSuccess(this, "heartbeat")
+                    } catch (error: Exception) {
+                        RelayStore.recordNetworkError(this, "heartbeat", error)
+                    }
                 }
                 val temperature = metrics.optDouble("batteryTemperatureC", 0.0)
                 if (temperature >= 50.0) {
                     if (now - lastWarning > 60_000L) {
-                        notifyUser("Suhu baterai tinggi (${temperature}°C). Periksa charger dan ventilasi.")
+                        notifyUser("Suhu baterai tinggi (${temperature}°C). Relay menahan polling sampai suhu turun.")
                         lastWarning = now
                     }
-                    delay(60_000L); continue
+                    updateNotification("Perlindungan suhu aktif • periksa charger")
+                } else {
+                    try {
+                        val response = withNetworkWakeLock { RelayApi.poll(credentials) }
+                        RelayStore.recordNetworkSuccess(this, "poll")
+                        response.optJSONObject("command")?.let { processCommand(credentials, it) }
+                    } catch (error: Exception) {
+                        RelayStore.recordNetworkError(this, "poll", error)
+                    }
+                    val hasError = RelayStore.runtimeDiagnostics(this).contains(" • Error ")
+                    updateNotification(if (hasError) "Relay aktif • cek detail koneksi" else "Relay ONLINE • menunggu perintah")
                 }
-                val response = withNetworkWakeLock { RelayApi.poll(credentials) }
-                response.optJSONObject("command")?.let { processCommand(credentials, it) }
-                updateNotification("Relay online • baterai ${metrics.optInt("batteryPercent", -1)}%")
-                delay(15_000L)
+                delay(POLL_INTERVAL_MS)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                updateNotification("Menyambung ulang • ${error.message?.take(55) ?: "jaringan"}")
+                RelayStore.recordNetworkError(this, "loop", error)
+                updateNotification("Relay mencoba pulih • cek detail aplikasi")
                 delay(20_000L)
             }
         }
-        stopSelf()
+        if (RelayStore.credentials(this) == null || !RelayStore.enabled(this)) stopSelf()
     }
-
     private suspend fun processCommand(credentials: RelayCredentials, command: JSONObject) {
         val id = command.optString("id")
         if (id.isBlank()) return
         val mac = command.optString("targetMac")
         val name = command.optString("targetDeviceName", "PC target")
-        val expiryText = command.optString("expiresAt")
-        val expires = try {
-            OffsetDateTime.parse(expiryText).toInstant().toEpochMilli()
-        } catch (_: Exception) { 0L }
+        val expires = try { OffsetDateTime.parse(command.optString("expiresAt")).toInstant().toEpochMilli() } catch (_: Exception) { 0L }
         if (expires <= System.currentTimeMillis()) {
             withNetworkWakeLock { RelayApi.acknowledge(credentials, id, "failed", JSONObject().put("error", "COMMAND_EXPIRED")) }
             return
@@ -117,22 +129,23 @@ class RelayService : Service() {
                     .put("message", "Magic Packet dikirim; PC belum dikonfirmasi menyala")
                     .put("targetDeviceName", name).put("broadcasts", result.destinations).put("attempts", result.sent))
             }
+            RelayStore.recordNetworkSuccess(this, "command")
             notifyUser("Magic Packet dikirim ke $name")
         } catch (error: Exception) {
+            RelayStore.recordNetworkError(this, "command", error)
             withNetworkWakeLock {
                 RelayApi.acknowledge(credentials, id, "failed", JSONObject()
                     .put("error", "WOL_SEND_FAILED").put("message", error.message ?: "Gagal mengirim Magic Packet"))
             }
+            throw error
         }
     }
-
     private suspend fun <T> withNetworkWakeLock(block: suspend () -> T): T {
         val lock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AniWoLRelay:Network")
         lock.acquire(25_000L)
         return try { block() } finally { if (lock.isHeld) lock.release() }
     }
-
     private fun batteryMetrics(): JSONObject {
         val intent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
@@ -154,7 +167,19 @@ class RelayService : Service() {
             .put("charging", charging).put("batteryHealth", healthText)
             .put("model", Build.MODEL).put("appVersion", RelayApi.APP_VERSION)
     }
-
+    private fun scheduleTaskRemovalRecovery() {
+        if (!RelayStore.enabled(this) || RelayStore.credentials(this) == null) return
+        try {
+            val intent = Intent(this, BootReceiver::class.java).setAction(BootReceiver.ACTION_RECOVER)
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+            val pending = PendingIntent.getBroadcast(this, 4703, intent, flags)
+            val alarm = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarm.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 20_000L, pending)
+        } catch (error: Exception) {
+            RelayStore.recordNetworkError(this, "recovery_alarm", error)
+        }
+    }
+    override fun onTaskRemoved(rootIntent: Intent?) { scheduleTaskRemovalRecovery(); super.onTaskRemoved(rootIntent) }
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
@@ -171,9 +196,7 @@ class RelayService : Service() {
             .setContentIntent(pending).setOngoing(true).setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW).build()
     }
-    private fun updateNotification(text: String) {
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
-    }
+    private fun updateNotification(text: String) { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text)) }
     private fun notifyUser(text: String) {
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID + 1,
             NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(android.R.drawable.stat_sys_upload_done)

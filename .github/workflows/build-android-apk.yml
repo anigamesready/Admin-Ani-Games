@@ -1,4 +1,4 @@
-name: Build AniGames Admin V12.1.47 Android WoL Relay
+name: Build AniGames Admin V12.1.48 Android WoL Relay
 
 on:
   push:
@@ -26,6 +26,7 @@ on:
       - release/admin-v12.1.45-billing-login-toggle
       - feature/admin-v12.1.46-monthly-yearly-member-rankings
       - feature/ani-wol-relay-android-v1
+      - fix/ani-wol-relay-reliability-20261112
   pull_request:
     branches:
       - main
@@ -36,7 +37,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build AniGames Admin V12.1.47 Android WoL Relay APK
+    name: Build AniGames Admin V12.1.48 Android WoL Relay APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -109,6 +110,7 @@ jobs:
             "scripts/patch_admin_v12_1_46_monthly_yearly_report_pc.py"
             "scripts/patch_admin_v12_1_46_rank_period_alignment.py"
             "scripts/patch_admin_v12_1_47_android_wol_relay.py"
+            "scripts/patch_admin_v12_1_48_android_wol_relay_fix.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -175,9 +177,10 @@ jobs:
           python3 patch_admin_v12_1_46_monthly_yearly_report_pc.py
           python3 patch_admin_v12_1_46_rank_period_alignment.py
           python3 patch_admin_v12_1_47_android_wol_relay.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py patch_admin_v12_1_45_billing_logout_login_toggle.py patch_admin_v12_1_46_monthly_yearly_report_pc.py patch_admin_v12_1_46_rank_period_alignment.py patch_admin_v12_1_47_android_wol_relay.py
-          grep -q "versionCode 75" android/app/build.gradle
-          grep -q "versionName '12.1.47'" android/app/build.gradle
+          python3 patch_admin_v12_1_48_android_wol_relay_fix.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py patch_admin_v12_1_45_billing_logout_login_toggle.py patch_admin_v12_1_46_monthly_yearly_report_pc.py patch_admin_v12_1_46_rank_period_alignment.py patch_admin_v12_1_47_android_wol_relay.py patch_admin_v12_1_48_android_wol_relay_fix.py
+          grep -q "versionCode 76" android/app/build.gradle
+          grep -q "versionName '12.1.48'" android/app/build.gradle
           grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
           grep -q "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY" android/app/src/main/assets/web/admin.html
@@ -189,6 +192,7 @@ jobs:
           grep -q "V12.1.36-GLOBAL-RENTAL-DB-FIRST-NO-PC-RENTAL-WOL-RELAY" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.36-PC-WOL-RELAY" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.47-ANDROID-WOL-RELAY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.48-ANDROID-WOL-RELAY-RELIABILITY" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_create_enrollment" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_enqueue" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_command_status" android/app/src/main/assets/web/admin.html
@@ -397,9 +401,9 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-debug.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='75' versionName='12.1.47'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='76' versionName='12.1.48'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
@@ -412,7 +416,7 @@ jobs:
           set -euo pipefail
           GRADLE_FILE="$ANDROID_PROJECT_DIR/app/build.gradle"
           MANIFEST_FILE="$ANDROID_PROJECT_DIR/app/src/main/AndroidManifest.xml"
-          cp "$GRADLE_FILE" /tmp/admin-v145-original-build.gradle
+          cp "$GRADLE_FILE" /tmp/admin-v148-original-build.gradle
           cp "$MANIFEST_FILE" /tmp/admin-v145-original-AndroidManifest.xml
           restore_source() {
             cp /tmp/admin-v145-original-build.gradle "$GRADLE_FILE"
@@ -431,8 +435,8 @@ jobs:
               raise SystemExit("Safe-test package ID anchor mismatch")
           if m.count('android:label="AniGames Admin"') != 1:
               raise SystemExit("Safe-test app label anchor mismatch")
-          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v146test'", 1), encoding="utf-8")
-          manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.47 TEST"', 1), encoding="utf-8")
+          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v148test'", 1), encoding="utf-8")
+          manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.48 TEST"', 1), encoding="utf-8")
           PY
           gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
           TEST_APK="$ANDROID_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
@@ -440,7 +444,7 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-ANDROID-WOL-RELAY-SAFE-TEST.apk"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-ANDROID-WOL-RELAY-SAFE-TEST.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-ANDROID-WOL-RELAY-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "package: name='com.anigames.billingadmin.v146test' versionCode='75' versionName='12.1.47'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "application-label:'AniGames Admin V12.1.47 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
@@ -452,7 +456,7 @@ jobs:
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-Android-v12.1.47-android-wol-relay
+          name: AniGames-Admin-Android-v12.1.48-wol-relay-reliability
           path: output/*
           if-no-files-found: error
           retention-days: 30

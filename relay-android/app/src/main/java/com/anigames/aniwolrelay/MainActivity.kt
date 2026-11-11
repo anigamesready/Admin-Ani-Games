@@ -84,6 +84,10 @@ class MainActivity : AppCompatActivity() {
         root.addView(Button(this).apply {
             text = "Izinkan berjalan tanpa optimasi baterai"; setOnClickListener { requestBatteryOptimizationExemption() }
         }, matchWidth())
+        root.addView(Button(this).apply {
+            text = "Buka pengaturan aplikasi / Autostart"
+            setOnClickListener { openApplicationSettings() }
+        }, matchWidth())
         root.addView(TextView(this).apply {
             text = "DAYA & KESELAMATAN\\n• Monitoring baterai dan suhu hanya-baca.\\n• Charge limit 50–80% tidak dapat dikendalikan aplikasi Android biasa; aplikasi tidak memutus arus charger.\\n• Gunakan baterai sehat, charger berkualitas, dan ventilasi terbuka.\\n• Foreground service menampilkan notifikasi saat relay aktif."
             textSize = 13f; setTextColor(0xFF52615B.toInt()); setPadding(0, 22, 0, 0)
@@ -131,6 +135,14 @@ class MainActivity : AppCompatActivity() {
         startButton.visibility = if (credentials != null && !enabled) View.VISIBLE else View.GONE
         stopButton.visibility = if (credentials != null && enabled) View.VISIBLE else View.GONE
     }
+    private fun openApplicationSettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.parse("package:$packageName")))
+        } catch (_: Exception) {
+            startActivity(Intent(Settings.ACTION_SETTINGS))
+        }
+    }
+
     private fun requestBatteryOptimizationExemption() {
         try {
             val pm = getSystemService(POWER_SERVICE) as PowerManager
@@ -146,5 +158,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private fun matchWidth() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 10 }
+    override fun onResume() {
+        super.onResume()
+        refreshUi()
+        if (RelayStore.credentials(this) != null && RelayStore.enabled(this)) startRelayService()
+    }
     override fun onDestroy() { uiScope.cancel(); super.onDestroy() }
 }

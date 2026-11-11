@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 object RelayApi {
     private const val BASE_URL = "https://wzkjpycjizexxcxrfdvr.supabase.co/functions/v1/ani-games-api"
     private const val ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6a2pweWNqaXpleHhjeHJmZHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzc0OTUsImV4cCI6MjEwNjYxMzQ5NX0.lxjSt7CqWDJhKItPi1ckVRIcc-kM7etMzxTu3txANaI"
-    const val APP_VERSION = "1.0.0"
+    const val APP_VERSION = "1.0.1"
 
     suspend fun register(code: String, installationId: String): RelayCredentials = withContext(Dispatchers.IO) {
         val body = JSONObject().put("code", code.trim().uppercase())

@@ -7,13 +7,18 @@ import java.net.NetworkInterface
 
 object MagicPacketSender {
     data class SendResult(val sent: Int, val destinations: List<String>)
-    fun send(macAddress: String): SendResult {
+    internal fun buildPayload(macAddress: String): ByteArray {
         val mac = macAddress.replace(":", "").replace("-", "").trim().uppercase()
         require(mac.matches(Regex("^[0-9A-F]{12}$"))) { "MAC LAN target tidak valid" }
+        require(mac != "000000000000" && mac != "FFFFFFFFFFFF") { "MAC LAN target tidak valid" }
         val bytes = mac.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        val packet = ByteArray(102)
-        for (i in 0 until 6) packet[i] = 0xFF.toByte()
-        for (i in 0 until 16) System.arraycopy(bytes, 0, packet, 6 + i * 6, 6)
+        return ByteArray(102).apply {
+            for (i in 0 until 6) this[i] = 0xFF.toByte()
+            for (i in 0 until 16) System.arraycopy(bytes, 0, this, 6 + i * 6, 6)
+        }
+    }
+    fun send(macAddress: String): SendResult {
+        val packet = buildPayload(macAddress)
         val destinations = linkedSetOf<InetAddress>()
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()
@@ -39,7 +44,7 @@ object MagicPacketSender {
                 } catch (_: Exception) { }
             }
         }
-        if (sent == 0) throw IllegalStateException("Magic Packet tidak berhasil dikirim melalui Wi-Fi")
+        if (sent == 0) throw IllegalStateException("Magic Packet tidak berhasil dikirim melalui jaringan lokal")
         return SendResult(sent, labels.distinct())
     }
 }

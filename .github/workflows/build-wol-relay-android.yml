@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/ani-wol-relay-android-v1
+      - fix/ani-wol-relay-reliability-20261112
     paths:
       - 'relay-android/**'
       - '.github/workflows/build-wol-relay-android.yml'
@@ -48,6 +49,8 @@ jobs:
             -o /tmp/ani-wol-relay-smoke.json -w "%{http_code}")
           test "$HTTP_CODE" = "401"
           grep -q '"error":"WOL_RELAY_ENROLLMENT_INVALID"' /tmp/ani-wol-relay-smoke.json
+      - name: Test standard Magic Packet payload
+        run: gradle -p relay-android :app:testDebugUnitTest --no-daemon
       - name: Build debug APK
         run: gradle -p relay-android :app:assembleDebug --no-daemon
       - name: Verify APK
@@ -61,8 +64,8 @@ jobs:
           meta = json.loads(Path("relay-android/app/build/outputs/apk/debug/output-metadata.json").read_text())
           assert meta["applicationId"] == "com.anigames.aniwolrelay", meta
           assert meta["variantName"] == "debug", meta
-          assert meta["elements"][0]["versionName"] == "1.0.0", meta
-          assert meta["elements"][0]["versionCode"] == 1, meta
+          assert meta["elements"][0]["versionName"] == "1.0.1", meta
+          assert meta["elements"][0]["versionCode"] == 2, meta
           print("APK metadata verified:", meta["applicationId"], meta["elements"][0]["versionName"])
           PY
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
@@ -70,7 +73,7 @@ jobs:
       - name: Upload relay APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-WoL-Relay-Android-v1.0.0
+          name: Ani-WoL-Relay-Android-v1.0.1
           path: relay-android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
