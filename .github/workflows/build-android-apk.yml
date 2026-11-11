@@ -417,10 +417,10 @@ jobs:
           GRADLE_FILE="$ANDROID_PROJECT_DIR/app/build.gradle"
           MANIFEST_FILE="$ANDROID_PROJECT_DIR/app/src/main/AndroidManifest.xml"
           cp "$GRADLE_FILE" /tmp/admin-v148-original-build.gradle
-          cp "$MANIFEST_FILE" /tmp/admin-v145-original-AndroidManifest.xml
+          cp "$MANIFEST_FILE" /tmp/admin-v148-original-AndroidManifest.xml
           restore_source() {
-            cp /tmp/admin-v145-original-build.gradle "$GRADLE_FILE"
-            cp /tmp/admin-v145-original-AndroidManifest.xml "$MANIFEST_FILE"
+            cp /tmp/admin-v148-original-build.gradle "$GRADLE_FILE"
+            cp /tmp/admin-v148-original-AndroidManifest.xml "$MANIFEST_FILE"
           }
           trap restore_source EXIT
           python3 - <<'PY'
