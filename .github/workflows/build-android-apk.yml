@@ -402,13 +402,13 @@ jobs:
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-debug.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "package: name='com.anigames.billingadmin' versionCode='76' versionName='12.1.48'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-debug.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-debug.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-debug.apk"
 
       - name: Build side-by-side safe test APK without replacing installed app
         shell: bash
@@ -445,12 +445,12 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-ANDROID-WOL-RELAY-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-ANDROID-WOL-RELAY-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-ANDROID-WOL-RELAY-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "package: name='com.anigames.billingadmin.v146test' versionCode='75' versionName='12.1.47'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "application-label:'AniGames Admin V12.1.47 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-ANDROID-WOL-RELAY-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-ANDROID-WOL-RELAY-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.47-ANDROID-WOL-RELAY-SAFE-TEST.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-ANDROID-WOL-RELAY-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-ANDROID-WOL-RELAY-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.48-ANDROID-WOL-RELAY-SAFE-TEST.apk"
           echo "PASS: side-by-side test package verified; original application package source restored."
 
       - name: Upload final Admin APK
