@@ -28,8 +28,8 @@ for token in ("createWakeRelayPairingCode", "wol_relay_create_enrollment",
 
 # Normalize the canonical role once. Do not grant the permission to generic admin/reseller roles.
 owner_fn = r"""function isWakeRelayOwner() {
- const role = String(ctx?.role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
- return ['owner', 'master', 'super_admin', 'superadmin'].includes(role);
+ const role = String(ctx?.role || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+ return ['owner', 'master', 'master_owner', 'owner_master', 'master_admin', 'admin_master', 'super_admin', 'superadmin'].includes(role);
 }"""
 html, n = re.subn(
     r"function isWakeRelayOwner\(\)\s*\{.*?\n\}",
@@ -108,7 +108,7 @@ request_fn = r"""async function requestWakePc2() {
      !lastSeen || Date.now() - lastSeen > 120000) {
   return updateWakeRelayStatus('HP relay OFFLINE. Buka aplikasi relay dan aktifkan kembali service-nya.');
  }
- if (!confirm('Kirim Wake-on-LAN ke ' + wakeRelayLabel(target) + '?\\n\\nRelay Android: ONLINE\\nPC target: OFFLINE\\nMAC LAN diambil dari database PC Billing.')) return;
+ if (!confirm('Kirim Wake-on-LAN ke ' + wakeRelayLabel(target) + '?\n\nRelay Android: ONLINE\nPC target: OFFLINE\nMAC LAN diambil dari database PC Billing.')) return;
  aniAndroidWakeRelayBusy = true;
  const button = $('wakeRelaySend');
  if (button) button.disabled = true;
