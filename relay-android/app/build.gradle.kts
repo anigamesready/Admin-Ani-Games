@@ -6,10 +6,10 @@ android {
     namespace = "com.anigames.aniwolrelay"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.anigames.aniwolrelay"
+        applicationId = "com.anigames.aniwolrelay.standby"
         minSdk = 23
         targetSdk = 28
-        versionCode = 3
+        versionCode = 1
         versionName = "1.0.2"
     }
     compileOptions {
