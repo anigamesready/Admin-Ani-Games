@@ -462,7 +462,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.49-debug.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.49-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='77' versionName='12.1.49'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin' versionCode='78' versionName='12.1.50'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.49-debug.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.49-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
