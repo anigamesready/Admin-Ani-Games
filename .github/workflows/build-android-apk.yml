@@ -113,6 +113,7 @@ jobs:
             "scripts/patch_admin_v12_1_47_android_wol_relay.py"
             "scripts/patch_admin_v12_1_48_android_wol_relay_fix.py"
             "scripts/patch_admin_v12_1_49_wol_master_role.py"
+            "scripts/patch_admin_v12_1_50_relay_manual_probe.py"
           )
           for patch in "${patches[@]}"; do
             cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
@@ -181,9 +182,14 @@ jobs:
           python3 patch_admin_v12_1_47_android_wol_relay.py
           python3 patch_admin_v12_1_48_android_wol_relay_fix.py
           python3 patch_admin_v12_1_49_wol_master_role.py
-          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py patch_admin_v12_1_45_billing_logout_login_toggle.py patch_admin_v12_1_46_monthly_yearly_report_pc.py patch_admin_v12_1_46_rank_period_alignment.py patch_admin_v12_1_47_android_wol_relay.py patch_admin_v12_1_48_android_wol_relay_fix.py patch_admin_v12_1_49_wol_master_role.py
-          grep -q "versionCode 77" android/app/build.gradle
-          grep -q "versionName '12.1.49'" android/app/build.gradle
+          python3 patch_admin_v12_1_50_relay_manual_probe.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py patch_admin_v12_1_45_billing_logout_login_toggle.py patch_admin_v12_1_46_monthly_yearly_report_pc.py patch_admin_v12_1_46_rank_period_alignment.py patch_admin_v12_1_47_android_wol_relay.py patch_admin_v12_1_48_android_wol_relay_fix.py patch_admin_v12_1_49_wol_master_role.py patch_admin_v12_1_50_relay_manual_probe.py
+          grep -q "versionCode 78" android/app/build.gradle
+          grep -q "versionName '12.1.50'" android/app/build.gradle
+          grep -q "ANI-WOL-RELAY V12.1.50" android/app/src/main/assets/web/admin.html
+          grep -q "probeWakeRelayNow" android/app/src/main/assets/web/admin.html
+          grep -q "wol_relay_probe_request" android/app/src/main/assets/web/admin.html
+          grep -q "wol_relay_probe_status" android/app/src/main/assets/web/admin.html
           grep -q "Akses pairing WoL hanya untuk Master/Owner" android/app/src/main/assets/web/admin.html
 
           python3 - <<'PY'
@@ -222,6 +228,29 @@ jobs:
           grep -q "V12.1.48-ANDROID-WOL-RELAY-RELIABILITY" android/app/src/main/assets/web/admin.html
           grep -q "V12.1.49-ANDROID-WOL-PAIRING-ROLE-FIX" android/app/src/main/assets/web/admin.html
           grep -q "function isWakeRelayOwner()" android/app/src/main/assets/web/admin.html
+          grep -q "function probeWakeRelayNow()" android/app/src/main/assets/web/admin.html
+          ! grep -q "let aniAndroidWakeRelay = null" <(sed -n '2200,2208p' android/app/src/main/assets/web/admin.html)
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          if len(scripts) != 1:
+              raise SystemExit(f"Expected one inline app script, found {len(scripts)}")
+          source = scripts[0]
+          state = source.find("let aniAndroidWakeRelay = null;")
+          startup = source.find("startDualDbAdmin();")
+          if state < 0 or startup < 0 or state > startup:
+              raise SystemExit("Relay state variables are still declared after startup callbacks")
+          reqs = list(re.finditer(r"(?ms)^async function requestWakePc2\(\) \{.*?^\}", source))
+          if len(reqs) < 2 or "probeWakeRelayNow()" not in reqs[-1].group(0):
+              raise SystemExit("Active WoL handler does not require an explicit relay probe")
+          if "wol_relay_probe_request" not in source or "wol_relay_probe_status" not in source:
+              raise SystemExit("Admin manual probe RPC wiring missing")
+          Path("/tmp/admin-v1250-check.js").write_text(source, encoding="utf-8")
+          print("PASS: relay state is initialized before startup and active WoL requires an on-demand probe.")
+          PY
+          node --check /tmp/admin-v1250-check.js
           grep -q "wol_relay_create_enrollment" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_enqueue" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_command_status" android/app/src/main/assets/web/admin.html
