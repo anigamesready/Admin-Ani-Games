@@ -68,10 +68,10 @@ jobs:
           import json
           from pathlib import Path
           meta = json.loads(Path("relay-android/app/build/outputs/apk/debug/output-metadata.json").read_text())
-          assert meta["applicationId"] == "com.anigames.aniwolrelay", meta
+          assert meta["applicationId"] == "com.anigames.aniwolrelay.standby", meta
           assert meta["variantName"] == "debug", meta
           assert meta["elements"][0]["versionName"] == "1.0.2", meta
-          assert meta["elements"][0]["versionCode"] == 3, meta
+          assert meta["elements"][0]["versionCode"] == 1, meta
           print("APK metadata verified:", meta["applicationId"], meta["elements"][0]["versionName"])
           PY
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
