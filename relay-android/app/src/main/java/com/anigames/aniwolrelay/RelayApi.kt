@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 object RelayApi {
     private const val BASE_URL = "https://wzkjpycjizexxcxrfdvr.supabase.co/functions/v1/ani-games-api"
     private const val ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind6a2pweWNqaXpleHhjeHJmZHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzc0OTUsImV4cCI6MjEwNjYxMzQ5NX0.lxjSt7CqWDJhKItPi1ckVRIcc-kM7etMzxTu3txANaI"
-    const val APP_VERSION = "1.0.3"
+    const val APP_VERSION = "1.0.4"
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
     private val client = OkHttpClient.Builder()
         .dns(RelayDns)
@@ -38,13 +38,48 @@ object RelayApi {
     }
 
     suspend fun heartbeat(credentials: RelayCredentials, metrics: JSONObject) = withContext(Dispatchers.IO) {
-        post("wol/relay/heartbeat", auth(credentials).put("metrics", metrics))
+        val response = post("wol/relay/heartbeat", auth(credentials).put("metrics", metrics))
+        requireApiOk(response, "heartbeat")
+        response
     }
+
     suspend fun poll(credentials: RelayCredentials): JSONObject = withContext(Dispatchers.IO) {
-        post("wol/relay/poll", auth(credentials))
+        val response = post("wol/relay/poll", auth(credentials))
+        requireApiOk(response, "poll")
+        response
     }
+
     suspend fun acknowledge(credentials: RelayCredentials, commandId: String, status: String, result: JSONObject) = withContext(Dispatchers.IO) {
-        post("wol/relay/ack", auth(credentials).put("commandId", commandId).put("status", status).put("result", result))
+        val response = post("wol/relay/ack", auth(credentials).put("commandId", commandId).put("status", status).put("result", result))
+        requireApiOk(response, "command acknowledgement")
+        response
+    }
+
+    suspend fun acknowledgeProbe(
+        credentials: RelayCredentials,
+        probeId: String,
+        nonce: String,
+        metrics: JSONObject
+    ) = withContext(Dispatchers.IO) {
+        val response = post(
+            "wol/relay/probe-ack",
+            auth(credentials)
+                .put("probeId", probeId)
+                .put("nonce", nonce)
+                .put("metrics", metrics)
+        )
+        requireApiOk(response, "relay probe acknowledgement")
+        response
+    }
+
+    private fun requireApiOk(response: JSONObject, action: String) {
+        if (!response.optBoolean("ok", false)) {
+            val reason = response.optString(
+                "error",
+                response.optString("message", "API tidak mengonfirmasi keberhasilan")
+            )
+            throw IOException("$action ditolak server: $reason")
+        }
     }
 
     private fun auth(credentials: RelayCredentials) =

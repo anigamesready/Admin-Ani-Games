@@ -34,6 +34,7 @@ class RelayService : Service() {
         private const val CHANNEL_ID = "ani_wol_relay"
         private const val NOTIFICATION_ID = 4701
         private const val POLL_INTERVAL_MS = 15_000L
+        private const val HEARTBEAT_INTERVAL_MS = 45_000L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -102,48 +103,124 @@ class RelayService : Service() {
 
     private suspend fun runRelayLoop() {
         var lastWarning = 0L
+        var lastHeartbeatAttempt = 0L
+
         while (scope.isActive) {
             val credentials = RelayStore.credentials(this)
             if (credentials == null || !RelayStore.enabled(this)) break
+
             try {
-                // The foreground service and partial wake lock keep this loop alive
-                // while the activity is at Home or the display is locked.
+                // Keep the user-visible service, Wi-Fi lock, and CPU wake lock alive
+                // even after Home / screen lock. The Activity is not part of the poll loop.
                 acquireStandbyCpuWakeLock()
                 ensureWifiLock()
 
                 val metrics = batteryMetrics()
                 val now = System.currentTimeMillis()
-
-                // wol/relay/poll also updates last_seen_at; no separate heartbeat write is needed.
-
                 val temperature = metrics.optDouble("batteryTemperatureC", 0.0)
-                if (temperature >= 50.0) {
-                    if (now - lastWarning > 60_000L) {
-                        notifyUser("Suhu baterai tinggi (${temperature}°C). Relay menahan polling sampai suhu turun.")
-                        lastWarning = now
-                    }
-                    updateNotification("Perlindungan suhu aktif • periksa charger")
-                } else {
+                val thermalProtection = temperature >= 50.0
+
+                // The current server poll RPC leases commands/probes but deliberately does
+                // not refresh last_seen_at. A 45-second authenticated heartbeat is required
+                // for the Admin's 90-second ONLINE window.
+                if (now - lastHeartbeatAttempt >= HEARTBEAT_INTERVAL_MS) {
+                    lastHeartbeatAttempt = now
                     try {
-                        val response = withNetworkWakeLock { RelayApi.poll(credentials) }
-                        RelayStore.recordNetworkSuccess(this, "poll")
-                        response.optJSONObject("command")?.let { processCommand(credentials, it) }
+                        withNetworkWakeLock { RelayApi.heartbeat(credentials, metrics) }
+                        RelayStore.recordNetworkSuccess(this, "heartbeat")
                     } catch (error: Exception) {
-                        RelayStore.recordNetworkError(this, "poll", error)
+                        RelayStore.recordNetworkError(this, "heartbeat", error)
                     }
-                    val hasError = RelayStore.runtimeDiagnostics(this).contains(" • Error ")
-                    updateNotification(if (hasError) "Relay aktif • cek detail koneksi" else "Relay ONLINE • menunggu perintah")
                 }
+
+                try {
+                    val response = withNetworkWakeLock { RelayApi.poll(credentials) }
+                    RelayStore.recordNetworkSuccess(this, "poll")
+
+                    // Admin direct test creates a 45-second probe. Acknowledge it explicitly;
+                    // merely receiving HTTP 200 from poll is not proof the relay is online.
+                    response.optJSONObject("probe")?.let { processProbe(credentials, it, metrics) }
+
+                    response.optJSONObject("command")?.let { command ->
+                        if (thermalProtection) {
+                            rejectCommandForThermalProtection(credentials, command, temperature)
+                        } else {
+                            processCommand(credentials, command)
+                        }
+                    }
+                } catch (error: Exception) {
+                    RelayStore.recordNetworkError(this, "poll", error)
+                }
+
+                val hasError = RelayStore.runtimeDiagnostics(this).contains(" • Error ")
+                val notificationText = when {
+                    thermalProtection -> "Relay tersambung • perlindungan suhu aktif"
+                    hasError -> "Relay aktif • mencoba pulihkan koneksi"
+                    else -> "Relay ONLINE • menunggu perintah"
+                }
+                updateNotification(notificationText)
+
+                if (thermalProtection && now - lastWarning > 60_000L) {
+                    notifyUser("Suhu baterai tinggi (${temperature}°C). Relay menahan pengiriman Magic Packet sampai suhu turun.")
+                    lastWarning = now
+                }
+
                 delay(POLL_INTERVAL_MS)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 RelayStore.recordNetworkError(this, "loop", error)
-                updateNotification("Relay mencoba pulih • cek detail aplikasi")
+                updateNotification("Relay mencoba pulih • cek detail koneksi")
                 delay(20_000L)
             }
         }
+
         if (RelayStore.credentials(this) == null || !RelayStore.enabled(this)) stopSelf()
+    }
+
+    private suspend fun processProbe(
+        credentials: RelayCredentials,
+        probe: JSONObject,
+        metrics: JSONObject
+    ) {
+        val probeId = probe.optString("id")
+        val nonce = probe.optString("nonce")
+        if (probeId.isBlank() || nonce.isBlank()) {
+            throw IllegalStateException("Probe dari Admin tidak lengkap")
+        }
+
+        val expires = try {
+            OffsetDateTime.parse(probe.optString("expiresAt")).toInstant().toEpochMilli()
+        } catch (error: Exception) {
+            throw IllegalStateException("Waktu kedaluwarsa probe tidak valid", error)
+        }
+        if (expires <= System.currentTimeMillis()) return
+
+        withNetworkWakeLock {
+            RelayApi.acknowledgeProbe(credentials, probeId, nonce, metrics)
+        }
+        RelayStore.recordNetworkSuccess(this, "probe")
+        updateNotification("Relay ONLINE • tes Admin berhasil")
+    }
+
+    private suspend fun rejectCommandForThermalProtection(
+        credentials: RelayCredentials,
+        command: JSONObject,
+        temperature: Double
+    ) {
+        val id = command.optString("id")
+        if (id.isBlank()) return
+        withNetworkWakeLock {
+            RelayApi.acknowledge(
+                credentials,
+                id,
+                "failed",
+                JSONObject()
+                    .put("error", "RELAY_THERMAL_LIMIT")
+                    .put("message", "Magic Packet ditahan karena suhu baterai ${temperature}°C")
+            )
+        }
+        notifyUser("Perintah WoL ditahan demi keselamatan baterai (${temperature}°C)")
     }
 
     private suspend fun processCommand(credentials: RelayCredentials, command: JSONObject) {

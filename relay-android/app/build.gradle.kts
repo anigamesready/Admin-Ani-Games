@@ -9,8 +9,8 @@ android {
         applicationId = "com.anigames.aniwolrelay.standby"
         minSdk = 23
         targetSdk = 28
-        versionCode = 2
-        versionName = "1.0.3"
+        versionCode = 3
+        versionName = "1.0.4"
     }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

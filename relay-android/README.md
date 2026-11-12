@@ -6,7 +6,7 @@ Standalone Android companion app for the Ani Games Ready Admin WoL relay integra
 
 The app first uses the Android/Wi-Fi DNS resolver. If the router or Wi-Fi DNS cannot resolve the Supabase hostname, the app automatically falls back to DNS-over-HTTPS through Cloudflare and then Google. Both paths use HTTPS certificate and hostname validation; no Android Private DNS setting or manual network configuration is required. DNS answers are cached to avoid unnecessary lookups.
 
-The same resolver is used for pairing, polling, and command acknowledgements. The configured Supabase project remains DB1 (\`wzkjpycjizexxcxrfdvr\`); this patch does not switch DB targets or alter database pairing rows.
+The same resolver is used for pairing, heartbeat, polling, command acknowledgements, and Admin probe acknowledgements. A 45-second authenticated heartbeat refreshes the server's 90-second ONLINE window; every Admin direct probe is explicitly acknowledged by the app. The configured Supabase project remains DB1 (\`wzkjpycjizexxcxrfdvr\`); this patch does not switch DB targets or alter database pairing rows.
 
 ## Standby behavior
 

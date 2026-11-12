@@ -40,6 +40,10 @@ jobs:
         run: |
           test -f relay-android/app/src/main/AndroidManifest.xml
           grep -q 'wol/relay/poll' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt
+          grep -q 'wol/relay/probe-ack' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt
+          grep -q 'HEARTBEAT_INTERVAL_MS = 45_000L' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
+          grep -q 'processProbe' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
+          grep -q 'requireApiOk' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt
           grep -q 'MagicPacketSender' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
           grep -q 'acquireStandbyCpuWakeLock' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
           grep -q 'START_STICKY' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
@@ -82,8 +86,8 @@ jobs:
           meta = json.loads(Path("relay-android/app/build/outputs/apk/debug/output-metadata.json").read_text())
           assert meta["applicationId"] == "com.anigames.aniwolrelay.standby", meta
           assert meta["variantName"] == "debug", meta
-          assert meta["elements"][0]["versionName"] == "1.0.3", meta
-          assert meta["elements"][0]["versionCode"] == 2, meta
+          assert meta["elements"][0]["versionName"] == "1.0.4", meta
+          assert meta["elements"][0]["versionCode"] == 3, meta
           print("APK metadata verified:", meta["applicationId"], meta["elements"][0]["versionName"])
           PY
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
@@ -91,7 +95,7 @@ jobs:
       - name: Upload relay APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-WoL-Relay-Android-v1.0.3-DNS-AutoRecovery
+          name: Ani-WoL-Relay-Android-v1.0.4-Heartbeat-Probe-Fix
           path: relay-android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
