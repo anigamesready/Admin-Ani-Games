@@ -240,7 +240,7 @@ if n1 != 1 or n2 != 1:
 # Keep the installed stable Admin untouched. V12.1.50 is a separate install
 # identity so Android never tries to replace a differently signed old build.
 gradle, n3 = re.subn(
-    r"applicationId\\s+'com\\.anigames\\.billingadmin'",
+    r"applicationId\s+'com\.anigames\.billingadmin'",
     "applicationId 'com.anigames.billingadmin.v150'", gradle, count=1)
 manifest, n4 = re.subn(
     r'android:label="AniGames Admin"',
