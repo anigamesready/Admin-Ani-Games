@@ -6,7 +6,7 @@ android {
     namespace = "com.anigames.aniwolrelay"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.anigames.aniwolrelay"
+        applicationId = "com.anigames.aniwolrelay.v102"
         minSdk = 23
         targetSdk = 28
         versionCode = 3
