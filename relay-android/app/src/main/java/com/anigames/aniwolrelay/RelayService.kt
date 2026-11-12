@@ -32,7 +32,6 @@ class RelayService : Service() {
         const val ACTION_STOP = "com.anigames.aniwolrelay.STOP"
         private const val CHANNEL_ID = "ani_wol_relay"
         private const val NOTIFICATION_ID = 4701
-        private const val HEARTBEAT_INTERVAL_MS = 45_000L
         private const val POLL_INTERVAL_MS = 15_000L
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -64,7 +63,6 @@ class RelayService : Service() {
         return START_STICKY
     }
     private suspend fun runRelayLoop() {
-        var lastHeartbeatAttempt = 0L
         var lastWarning = 0L
         while (scope.isActive) {
             val credentials = RelayStore.credentials(this)
@@ -73,16 +71,8 @@ class RelayService : Service() {
                 ensureWifiLock()
                 val metrics = batteryMetrics()
                 val now = System.currentTimeMillis()
-                // Heartbeat and polling are isolated; heartbeat failure must not block WoL commands.
-                if (now - lastHeartbeatAttempt >= HEARTBEAT_INTERVAL_MS) {
-                    lastHeartbeatAttempt = now
-                    try {
-                        withNetworkWakeLock { RelayApi.heartbeat(credentials, metrics) }
-                        RelayStore.recordNetworkSuccess(this, "heartbeat")
-                    } catch (error: Exception) {
-                        RelayStore.recordNetworkError(this, "heartbeat", error)
-                    }
-                }
+                // Status writes happen only after an Admin-triggered probe response.
+                // Idle poll requests are read-only on the database.
                 val temperature = metrics.optDouble("batteryTemperatureC", 0.0)
                 if (temperature >= 50.0) {
                     if (now - lastWarning > 60_000L) {
@@ -94,6 +84,21 @@ class RelayService : Service() {
                     try {
                         val response = withNetworkWakeLock { RelayApi.poll(credentials) }
                         RelayStore.recordNetworkSuccess(this, "poll")
+                        response.optJSONObject("probe")?.let { probe ->
+                            try {
+                                withNetworkWakeLock {
+                                    RelayApi.acknowledgeProbe(
+                                        credentials,
+                                        probe.optString("id"),
+                                        probe.optString("nonce"),
+                                        metrics
+                                    )
+                                }
+                                RelayStore.recordNetworkSuccess(this, "probe")
+                            } catch (error: Exception) {
+                                RelayStore.recordNetworkError(this, "probe", error)
+                            }
+                        }
                         response.optJSONObject("command")?.let { processCommand(credentials, it) }
                     } catch (error: Exception) {
                         RelayStore.recordNetworkError(this, "poll", error)
