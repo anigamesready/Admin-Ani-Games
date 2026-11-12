@@ -505,7 +505,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-ANDROID-WOL-RELAY-SAFE-TEST.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-ANDROID-WOL-RELAY-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v150test' versionCode='77' versionName='12.1.49'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v150test' versionCode='78' versionName='12.1.50'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           grep -q "application-label:'AniGames Admin V12.1.50 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-ANDROID-WOL-RELAY-SAFE-TEST.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-ANDROID-WOL-RELAY-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
