@@ -211,8 +211,17 @@ new_gate = """ const probeAt = Number(aniAndroidWakeRelay?.active_probe_at || 0)
   if (!live) return updateWakeRelayStatus('HP relay tidak merespons tes langsung. Periksa aplikasi dan izin background.');
  }"""
 if old_gate not in html:
-    raise SystemExit("Could not find exact active WoL relay readiness gate")
-html = html.replace(old_gate, new_gate, 1)
+    raise SystemExit("Could not find exact WoL relay readiness gate")
+request_pattern = re.compile(r"(?ms)^async function requestWakePc2\(\) \{.*?^\}")
+request_matches = list(request_pattern.finditer(html))
+if len(request_matches) < 2:
+    raise SystemExit(f"Expected both legacy and active WoL send handlers; found {len(request_matches)}")
+active_request = request_matches[-1]
+request_body = active_request.group(0)
+if old_gate not in request_body:
+    raise SystemExit("Could not find readiness gate inside the active requestWakePc2 handler")
+request_body = request_body.replace(old_gate, new_gate, 1)
+html = html[:active_request.start()] + request_body + html[active_request.end():]
 
 # Keep the legacy backend heartbeat endpoint for backwards compatibility, but
 # no UI/service code in V1.0.2 is allowed to call it.
