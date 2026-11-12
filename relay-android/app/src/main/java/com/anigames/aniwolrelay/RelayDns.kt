@@ -4,7 +4,8 @@ import okhttp3.Dns
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
+import com.squareup.moshi.JsonReader
+import okio.Buffer
 import java.io.IOException
 import java.net.InetAddress
 import java.net.UnknownHostException
@@ -119,23 +120,58 @@ internal object RelayDns : Dns {
     }
 
     internal fun parseDnsJson(payload: String): LookupResult {
-        val root = JSONObject(payload)
-        if (root.optInt("Status", -1) != 0) return LookupResult(emptyList(), 60)
-        val answers = root.optJSONArray("Answer") ?: return LookupResult(emptyList(), 60)
+        val reader = JsonReader.of(Buffer().writeUtf8(payload))
+        var status = -1
+        val records = ArrayList<Triple<Int, Long, String>>()
+
+        reader.beginObject()
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "Status" -> status = reader.nextInt()
+                "Answer" -> {
+                    if (reader.peek() != JsonReader.Token.BEGIN_ARRAY) {
+                        reader.skipValue()
+                        continue
+                    }
+                    reader.beginArray()
+                    while (reader.hasNext()) {
+                        var type = -1
+                        var ttl = 60L
+                        var data = ""
+                        reader.beginObject()
+                        while (reader.hasNext()) {
+                            when (reader.nextName()) {
+                                "type" -> type = reader.nextInt()
+                                "TTL" -> ttl = reader.nextLong()
+                                "data" -> data = reader.nextString()
+                                else -> reader.skipValue()
+                            }
+                        }
+                        reader.endObject()
+                        records.add(Triple(type, ttl, data))
+                    }
+                    reader.endArray()
+                }
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+        reader.close()
+
+        if (status != 0) return LookupResult(emptyList(), 60)
         val found = LinkedHashMap<String, InetAddress>()
-        var ttl = 600L
-        for (index in 0 until answers.length()) {
-            val answer = answers.optJSONObject(index) ?: continue
-            val value = answer.optString("data", "").trim().trimEnd('.')
-            val address = when (answer.optInt("type", -1)) {
+        var minimumTtl = 600L
+        for ((type, ttl, rawData) in records) {
+            val value = rawData.trim().trimEnd('.')
+            val address = when (type) {
                 1 -> parseIpv4(value)
                 28 -> parseIpv6(value)
                 else -> null
             } ?: continue
             found[address.hostAddress] = address
-            ttl = minOf(ttl, answer.optLong("TTL", 60L).coerceAtLeast(1L))
+            minimumTtl = minOf(minimumTtl, ttl.coerceAtLeast(1L))
         }
-        return LookupResult(found.values.toList(), ttl.coerceIn(30L, 600L))
+        return LookupResult(found.values.toList(), minimumTtl.coerceIn(30L, 600L))
     }
 
     private fun parseIpv4(value: String): InetAddress? {
