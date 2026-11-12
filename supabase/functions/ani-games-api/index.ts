@@ -56,7 +56,7 @@ const ROUTE_DB2_URL="https://xcdbipgsvohesxhxydep.supabase.co";
 const ROUTE_DB2_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhjZGJpcGdzdm9oZXN4aHh5ZGVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNjI5ODUsImV4cCI6MjEwNzYzODk4NX0.kHymS-T8a_PcKk-oQBYMGhHy3SSW1kAKStOBJVzMoSI";
 const ROUTE_DB1_REF="wzkjpycjizexxcxrfdvr";
 const ROUTE_DB2_REF="xcdbipgsvohesxhxydep";
-const GATEWAY_PATHS=new Set(["device/alert","device/disconnect","device/enroll","device/heartbeat","device/ack","device/sync","device/pull","device/rentals","device/test-policy","device/rental/lookup","device/session/start","device/session/end","device/rental/release","device/sync-cursor","wol/relay/register","wol/relay/heartbeat","wol/relay/poll","wol/relay/ack"]);
+const GATEWAY_PATHS=new Set(["device/alert","device/disconnect","device/enroll","device/heartbeat","device/ack","device/sync","device/pull","device/rentals","device/test-policy","device/rental/lookup","device/session/start","device/session/end","device/rental/release","device/sync-cursor","wol/relay/register","wol/relay/heartbeat","wol/relay/poll","wol/relay/ack","wol/relay/probe-ack"]);
 let routeCache:{at:number;target:"primary"|"backup"|"pending";reason?:string;epoch?:number;switchId?:string}|null=null;
 async function readRoute(url:string,key:string){
  const r=await fetch(url+"/functions/v1/db-route-status",{headers:{apikey:key},cache:"no-store",signal:AbortSignal.timeout(7000)}).catch(()=>null);
@@ -205,6 +205,14 @@ if(p.startsWith("wol/relay/")){
   return out(200,{ok:true,...await serverRpc("wol_relay_ack",{
    p_relay_id:relayId,p_token_hash:tokenHash,p_command_id:commandId,
    p_status:status,p_result:b.result&&typeof b.result==="object"?b.result:{}
+  })});
+ }
+ if(p==="wol/relay/probe-ack"){
+  const probeId=String(b.probeId||"").trim(),nonce=String(b.nonce||"").trim();
+  if(!/^[0-9a-fA-F-]{36}$/.test(probeId)||!/^[0-9a-fA-F-]{36}$/.test(nonce))return out(400,{ok:false,error:"INVALID_WOL_RELAY_PROBE"});
+  const metrics=b.metrics&&typeof b.metrics==="object"?b.metrics:{};
+  return out(200,{ok:true,...await serverRpc("wol_relay_probe_ack",{
+   p_relay_id:relayId,p_token_hash:tokenHash,p_probe_id:probeId,p_nonce:nonce,p_metrics:metrics
   })});
  }
  return out(404,{ok:false,error:"not_found",path:p});
