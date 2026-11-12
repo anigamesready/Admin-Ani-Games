@@ -33,7 +33,6 @@ class RelayService : Service() {
         const val ACTION_STOP = "com.anigames.aniwolrelay.STOP"
         private const val CHANNEL_ID = "ani_wol_relay"
         private const val NOTIFICATION_ID = 4701
-        private const val HEARTBEAT_INTERVAL_MS = 45_000L
         private const val POLL_INTERVAL_MS = 15_000L
     }
 
@@ -102,7 +101,6 @@ class RelayService : Service() {
     }
 
     private suspend fun runRelayLoop() {
-        var lastHeartbeatAttempt = 0L
         var lastWarning = 0L
         while (scope.isActive) {
             val credentials = RelayStore.credentials(this)
@@ -116,16 +114,7 @@ class RelayService : Service() {
                 val metrics = batteryMetrics()
                 val now = System.currentTimeMillis()
 
-                // Heartbeat and polling are isolated; a heartbeat error must not block commands.
-                if (now - lastHeartbeatAttempt >= HEARTBEAT_INTERVAL_MS) {
-                    lastHeartbeatAttempt = now
-                    try {
-                        withNetworkWakeLock { RelayApi.heartbeat(credentials, metrics) }
-                        RelayStore.recordNetworkSuccess(this, "heartbeat")
-                    } catch (error: Exception) {
-                        RelayStore.recordNetworkError(this, "heartbeat", error)
-                    }
-                }
+                // wol/relay/poll also updates last_seen_at; no separate heartbeat write is needed.
 
                 val temperature = metrics.optDouble("batteryTemperatureC", 0.0)
                 if (temperature >= 50.0) {
