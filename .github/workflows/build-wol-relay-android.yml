@@ -28,14 +28,15 @@ jobs:
           gradle-version: '8.9'
       - name: Configure Android SDK
         run: |
-          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDK_ROOT="$ANDROID_HOME"
+          if [ -z "$SDK_ROOT" ]; then SDK_ROOT=/usr/local/lib/android/sdk; fi
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)"
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null
           "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-      - name: Verify background relay source and settings entry points
+      - name: Verify background relay and automatic DNS fallback source
         run: |
           test -f relay-android/app/src/main/AndroidManifest.xml
           grep -q 'wol/relay/poll' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt
@@ -43,8 +44,19 @@ jobs:
           grep -q 'acquireStandbyCpuWakeLock' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
           grep -q 'START_STICKY' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
           grep -q 'stopWithTask="false"' relay-android/app/src/main/AndroidManifest.xml
+          grep -q 'class RelayDns' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayDns.kt
+          grep -q 'cloudflare-dns.com' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayDns.kt
+          grep -q 'dns.google' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayDns.kt
+          grep -q 'Dns.SYSTEM.lookup' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayDns.kt
+          grep -q 'dns(RelayDns)' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt
           grep -q 'AutoStartManagementActivity' relay-android/app/src/main/java/com/anigames/aniwolrelay/MainActivity.kt
           grep -q 'ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS' relay-android/app/src/main/java/com/anigames/aniwolrelay/MainActivity.kt
+      - name: Smoke-test Cloudflare and Google HTTPS DNS
+        run: |
+          curl -fsS -H 'accept: application/dns-json' 'https://cloudflare-dns.com/dns-query?name=wzkjpycjizexxcxrfdvr.supabase.co&type=A' -o /tmp/cf-doh.json
+          python3 -c 'import json; d=json.load(open("/tmp/cf-doh.json")); assert d.get("Status")==0 and any(x.get("type")==1 for x in d.get("Answer",[]))'
+          curl -fsS 'https://dns.google/resolve?name=wzkjpycjizexxcxrfdvr.supabase.co&type=A' -o /tmp/google-doh.json
+          python3 -c 'import json; d=json.load(open("/tmp/google-doh.json")); assert d.get("Status")==0 and any(x.get("type")==1 for x in d.get("Answer",[]))'
       - name: Smoke-test live relay API with an invalid one-time code
         run: |
           ANON_KEY=$(sed -n 's/.*ANON_KEY = "\([^"]*\)".*/\1/p' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt)
@@ -55,7 +67,7 @@ jobs:
             -o /tmp/ani-wol-relay-smoke.json -w "%{http_code}")
           test "$HTTP_CODE" = "401"
           grep -q '"error":"WOL_RELAY_ENROLLMENT_INVALID"' /tmp/ani-wol-relay-smoke.json
-      - name: Test standard Magic Packet payload
+      - name: Test relay DNS parser and Magic Packet payload
         run: gradle -p relay-android :app:testDebugUnitTest --no-daemon
       - name: Build debug APK
         run: gradle -p relay-android :app:assembleDebug --no-daemon
@@ -70,8 +82,8 @@ jobs:
           meta = json.loads(Path("relay-android/app/build/outputs/apk/debug/output-metadata.json").read_text())
           assert meta["applicationId"] == "com.anigames.aniwolrelay.standby", meta
           assert meta["variantName"] == "debug", meta
-          assert meta["elements"][0]["versionName"] == "1.0.2", meta
-          assert meta["elements"][0]["versionCode"] == 1, meta
+          assert meta["elements"][0]["versionName"] == "1.0.3", meta
+          assert meta["elements"][0]["versionCode"] == 2, meta
           print("APK metadata verified:", meta["applicationId"], meta["elements"][0]["versionName"])
           PY
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
@@ -79,7 +91,7 @@ jobs:
       - name: Upload relay APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-WoL-Relay-Android-v1.0.2-standby
+          name: Ani-WoL-Relay-Android-v1.0.3-DNS-AutoRecovery
           path: relay-android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30

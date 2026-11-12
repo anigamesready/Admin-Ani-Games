@@ -1,25 +1,21 @@
 # Ani WoL Relay Android
 
-Standalone side-by-side Android companion app for the Ani Games Ready Admin WoL relay integration. This standby build uses application ID `com.anigames.aniwolrelay.standby`, so it can coexist with the existing Relay APK without overwriting its data. It has its own relay installation identity and must be paired separately from Admin.
+Standalone Android companion app for the Ani Games Ready Admin WoL relay integration. This standby build uses application ID \`com.anigames.aniwolrelay.standby\`, separate from the original legacy Relay application.
 
-Target hardware: Redmi 6 Pro (primary). The app is minSdk 23 and runs a user-visible Android foreground service with a persistent notification, a partial CPU wake lock while Relay is enabled, a Wi-Fi lock, encrypted relay-token storage, local UDP Magic Packet broadcast, battery/temperature telemetry, boot recovery, and HTTPS command polling through the DB1 ani-games-api gateway.
+## Network recovery
 
-## One-time Redmi / MIUI standby setup
+The app first uses the Android/Wi-Fi DNS resolver. If the router or Wi-Fi DNS cannot resolve the Supabase hostname, the app automatically falls back to DNS-over-HTTPS through Cloudflare and then Google. Both paths use HTTPS certificate and hostname validation; no Android Private DNS setting or manual network configuration is required. DNS answers are cached to avoid unnecessary lookups.
 
-1. Pair from Admin, then press **Aktifkan Mode Siaga 24 Jam** in Relay.
-2. Allow the Android battery-optimization exemption prompt.
-3. In Xiaomi Autostart settings, enable Ani WoL Relay.
-4. In Xiaomi app battery settings, select No restrictions / Tanpa Batasan for Ani WoL Relay.
-5. Keep the permanent Relay notification visible. The activity may be sent to Home and the screen may be locked.
+The same resolver is used for pairing, polling, and command acknowledgements. The configured Supabase project remains DB1 (\`wzkjpycjizexxcxrfdvr\`); this patch does not switch DB targets or alter database pairing rows.
 
-The app can open the Android and MIUI settings screens directly, but Android does not allow a normal app to silently change protected system switches. The user must confirm the displayed settings. Force Stop, manually disabling the service, powering off the phone, or an OEM/system kill can still stop a relay. The long-lived CPU wake lock is intentional for the always-on gateway use case and can increase power consumption and temperature; use a good charger and ventilation.
+## Standby behavior
 
-## Network and status behavior
+The app uses a foreground service with persistent notification, partial CPU wake lock while Relay is enabled, Wi-Fi lock, encrypted relay-token storage, local UDP Magic Packet broadcast, battery/temperature telemetry, boot recovery, and HTTPS command polling. The activity may be sent to Home and the screen may be locked while the service remains enabled.
 
-The Relay polls the gateway for queued WoL commands. The current DB function updates `last_seen_at` during `wol_relay_poll`, so polling also refreshes the Admin's ONLINE status. The redundant separate heartbeat request has been removed. Polling still writes the last-seen status row because that is how the current backend knows the Relay is reachable. Do not remove polling without replacing it with a push-delivery path (for example, FCM), otherwise queued WoL commands cannot reach the phone while idle.
+Android and MIUI can still restrict autostart/background execution through protected system controls; a normal app cannot silently override those controls. Force Stop, manually disabling the service, powering off the phone, or an OEM/system kill can still stop a relay. Keep the phone ventilated and use a good-quality charger.
 
-This is a separate relay identity; it is never registered as a PC Billing device. Charge control is intentionally read-only unless the handset's charging hardware exposes a supported safe control interface.
+Polling updates the backend last-seen status and receives queued WoL commands. It must remain enabled unless replaced with push delivery. DB1/DB2 relay enrollment/device/command rows are not synchronized automatically; do not switch DB targets expecting a paired relay to survive.
 
-## DB1/DB2 failover note
+## Compatibility note
 
-The relay schema and API are deployed on both databases, but relay enrollment/device/command rows currently live only in the active database. The live route still reports backup_ready=false and sync_ready=false. Do not switch DB targets expecting a paired relay to survive until relay rows are included in the approved DB sync/replication process.
+The previous 1.0.2 debug APK was signed by an ephemeral GitHub Actions debug key. A new debug APK cannot be guaranteed to update it in place. If Android rejects this update as a signature mismatch, the old app must be uninstalled before installing this build, and the Relay must be paired once more. Do not remove the old app until this APK is ready.
