@@ -64,6 +64,6 @@ object RelayStore {
         val stage = p.getString("last_error_stage", null)
         val error = p.getString("last_error_message", null)
         val problem = if (!stage.isNullOrBlank() && !error.isNullOrBlank()) " • Error $stage: $error" else ""
-        return "Heartbeat: ${age("last_heartbeat_success")} • Poll: ${age("last_poll_success")}$problem"
+        return "Poll terakhir: ${age("last_poll_success")}$problem"
     }
 }
