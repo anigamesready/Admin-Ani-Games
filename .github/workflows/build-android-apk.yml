@@ -379,9 +379,9 @@ jobs:
           ! grep -q "/galtys/i" android/app/src/main/assets/web/admin.html
           grep -q "admin_get_free_test_policy" android/app/src/main/assets/web/admin.html
           grep -q "admin_set_free_test_policy" android/app/src/main/assets/web/admin.html
-          grep -q "applicationId 'com.anigames.billingadmin'" android/app/build.gradle
+          grep -q "applicationId 'com.anigames.billingadmin.v150'" android/app/build.gradle
           ! grep -q "com.anigames.billingadmin.v12test" android/app/build.gradle
-          grep -q 'android:label="AniGames Admin"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:label="AniGames Admin V12.1.50"' android/app/src/main/AndroidManifest.xml
           ! grep -q "AniGames Admin V12 Test" android/app/src/main/AndroidManifest.xml
           ! grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
           grep -q "dbSyncCall('start')" android/app/src/main/assets/web/admin.html
@@ -462,8 +462,8 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-debug.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-debug.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin' versionCode='78' versionName='12.1.50'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "application-label:'AniGames Admin'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v150' versionCode='78' versionName='12.1.50'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.50'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-debug.apk"
           "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-debug.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-debug.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
@@ -491,12 +491,12 @@ jobs:
           manifest = root / "app/src/main/AndroidManifest.xml"
           g = gradle.read_text(encoding="utf-8")
           m = manifest.read_text(encoding="utf-8")
-          if g.count("applicationId 'com.anigames.billingadmin'") != 1:
+          if g.count("applicationId 'com.anigames.billingadmin.v150'") != 1:
               raise SystemExit("Safe-test package ID anchor mismatch")
-          if m.count('android:label="AniGames Admin"') != 1:
+          if m.count('android:label="AniGames Admin V12.1.50"') != 1:
               raise SystemExit("Safe-test app label anchor mismatch")
-          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin'", "applicationId 'com.anigames.billingadmin.v150test'", 1), encoding="utf-8")
-          manifest.write_text(m.replace('android:label="AniGames Admin"', 'android:label="AniGames Admin V12.1.50 TEST"', 1), encoding="utf-8")
+          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin.v150'", "applicationId 'com.anigames.billingadmin.v150test'", 1), encoding="utf-8")
+          manifest.write_text(m.replace('android:label="AniGames Admin V12.1.50"', 'android:label="AniGames Admin V12.1.50 TEST"', 1), encoding="utf-8")
           PY
           gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
           TEST_APK="$ANDROID_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
