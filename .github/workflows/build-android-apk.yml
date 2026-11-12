@@ -229,7 +229,6 @@ jobs:
           grep -q "V12.1.49-ANDROID-WOL-PAIRING-ROLE-FIX" android/app/src/main/assets/web/admin.html
           grep -q "function isWakeRelayOwner()" android/app/src/main/assets/web/admin.html
           grep -q "function probeWakeRelayNow()" android/app/src/main/assets/web/admin.html
-          ! grep -q "let aniAndroidWakeRelay = null" <(sed -n '2200,2208p' android/app/src/main/assets/web/admin.html)
           python3 - <<'PY'
           import re
           from pathlib import Path
@@ -239,6 +238,8 @@ jobs:
               raise SystemExit(f"Expected one inline app script, found {len(scripts)}")
           source = scripts[0]
           state = source.find("let aniAndroidWakeRelay = null;")
+          if source.count("let aniAndroidWakeRelay = null;") != 1:
+              raise SystemExit("Relay state has duplicate declarations")
           startup = source.find("startDualDbAdmin();")
           if state < 0 or startup < 0 or state > startup:
               raise SystemExit("Relay state variables are still declared after startup callbacks")
