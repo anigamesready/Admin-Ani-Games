@@ -16,7 +16,7 @@ The app can open the Android and MIUI settings screens directly, but Android doe
 
 ## Network and status behavior
 
-The Relay polls the gateway for queued WoL commands. The current DB function updates `last_seen_at` during `wol_relay_poll`, so polling also refreshes the Admin's ONLINE status. The separate telemetry heartbeat remains for battery/temperature metadata. Do not remove polling without replacing it with a push-delivery path (for example, FCM), otherwise queued WoL commands cannot reach the phone while idle.
+The Relay polls the gateway for queued WoL commands. The current DB function updates `last_seen_at` during `wol_relay_poll`, so polling also refreshes the Admin's ONLINE status. The redundant separate heartbeat request has been removed. Polling still writes the last-seen status row because that is how the current backend knows the Relay is reachable. Do not remove polling without replacing it with a push-delivery path (for example, FCM), otherwise queued WoL commands cannot reach the phone while idle.
 
 This is a separate relay identity; it is never registered as a PC Billing device. Charge control is intentionally read-only unless the handset's charging hardware exposes a supported safe control interface.
 
