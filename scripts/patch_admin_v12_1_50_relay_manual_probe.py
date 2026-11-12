@@ -6,11 +6,13 @@ import re
 HTML = Path("android/app/src/main/assets/web/admin.html")
 GRADLE = Path("android/app/build.gradle")
 VERSION = Path("VERSION_ADMIN_ANDROID.txt")
-if not HTML.exists() or not GRADLE.exists():
+MANIFEST = Path("android/app/src/main/AndroidManifest.xml")
+if not HTML.exists() or not GRADLE.exists() or not MANIFEST.exists():
     raise SystemExit("Admin Android source files not found")
 
 html = HTML.read_text(encoding="utf-8")
 gradle = GRADLE.read_text(encoding="utf-8")
+manifest = MANIFEST.read_text(encoding="utf-8")
 
 STATE = """// ANI-WOL-RELAY V12.1.50 — state is declared before startup/auth callbacks can access it.
 let aniAndroidWakeRelay = null;
@@ -235,6 +237,17 @@ gradle, n2 = re.subn(r"versionName\s*'12\.1\.49'", "versionName '12.1.50'", grad
 if n1 != 1 or n2 != 1:
     raise SystemExit("Admin version update anchor mismatch")
 
+# Keep the installed stable Admin untouched. V12.1.50 is a separate install
+# identity so Android never tries to replace a differently signed old build.
+gradle, n3 = re.subn(
+    r"applicationId\\s+'com\\.anigames\\.billingadmin'",
+    "applicationId 'com.anigames.billingadmin.v150'", gradle, count=1)
+manifest, n4 = re.subn(
+    r'android:label="AniGames Admin"',
+    'android:label="AniGames Admin V12.1.50"', manifest, count=1)
+if n3 != 1 or n4 != 1:
+    raise SystemExit("V12.1.50 side-by-side package/label anchor mismatch")
+
 # Syntax is checked by the CI after every patch. Also assert all old feature
 # markers remain present before touching source files.
 for token in (
@@ -248,6 +261,7 @@ for token in (
 
 HTML.write_text(html, encoding="utf-8")
 GRADLE.write_text(gradle, encoding="utf-8")
+MANIFEST.write_text(manifest, encoding="utf-8")
 VERSION.write_text(
     "AniGames Admin Android V12.1.50 — relay TDZ fix and on-demand relay probe; "
     "existing rental, billing, reports and DB routing retained.\n",
@@ -258,4 +272,4 @@ print(f"PASS: replaced active relay functions (load={load_count}, update={update
 print("PASS: Admin status now requires a fresh explicit relay probe.")
 print("PASS: WoL action requires a recent probe response.")
 print("PASS: prior rental, billing, reports, reseller and dual-DB markers preserved.")
-print("PASS: Admin V12.1.50 / versionCode 78.")
+print("PASS: Admin V12.1.50 / versionCode 78 / side-by-side package com.anigames.billingadmin.v150.")
