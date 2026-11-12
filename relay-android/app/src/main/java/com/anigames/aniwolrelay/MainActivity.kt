@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
             text = "WoL Relay Gateway"; textSize = 27f; setTextColor(0xFF17231F.toInt()); setPadding(0, 4, 0, 8)
         })
         root.addView(TextView(this).apply {
-            text = "HP menerima perintah aman dari Admin, lalu mengirim Magic Packet ke PC melalui Wi-Fi lokal. Layar boleh dimatikan."
+            text = "HP menerima perintah aman dari Admin dan mengirim Magic Packet melalui Wi-Fi lokal. Status HP diuji langsung saat Admin menekan Refresh; layar boleh mati selama service tidak dihentikan Android."
             textSize = 14f; setTextColor(0xFF52615B.toInt()); setPadding(0, 0, 0, 18)
         })
         status = TextView(this).apply {
@@ -128,7 +128,7 @@ class MainActivity : AppCompatActivity() {
         relayInfo.text = if (credentials == null) {
             "Perangkat: ${Build.MANUFACTURER} ${Build.MODEL}\\nVersi aplikasi: ${RelayApi.APP_VERSION}"
         } else {
-            "Relay ID: ${credentials.relayId}\\nPerangkat: ${Build.MANUFACTURER} ${Build.MODEL}\\nVersi aplikasi: ${RelayApi.APP_VERSION}\\nStatus server terlihat di Admin APK."
+            "Relay ID: ${credentials.relayId}\\nPerangkat: ${Build.MANUFACTURER} ${Build.MODEL}\\nVersi aplikasi: ${RelayApi.APP_VERSION}\\nStatus aktif dikonfirmasi saat Admin menekan Refresh status. Relay tetap standby menerima perintah."
         }
         pairButton.visibility = if (credentials == null) View.VISIBLE else View.GONE
         code.visibility = if (credentials == null) View.VISIBLE else View.GONE
