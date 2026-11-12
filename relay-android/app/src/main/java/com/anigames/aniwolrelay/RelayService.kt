@@ -1,4 +1,5 @@
 package com.anigames.aniwolrelay
+
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -35,11 +36,18 @@ class RelayService : Service() {
         private const val HEARTBEAT_INTERVAL_MS = 45_000L
         private const val POLL_INTERVAL_MS = 15_000L
     }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var loopStarted = false
     private var wifiLock: WifiManager.WifiLock? = null
+    private var standbyCpuWakeLock: PowerManager.WakeLock? = null
 
-    override fun onCreate() { super.onCreate(); createChannel(); ensureWifiLock() }
+    override fun onCreate() {
+        super.onCreate()
+        createChannel()
+        ensureWifiLock()
+    }
+
     private fun ensureWifiLock() {
         try {
             val wifi = getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -50,19 +58,49 @@ class RelayService : Service() {
                 }
                 wifiLock?.acquire()
             }
-        } catch (_: Exception) { }
+        } catch (error: Exception) {
+            RelayStore.recordNetworkError(this, "wifi_wake_lock", error)
+        }
     }
+
+    private fun acquireStandbyCpuWakeLock() {
+        try {
+            if (standbyCpuWakeLock?.isHeld == true) return
+            val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+            standbyCpuWakeLock = power.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "AniWoLRelay:Standby"
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        } catch (error: Exception) {
+            RelayStore.recordNetworkError(this, "cpu_wake_lock", error)
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            RelayStore.setEnabled(this, false); stopSelf(); return START_NOT_STICKY
+            RelayStore.setEnabled(this, false)
+            stopSelf()
+            return START_NOT_STICKY
         }
         if (RelayStore.credentials(this) == null || !RelayStore.enabled(this)) {
-            stopSelf(); return START_NOT_STICKY
+            stopSelf()
+            return START_NOT_STICKY
         }
+
         startForeground(NOTIFICATION_ID, notification("Relay aktif • layar boleh mati"))
-        if (!loopStarted) { loopStarted = true; scope.launch { runRelayLoop() } }
+        acquireStandbyCpuWakeLock()
+        ensureWifiLock()
+
+        if (!loopStarted) {
+            loopStarted = true
+            scope.launch { runRelayLoop() }
+        }
         return START_STICKY
     }
+
     private suspend fun runRelayLoop() {
         var lastHeartbeatAttempt = 0L
         var lastWarning = 0L
@@ -70,10 +108,15 @@ class RelayService : Service() {
             val credentials = RelayStore.credentials(this)
             if (credentials == null || !RelayStore.enabled(this)) break
             try {
+                // The foreground service and partial wake lock keep this loop alive
+                // while the activity is at Home or the display is locked.
+                acquireStandbyCpuWakeLock()
                 ensureWifiLock()
+
                 val metrics = batteryMetrics()
                 val now = System.currentTimeMillis()
-                // Heartbeat and polling are isolated; heartbeat failure must not block WoL commands.
+
+                // Heartbeat and polling are isolated; a heartbeat error must not block commands.
                 if (now - lastHeartbeatAttempt >= HEARTBEAT_INTERVAL_MS) {
                     lastHeartbeatAttempt = now
                     try {
@@ -83,6 +126,7 @@ class RelayService : Service() {
                         RelayStore.recordNetworkError(this, "heartbeat", error)
                     }
                 }
+
                 val temperature = metrics.optDouble("batteryTemperatureC", 0.0)
                 if (temperature >= 50.0) {
                     if (now - lastWarning > 60_000L) {
@@ -112,40 +156,66 @@ class RelayService : Service() {
         }
         if (RelayStore.credentials(this) == null || !RelayStore.enabled(this)) stopSelf()
     }
+
     private suspend fun processCommand(credentials: RelayCredentials, command: JSONObject) {
         val id = command.optString("id")
         if (id.isBlank()) return
         val mac = command.optString("targetMac")
         val name = command.optString("targetDeviceName", "PC target")
-        val expires = try { OffsetDateTime.parse(command.optString("expiresAt")).toInstant().toEpochMilli() } catch (_: Exception) { 0L }
+        val expires = try {
+            OffsetDateTime.parse(command.optString("expiresAt")).toInstant().toEpochMilli()
+        } catch (_: Exception) {
+            0L
+        }
         if (expires <= System.currentTimeMillis()) {
-            withNetworkWakeLock { RelayApi.acknowledge(credentials, id, "failed", JSONObject().put("error", "COMMAND_EXPIRED")) }
+            withNetworkWakeLock {
+                RelayApi.acknowledge(credentials, id, "failed", JSONObject().put("error", "COMMAND_EXPIRED"))
+            }
             return
         }
         try {
             val result = MagicPacketSender.send(mac)
             withNetworkWakeLock {
-                RelayApi.acknowledge(credentials, id, "packet_sent", JSONObject()
-                    .put("message", "Magic Packet dikirim; PC belum dikonfirmasi menyala")
-                    .put("targetDeviceName", name).put("broadcasts", result.destinations).put("attempts", result.sent))
+                RelayApi.acknowledge(
+                    credentials,
+                    id,
+                    "packet_sent",
+                    JSONObject()
+                        .put("message", "Magic Packet dikirim; PC belum dikonfirmasi menyala")
+                        .put("targetDeviceName", name)
+                        .put("broadcasts", result.destinations)
+                        .put("attempts", result.sent)
+                )
             }
             RelayStore.recordNetworkSuccess(this, "command")
             notifyUser("Magic Packet dikirim ke $name")
         } catch (error: Exception) {
             RelayStore.recordNetworkError(this, "command", error)
             withNetworkWakeLock {
-                RelayApi.acknowledge(credentials, id, "failed", JSONObject()
-                    .put("error", "WOL_SEND_FAILED").put("message", error.message ?: "Gagal mengirim Magic Packet"))
+                RelayApi.acknowledge(
+                    credentials,
+                    id,
+                    "failed",
+                    JSONObject()
+                        .put("error", "WOL_SEND_FAILED")
+                        .put("message", error.message ?: "Gagal mengirim Magic Packet")
+                )
             }
             throw error
         }
     }
+
     private suspend fun <T> withNetworkWakeLock(block: suspend () -> T): T {
         val lock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AniWoLRelay:Network")
         lock.acquire(25_000L)
-        return try { block() } finally { if (lock.isHeld) lock.release() }
+        return try {
+            block()
+        } finally {
+            if (lock.isHeld) lock.release()
+        }
     }
+
     private fun batteryMetrics(): JSONObject {
         val intent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
@@ -162,52 +232,93 @@ class RelayService : Service() {
             BatteryManager.BATTERY_HEALTH_COLD -> "cold"
             else -> "unknown"
         }
-        return JSONObject().put("batteryPercent", percent)
+        return JSONObject()
+            .put("batteryPercent", percent)
             .put("batteryTemperatureC", if (temp >= 0) temp / 10.0 else JSONObject.NULL)
-            .put("charging", charging).put("batteryHealth", healthText)
-            .put("model", Build.MODEL).put("appVersion", RelayApi.APP_VERSION)
+            .put("charging", charging)
+            .put("batteryHealth", healthText)
+            .put("model", Build.MODEL)
+            .put("appVersion", RelayApi.APP_VERSION)
     }
+
     private fun scheduleTaskRemovalRecovery() {
         if (!RelayStore.enabled(this) || RelayStore.credentials(this) == null) return
         try {
             val intent = Intent(this, BootReceiver::class.java).setAction(BootReceiver.ACTION_RECOVER)
-            val flags = PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
             val pending = PendingIntent.getBroadcast(this, 4703, intent, flags)
             val alarm = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarm.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 20_000L, pending)
+            alarm.setAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + 20_000L,
+                pending
+            )
         } catch (error: Exception) {
             RelayStore.recordNetworkError(this, "recovery_alarm", error)
         }
     }
-    override fun onTaskRemoved(rootIntent: Intent?) { scheduleTaskRemovalRecovery(); super.onTaskRemoved(rootIntent) }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        scheduleTaskRemovalRecovery()
+        super.onTaskRemoved(rootIntent)
+    }
+
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Ani WoL Relay", NotificationManager.IMPORTANCE_LOW)
-                    .apply { description = "Status relay Wake-on-LAN" })
+                    .apply { description = "Status relay Wake-on-LAN" }
+            )
         }
     }
+
     private fun notification(text: String): Notification {
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
         val pending = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), flags)
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload_done)
-            .setContentTitle("Ani Games Ready • WoL Relay").setContentText(text)
-            .setContentIntent(pending).setOngoing(true).setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW).build()
+            .setContentTitle("Ani Games Ready • WoL Relay")
+            .setContentText(text)
+            .setContentIntent(pending)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
     }
-    private fun updateNotification(text: String) { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text)) }
+
+    private fun updateNotification(text: String) {
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
+    }
+
     private fun notifyUser(text: String) {
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID + 1,
-            NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(android.R.drawable.stat_sys_upload_done)
-                .setContentTitle("Ani WoL Relay").setContentText(text).setAutoCancel(true)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT).build())
+        getSystemService(NotificationManager::class.java).notify(
+            NOTIFICATION_ID + 1,
+            NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_upload_done)
+                .setContentTitle("Ani WoL Relay")
+                .setContentText(text)
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .build()
+        )
     }
+
     override fun onDestroy() {
         scope.cancel()
-        try { if (wifiLock?.isHeld == true) wifiLock?.release() } catch (_: Exception) { }
+        try {
+            if (wifiLock?.isHeld == true) wifiLock?.release()
+        } catch (_: Exception) {
+        }
         wifiLock = null
+        try {
+            if (standbyCpuWakeLock?.isHeld == true) standbyCpuWakeLock?.release()
+        } catch (_: Exception) {
+        }
+        standbyCpuWakeLock = null
         super.onDestroy()
     }
+
     override fun onBind(intent: Intent?): IBinder? = null
 }
