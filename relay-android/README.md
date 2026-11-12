@@ -1,6 +1,6 @@
 # Ani WoL Relay Android
 
-Standalone Android companion app for the Ani Games Ready Admin V12.1.50 Android WoL relay integration.
+Standalone side-by-side Android companion app for the Ani Games Ready Admin WoL relay integration. This standby build uses application ID `com.anigames.aniwolrelay.standby`, so it can coexist with the existing Relay APK without overwriting its data. It has its own relay installation identity and must be paired separately from Admin.
 
 Target hardware: Redmi 6 Pro (primary). The app is minSdk 23 and runs a user-visible Android foreground service with a persistent notification, a partial CPU wake lock while Relay is enabled, a Wi-Fi lock, encrypted relay-token storage, local UDP Magic Packet broadcast, battery/temperature telemetry, boot recovery, and HTTPS command polling through the DB1 ani-games-api gateway.
 
