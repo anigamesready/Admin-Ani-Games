@@ -22,11 +22,13 @@ internal object RelayDns : Dns {
         Provider("cloudflare-dns.com", "dns-query"),
         Provider("dns.google", "resolve")
     )
-    private val bootstrapDns = Dns { hostname ->
-        when (hostname.lowercase(Locale.US)) {
-            "cloudflare-dns.com" -> listOf(ipv4(1, 1, 1, 1), ipv4(1, 0, 0, 1))
-            "dns.google" -> listOf(ipv4(8, 8, 8, 8), ipv4(8, 8, 4, 4))
-            else -> throw UnknownHostException("No safe bootstrap address for " + hostname)
+    private val bootstrapDns = object : Dns {
+        override fun lookup(hostname: String): List<InetAddress> {
+            return when (hostname.lowercase(Locale.US)) {
+                "cloudflare-dns.com" -> listOf(ipv4(1, 1, 1, 1), ipv4(1, 0, 0, 1))
+                "dns.google" -> listOf(ipv4(8, 8, 8, 8), ipv4(8, 8, 4, 4))
+                else -> throw UnknownHostException("No safe bootstrap address for " + hostname)
+            }
         }
     }
     private val dohClient = OkHttpClient.Builder()
