@@ -1,9 +1,9 @@
-name: Build Ani Games Admin V12.1.50 DB Android APK
+name: Build Ani Games Admin V12.1.51 DB Android Login Fix APK
 
 on:
   push:
     branches:
-      - admin-v12.1.50-DB-Android
+      - fix/admin-db-android-login-gate-v1.51
   workflow_dispatch:
 
 permissions:
@@ -424,7 +424,7 @@ jobs:
           g = "\n".join(gradle_lines) + "\n"
           import re
           m, label_count = re.subn(r'android:label="[^"]+"',
-                                   'android:label="AniGames Admin V12.1.50 DB Android"', m, count=1)
+                                   'android:label="AniGames Admin V12.1.51 DB Android"', m, count=1)
           if label_count != 1:
               raise SystemExit("DB Android app label could not be isolated: " + str(manifest))
           gradle.write_text(g, encoding="utf-8")
@@ -473,6 +473,66 @@ jobs:
           node --check /tmp/admin-db-android-check.js
           node --check /tmp/admin-db-android-index.js
           node --check /tmp/admin-db-android-admin-control.js
+      - name: Apply V12.1.51 missing Admin login gate fix and regression test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/scripts/patch_admin_db_android_login_gate_fix.py" "$ADMIN_PROJECT_DIR"
+          python3 -m py_compile "$GITHUB_WORKSPACE/scripts/patch_admin_db_android_login_gate_fix.py"
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          root = Path(os.environ["ADMIN_PROJECT_DIR"])
+          page = (root / "android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          if len(scripts) != 1:
+              raise SystemExit(f"Expected one inline Admin script, found {len(scripts)}")
+          source = scripts[0]
+          fn = re.search(r"(?ms)^function setAdminAuthEnabled\(enabled\)\{.*?^\}", source)
+          if not fn:
+              raise SystemExit("setAdminAuthEnabled helper is missing after V12.1.51 patch")
+          if source.count("function setAdminAuthEnabled(") != 1:
+              raise SystemExit("setAdminAuthEnabled helper is duplicated")
+          if source.count("setAdminAuthEnabled(true)") < 3:
+              raise SystemExit("Startup / health / auth call sites unexpectedly changed")
+          if "localJson('/auth/v1/token?grant_type=password'" not in source:
+              raise SystemExit("Admin local auth endpoint wiring was changed")
+          Path("/tmp/admin-v1251-check.js").write_text(source, encoding="utf-8")
+          gradle = (root / "android/app/build.gradle").read_text(encoding="utf-8")
+          manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+          if "versionCode 79" not in gradle or "versionName '12.1.51'" not in gradle:
+              raise SystemExit("Admin version is not V12.1.51 / versionCode 79")
+          if 'applicationId \'com.anigames.billingadmin.v150db\'' not in gradle:
+              raise SystemExit("Existing DB Android package ID changed")
+          if 'android:label="AniGames Admin V12.1.51 DB Android"' not in manifest:
+              raise SystemExit("Admin V12.1.51 label missing")
+          if "startLocalAdmin();" not in source or "startDualDbAdmin();" in source:
+              raise SystemExit("Local Admin startup / dual-DB isolation regression")
+          if "relayAccessToken()" not in source or "wol_relay_probe_request" not in source:
+              raise SystemExit("Independent WoL relay sidecar wiring was removed")
+          print("PASS: unique missing login gate helper, all auth call sites, local API endpoint and isolated identity verified.")
+          PY
+          node --check /tmp/admin-v1251-check.js
+          node - <<'JS'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          const html = fs.readFileSync(process.env.ADMIN_PROJECT_DIR + '/android/app/src/main/assets/web/admin.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
+          assert.equal(scripts.length, 1);
+          const match = scripts[0].match(/function setAdminAuthEnabled\(enabled\)\{[\s\S]*?^\}/m);
+          assert.ok(match, 'login gate function should exist');
+          const button = {disabled: null, attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }};
+          const context = {document: {querySelector(selector) { assert.equal(selector, '#login button.primary'); return button; }}};
+          vm.runInNewContext(match[0], context);
+          context.setAdminAuthEnabled(true);
+          assert.equal(button.disabled, false);
+          assert.equal(button.attrs['aria-disabled'], 'false');
+          context.setAdminAuthEnabled(false);
+          assert.equal(button.disabled, true);
+          assert.equal(button.attrs['aria-disabled'], 'true');
+          console.log('PASS: login button gate enables/disables correctly in an isolated JS runtime test.');
+          JS
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -504,15 +564,15 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v150db' versionCode='78' versionName='12.1.50'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.50 DB Android'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50.apk"
-          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v150db' versionCode='79' versionName='12.1.51'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.51 DB Android'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51.apk"
+          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51.apk"
 
       - name: Build side-by-side safe test APK without replacing installed app
         shell: bash
@@ -537,10 +597,10 @@ jobs:
           m = manifest.read_text(encoding="utf-8")
           if g.count("applicationId 'com.anigames.billingadmin.v150db'") != 1:
               raise SystemExit("Safe-test package ID anchor mismatch")
-          if m.count('android:label="AniGames Admin V12.1.50 DB Android"') != 1:
+          if m.count('android:label="AniGames Admin V12.1.51 DB Android"') != 1:
               raise SystemExit("Safe-test app label anchor mismatch")
           gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin.v150db'", "applicationId 'com.anigames.billingadmin.v150dbtest'", 1), encoding="utf-8")
-          manifest.write_text(m.replace('android:label="AniGames Admin V12.1.50 DB Android"', 'android:label="AniGames Admin V12.1.50 DB Android TEST"', 1), encoding="utf-8")
+          manifest.write_text(m.replace('android:label="AniGames Admin V12.1.51 DB Android"', 'android:label="AniGames Admin V12.1.51 DB Android TEST"', 1), encoding="utf-8")
           PY
           gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
           TEST_APK="$ANDROID_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
@@ -548,20 +608,20 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v150dbtest' versionCode='78' versionName='12.1.50'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.50 DB Android TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50-SAFE-TEST.apk"
-          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50-SAFE-TEST.apk"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v150dbtest' versionCode='79' versionName='12.1.51'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.51 DB Android TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51-SAFE-TEST.apk"
+          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.51-SAFE-TEST.apk"
           echo "PASS: side-by-side test package verified; original application package source restored."
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-DB-Android-v12.1.50
+          name: AniGames-Admin-DB-Android-v12.1.51
           path: output/*
           if-no-files-found: error
           retention-days: 30
