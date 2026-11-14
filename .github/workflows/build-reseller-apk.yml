@@ -1,4 +1,4 @@
-name: Build Ani-Games Reseller APK V1.0.6 Remember Login + Rental Status
+name: Build Ani-Games Reseller APK V1.0.7 DB1-only Side-by-side
 
 on:
   push:
@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   build:
-    name: Audit source and compile Reseller V1.0.6 APK
+    name: Audit source and compile Reseller V1.0.7 APK
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -131,7 +131,7 @@ jobs:
               lambda m: m.group(1) + "com.anigames.reseller" + m.group(2), text, count=1)
           text, app_count = re.subn(
               r'(\bapplicationId\s*=?\s*["\'])[^"\']+(["\'])',
-              lambda m: m.group(1) + "com.anigames.reseller" + m.group(2), text, count=1)
+              lambda m: m.group(1) + "com.anigames.reseller.v107" + m.group(2), text, count=1)
           if not ns_count:
               raise SystemExit("Cannot isolate Android namespace: Gradle namespace setting not found")
           if not app_count:
@@ -140,7 +140,7 @@ jobs:
           text, _ = re.subn(r'(\bversionName\s*=?\s*["\'])[^"\']+(["\'])',
                             lambda m: m.group(1) + "1.0.1" + m.group(2), text, count=1)
           gradle.write_text(text)
-          print("Configured namespace and applicationId as com.anigames.reseller")
+          print("Configured namespace com.anigames.reseller and side-by-side applicationId com.anigames.reseller.v107")
 
           # Re-home Java/Kotlin package declarations so generated R references use the reseller namespace.
           src = root / "app/src/main"
@@ -158,14 +158,14 @@ jobs:
           manifest = manifest_path.read_text(errors="replace")
           if re.search(r'android:label\s*=\s*"[^"]+"', manifest):
               manifest = re.sub(r'android:label\s*=\s*"[^"]+"',
-                                'android:label="Ani-Games Reseller"', manifest, count=1)
+                                'android:label="Ani-Games Reseller 1.0.7"', manifest, count=1)
           else:
               raise SystemExit("Manifest has no explicit android:label to isolate")
           manifest_path.write_text(manifest)
           for strings in root.glob("app/src/main/res/values*/strings.xml"):
               body = strings.read_text(errors="replace")
               body = re.sub(r'(<string\s+name="app_name"[^>]*>).*?(</string>)',
-                            r'\1Ani-Games Reseller\2', body, count=1, flags=re.S)
+                            r'\1Ani-Games Reseller 1.0.7\2', body, count=1, flags=re.S)
               strings.write_text(body)
 
           web_dirs = [p for p in root.glob("app/src/main/assets/**")
@@ -427,21 +427,21 @@ jobs:
           mkdir -p output
           "$AAPT" dump badging "$APK" > output/apk-badging.txt
           cat output/apk-badging.txt | head -8
-          grep -q "package: name='com.anigames.reseller' versionCode='137' versionName='1.0.7'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
-          cp "$APK" output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
+          grep -q "package: name='com.anigames.reseller.v107' versionCode='137' versionName='1.0.7'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
+          cp "$APK" output/Ani-Games-Reseller-v1.0.7-DB1-only-side-by-side-debug.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
-          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
-          unzip -t output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
-          sha256sum output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
+          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.7-DB1-only-side-by-side-debug.apk
+          unzip -t output/Ani-Games-Reseller-v1.0.7-DB1-only-side-by-side-debug.apk
+          sha256sum output/Ani-Games-Reseller-v1.0.7-DB1-only-side-by-side-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v1.0.7-DB1-only-side-by-side-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Reseller-Android-v1.0.7-DB1-only-debug
+          name: Ani-Games-Reseller-Android-v1.0.7-DB1-only-side-by-side
           path: |
-            output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
+            output/Ani-Games-Reseller-v1.0.7-DB1-only-side-by-side-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
