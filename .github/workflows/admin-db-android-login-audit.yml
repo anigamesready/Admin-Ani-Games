@@ -1,0 +1,459 @@
+name: Audit AniGames Admin V12.1.50 login event flow
+
+on:
+  push:
+    branches:
+      - fix/admin-v12.1.50-db-android-login-click
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build AniGames Admin V12.1.50 Android WoL Relay APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Extract Android source bundle
+        run: |
+          set -euo pipefail
+          set -x
+          test -f "AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip"
+          mkdir -p source-bundle
+          unzip -q "AniGames-Admin-V12.1.4-ANDROID-PASSWORD-RESET-PATCH-v3.zip" -d source-bundle
+          PROJECT_DIR="$(find source-bundle -type f -path '*/android/app/build.gradle' -print -quit | sed 's#/android/app/build.gradle##')"
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android app/build.gradle not found in ZIP contents"
+            find source-bundle -maxdepth 4 -type f | head -100
+            exit 1
+          fi
+          test -f "$PROJECT_DIR/android/app/src/main/AndroidManifest.xml"
+          echo "ADMIN_PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_PROJECT_DIR=$PROJECT_DIR/android" >> "$GITHUB_ENV"
+          echo "Detected Admin project: $PROJECT_DIR"
+
+      - name: Apply Admin V12.1.14 dual-DB patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -x
+          gzip -dc "$GITHUB_WORKSPACE/scripts/patch_admin_v12_1_43_monthly_report_active_edit.py.gz" > "$GITHUB_WORKSPACE/scripts/patch_admin_v12_1_43_monthly_report_active_edit.py"
+          test -s "$GITHUB_WORKSPACE/scripts/patch_admin_v12_1_43_monthly_report_active_edit.py"
+          patches=(
+            "scripts/patch_admin_pc_recovery.py"
+            "scripts/patch_admin_android_notifications.py"
+            "scripts/patch_admin_dual_db_preflight.py"
+            "scripts/patch_admin_rental_identity_rpc.py"
+            "scripts/patch_admin_notification_reliability.py"
+            "scripts/patch_admin_dual_db_routing.py"
+            "scripts/patch_admin_db_sync_global_switch.py"
+            "scripts/patch_admin_final_readiness.py"
+            "scripts/patch_admin_copy_redirect.py"
+            "scripts/patch_admin_report_exports.py"
+            "scripts/patch_admin_v12_1_17_core_db.py"
+            "scripts/patch_admin_gateway_readiness.py"
+            "scripts/patch_admin_cutover_without_sync.py"
+            "scripts/patch_admin_v12_1_22_full_sync.py"
+            "scripts/patch_admin_v12_1_23_final_package.py"
+            "scripts/patch_admin_v12_1_24_owner_proof.py"
+            "scripts/patch_admin_v12_1_25_login_route_boot_fix.py"
+            "scripts/patch_admin_v12_1_26_primary_login_authority.py"
+            "scripts/patch_admin_v12_1_27_login_click_route_refresh.py"
+            "scripts/patch_admin_shutdown_timer.py"
+            "scripts/patch_admin_v12_1_28_free_test_gate.py"
+            "scripts/patch_admin_v12_1_29_free_test_status_fix.py"
+            "scripts/patch_admin_v12_1_30_device_list_init_fix.py"
+            "scripts/patch_admin_v12_1_31_route_auth_fast_cache.py"
+            "scripts/patch_admin_v12_1_32_route_no_preflight.py"
+            "scripts/patch_admin_v12_1_33_offline_restart_queue.py"
+            "scripts/patch_admin_v12_1_34_global_rentals.py"
+            "scripts/patch_admin_v12_1_36_pc_wol_relay.py"
+            "scripts/patch_admin_report_daily_v12_1_37.py"
+            "scripts/patch_admin_v12_1_38_auto_wol_metadata.py"
+            "scripts/patch_admin_v12_1_39_auto_relay_target_only.py"
+            "scripts/patch_admin_v12_1_40_remove_shutdown_timer.py"
+            "scripts/patch_admin_v12_1_41_dashboard_report_30d.py"
+            "scripts/patch_admin_v12_1_42_rental_edit_ui_fix.py"
+            "scripts/patch_admin_v12_1_43_monthly_report_active_edit.py"
+            "scripts/patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py"
+            "scripts/patch_admin_v12_1_45_billing_logout_login_toggle.py"
+            "scripts/patch_admin_v12_1_46_monthly_yearly_report_pc.py"
+            "scripts/patch_admin_v12_1_46_rank_period_alignment.py"
+            "scripts/patch_admin_v12_1_47_android_wol_relay.py"
+            "scripts/patch_admin_v12_1_48_android_wol_relay_fix.py"
+            "scripts/patch_admin_v12_1_49_wol_master_role.py"
+            "scripts/patch_admin_v12_1_50_relay_manual_probe.py"
+          )
+          for patch in "${patches[@]}"; do
+            cp "$GITHUB_WORKSPACE/$patch" "$ADMIN_PROJECT_DIR/$(basename "$patch")"
+          done
+          cd "$ADMIN_PROJECT_DIR"
+          python3 patch_admin_pc_recovery.py
+          python3 patch_admin_android_notifications.py
+          python3 patch_admin_dual_db_preflight.py
+          python3 patch_admin_rental_identity_rpc.py
+          python3 patch_admin_notification_reliability.py
+          python3 patch_admin_dual_db_routing.py
+          python3 patch_admin_db_sync_global_switch.py
+          python3 patch_admin_final_readiness.py
+          python3 patch_admin_copy_redirect.py
+          python3 patch_admin_report_exports.py
+          test "$(grep -c 'automatic failover is disabled' android/app/src/main/assets/web/admin.html)" -ge 1
+          test "$(grep -c 'ROUTE_FINAL_CONFIRMATION_FAILED' android/app/src/main/assets/web/admin.html)" -ge 1
+          grep -q "versionCode 44" android/app/build.gradle
+          grep -q "versionName '12.1.16'" android/app/build.gradle
+          grep -q "function exportExcelFallbackXLSX" android/app/src/main/assets/web/admin.html
+          grep -q "async function ensureJsPDF" android/app/src/main/assets/web/admin.html
+          grep -q "function blynkUserError" android/app/src/main/assets/web/admin.html
+          grep -q "DB_SYNC_REQUIRED: parity data/auth belum cocok" android/app/src/main/assets/web/admin.html
+          grep -q "var charts=window.charts" android/app/src/main/assets/web/admin.html
+          grep -q "async function saveReportFileDownload" android/app/src/main/assets/web/admin.html
+          grep -q "saveReportFile(String filename, String mimeType, String base64Payload)" android/app/src/main/java/com/anigames/billingadmin/MainActivity.java
+          grep -q "Downloads/Ani Games Reports" android/app/src/main/java/com/anigames/billingadmin/MainActivity.java
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          if len(scripts) != 1:
+              raise SystemExit(f"Expected one inline admin app script, found {len(scripts)}")
+          Path("/tmp/admin-inline-check.js").write_text(scripts[0], encoding="utf-8")
+          PY
+          python3 patch_admin_v12_1_17_core_db.py
+          python3 patch_admin_gateway_readiness.py
+          python3 patch_admin_cutover_without_sync.py
+          python3 patch_admin_v12_1_22_full_sync.py
+          python3 patch_admin_v12_1_23_final_package.py
+          python3 patch_admin_v12_1_24_owner_proof.py
+          python3 patch_admin_v12_1_25_login_route_boot_fix.py
+          python3 patch_admin_v12_1_26_primary_login_authority.py
+          python3 patch_admin_v12_1_27_login_click_route_refresh.py
+          python3 patch_admin_shutdown_timer.py
+          python3 patch_admin_v12_1_28_free_test_gate.py
+          python3 patch_admin_v12_1_29_free_test_status_fix.py
+          python3 patch_admin_v12_1_30_device_list_init_fix.py
+          python3 patch_admin_v12_1_31_route_auth_fast_cache.py
+          python3 patch_admin_v12_1_32_route_no_preflight.py
+          python3 patch_admin_v12_1_33_offline_restart_queue.py
+          python3 patch_admin_v12_1_34_global_rentals.py
+          python3 patch_admin_v12_1_36_pc_wol_relay.py
+          python3 patch_admin_report_daily_v12_1_37.py
+          python3 patch_admin_v12_1_38_auto_wol_metadata.py
+          python3 patch_admin_v12_1_39_auto_relay_target_only.py
+          python3 patch_admin_v12_1_40_remove_shutdown_timer.py
+          python3 patch_admin_v12_1_41_dashboard_report_30d.py
+          python3 patch_admin_v12_1_42_rental_edit_ui_fix.py
+          python3 patch_admin_v12_1_43_monthly_report_active_edit.py
+          python3 patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py
+          python3 patch_admin_v12_1_45_billing_logout_login_toggle.py
+          python3 patch_admin_v12_1_46_monthly_yearly_report_pc.py
+          python3 patch_admin_v12_1_46_rank_period_alignment.py
+          python3 patch_admin_v12_1_47_android_wol_relay.py
+          python3 patch_admin_v12_1_48_android_wol_relay_fix.py
+          python3 patch_admin_v12_1_49_wol_master_role.py
+          python3 patch_admin_v12_1_50_relay_manual_probe.py
+          python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py patch_admin_v12_1_45_billing_logout_login_toggle.py patch_admin_v12_1_46_monthly_yearly_report_pc.py patch_admin_v12_1_46_rank_period_alignment.py patch_admin_v12_1_47_android_wol_relay.py patch_admin_v12_1_48_android_wol_relay_fix.py patch_admin_v12_1_49_wol_master_role.py patch_admin_v12_1_50_relay_manual_probe.py
+          grep -q "versionCode 78" android/app/build.gradle
+          grep -q "versionName '12.1.50'" android/app/build.gradle
+          grep -q "ANI-WOL-RELAY V12.1.50" android/app/src/main/assets/web/admin.html
+          grep -q "probeWakeRelayNow" android/app/src/main/assets/web/admin.html
+          grep -q "wol_relay_probe_request" android/app/src/main/assets/web/admin.html
+          grep -q "wol_relay_probe_status" android/app/src/main/assets/web/admin.html
+          grep -q "Akses pairing WoL hanya untuk Master/Owner" android/app/src/main/assets/web/admin.html
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          pairings = list(re.finditer(r"(?ms)^async function createWakeRelayPairingCode\(\) \{.*?^\}", page))
+          if len(pairings) != 1:
+              raise SystemExit(f"Expected exactly one pairing handler, found {len(pairings)}")
+          pair_fn = pairings[0].group(0)
+          if "if (!isWakeRelayOwner()) return msg('Akses pairing WoL hanya untuk Master/Owner.', true);" not in pair_fn:
+              raise SystemExit("Pairing handler does not use the shared Master/Owner guard")
+          if "return msg('Pairing WoL hanya tersedia untuk Master/Owner.', true);" in pair_fn:
+              raise SystemExit("Unconditional legacy pairing denial remains")
+          requests = list(re.finditer(r"(?ms)^async function requestWakePc2\(\) \{.*?^\}", page))
+          if len(requests) < 2:
+              raise SystemExit(f"Expected duplicate legacy request handlers to be normalized, found {len(requests)}")
+          if any("if (!isWakeRelayOwner())" not in m.group(0) for m in requests):
+              raise SystemExit("A WoL request handler still uses a stale role check")
+          owner = re.search(r"(?ms)^function isWakeRelayOwner\(\) \{.*?^\}", page)
+          if not owner or "master_owner" not in owner.group(0) or "master_admin" not in owner.group(0):
+              raise SystemExit("Normalized Master/Owner role aliases are missing")
+          print("PASS: pairing denial is conditional only; every WoL action uses the shared role resolver.")
+          PY
+          grep -q "V12.1.25-ROUTE-BOOT-SEPARATION" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.26-PRIMARY-LOGIN-AUTHORITY" android/app/src/main/assets/web/admin.html
+          grep -q "PRIMARY_LOGIN_DOES_NOT_REQUIRE_DB2_READY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.27-LOGIN-CLICK-ROUTE-RESOLVE" android/app/src/main/assets/web/admin.html
+          grep -q "ensureActiveDbRouteForAuth" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.29-FREE-TEST-STATUS-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.30-DEVICE-LIST-INIT-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.31-AUTH-ROUTE-FAST-CACHE" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.36-GLOBAL-RENTAL-DB-FIRST-NO-PC-RENTAL-WOL-RELAY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.36-PC-WOL-RELAY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.47-ANDROID-WOL-RELAY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.48-ANDROID-WOL-RELAY-RELIABILITY" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.49-ANDROID-WOL-PAIRING-ROLE-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "function isWakeRelayOwner()" android/app/src/main/assets/web/admin.html
+          grep -q "function probeWakeRelayNow()" android/app/src/main/assets/web/admin.html
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          if len(scripts) != 1:
+              raise SystemExit(f"Expected one inline app script, found {len(scripts)}")
+          source = scripts[0]
+          state = source.find("let aniAndroidWakeRelay = null;")
+          if source.count("let aniAndroidWakeRelay = null;") != 1:
+              raise SystemExit("Relay state has duplicate declarations")
+          startup = source.find("startDualDbAdmin();")
+          if state < 0 or startup < 0 or state > startup:
+              raise SystemExit("Relay state variables are still declared after startup callbacks")
+          reqs = list(re.finditer(r"(?ms)^async function requestWakePc2\(\) \{.*?^\}", source))
+          if len(reqs) < 2 or "probeWakeRelayNow()" not in reqs[-1].group(0):
+              raise SystemExit("Active WoL handler does not require an explicit relay probe")
+          if "wol_relay_probe_request" not in source or "wol_relay_probe_status" not in source:
+              raise SystemExit("Admin manual probe RPC wiring missing")
+          Path("/tmp/admin-v1250-check.js").write_text(source, encoding="utf-8")
+          print("PASS: relay state is initialized before startup and active WoL requires an on-demand probe.")
+          PY
+          node --check /tmp/admin-v1250-check.js
+          grep -q "wol_relay_create_enrollment" android/app/src/main/assets/web/admin.html
+          grep -q "wol_relay_enqueue" android/app/src/main/assets/web/admin.html
+          grep -q "wol_relay_command_status" android/app/src/main/assets/web/admin.html
+          grep -q "wol_relay_create_enrollment" android/app/src/main/assets/web/admin.html
+          grep -q "wol_relay_enqueue" android/app/src/main/assets/web/admin.html
+          grep -q "createWakeRelayPairingCode" android/app/src/main/assets/web/admin.html
+          grep -q "id=\"wakeRelayTarget\"" android/app/src/main/assets/web/admin.html
+          ! grep -q "id=\"wakeRelaySource\"" android/app/src/main/assets/web/admin.html
+          ! grep -q "id=\"wakeRelayMac\"" android/app/src/main/assets/web/admin.html
+          grep -q "id=\"wakeRelayTarget\"" android/app/src/main/assets/web/admin.html
+          grep -q "createWakeRelayPairingCode" android/app/src/main/assets/web/admin.html
+          ! grep -q "id=\"wakeRelaySource\"" android/app/src/main/assets/web/admin.html
+          ! grep -q "id=\"wakeRelayMac\"" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.37-DAILY-REPORT-KEYSET-EXPORT" android/app/src/main/assets/web/admin.html
+          grep -q "rpc('report_detailed_usage_page'" android/app/src/main/assets/web/admin.html
+          grep -q "rpc('report_summary_compact'" android/app/src/main/assets/web/admin.html
+          grep -q "async function loadReportRangeForExport()" android/app/src/main/assets/web/admin.html
+          grep -Fq "if(id==='reports')loadReport();" android/app/src/main/assets/web/admin.html
+          ! grep -Fq "await Promise.all([loadDevices(),loadReport()])" android/app/src/main/assets/web/admin.html
+          ! grep -Fq "await Promise.all([loadGlobalRentalAccounts(),loadReport()])" android/app/src/main/assets/web/admin.html
+          ! grep -q "rpc('report_by_account_theme'" android/app/src/main/assets/web/admin.html
+          ! grep -q "rpc('report_detailed_usage'," android/app/src/main/assets/web/admin.html
+          ! grep -q 'id="kRevenue"' android/app/src/main/assets/web/admin.html
+          grep -q "wakeRelayCard" android/app/src/main/assets/web/admin.html
+          grep -q "wakeRelaySourceInfo" android/app/src/main/assets/web/admin.html
+          grep -q "metadata?.wolLanMac" android/app/src/main/assets/web/admin.html
+          ! grep -q 'id="wakeRelaySource"' android/app/src/main/assets/web/admin.html
+          ! grep -q 'id="wakeRelayMac"' android/app/src/main/assets/web/admin.html
+          grep -q "metadata?.wolLanMac" android/app/src/main/assets/web/admin.html
+          ! grep -q 'id="wakeRelayMac"' android/app/src/main/assets/web/admin.html
+          grep -q "RELAY OFFLINE" android/app/src/main/assets/web/admin.html
+          grep -q "TERKONFIRMASI" android/app/src/main/assets/web/admin.html
+          grep -q "admin_rental_accounts_global" android/app/src/main/assets/web/admin.html
+          grep -q "admin_create_rental_global" android/app/src/main/assets/web/admin.html
+          grep -q "admin_update_rental_global" android/app/src/main/assets/web/admin.html
+          grep -q "admin_delete_rental_global" android/app/src/main/assets/web/admin.html
+          grep -q "data-rental-delete" android/app/src/main/assets/web/admin.html
+          ! grep -q "data-rental-disable" android/app/src/main/assets/web/admin.html
+          grep -q "ID Rental:" android/app/src/main/assets/web/admin.html
+          grep -q "waitDeviceCommand(commandId,15000)" android/app/src/main/assets/web/admin.html
+          grep -q "RENTAL_ACTIVE_OFFLINE_LEASE" android/app/src/main/assets/web/admin.html
+          python3 - <<'PY'
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          accounts = page.find('<section id="accounts" class="section">')
+          devices = page.find('<section id="devices" class="section">')
+          if accounts < 0 or devices < 0:
+              raise SystemExit("Rental or PC tab section is missing")
+          accounts_end = page.find("</section>", accounts)
+          devices_end = page.find("</section>", devices)
+          if not (accounts < page.find("<h3>Tambah Data Rental</h3>") < accounts_end):
+              raise SystemExit("Rental creation form is not inside Rental tab")
+          if devices < page.find("<h3>Tambah Data Rental</h3>") < devices_end:
+              raise SystemExit("Rental creation form still belongs to PC tab")
+          for obsolete in ("rentalDevice", "PC wajib dipilih", "Buat & Kirim ke PC", "Rental di PC terpilih", "selectedRentalRows"):
+              if obsolete in page:
+                  raise SystemExit("Obsolete PC-specific rental UI remains: " + obsolete)
+          if "if(id==='accounts')loadGlobalRentalAccounts();" not in page:
+              raise SystemExit("Rental tab list loader still requires PC selection")
+          create_start = page.find("async function createGlobalRental(){")
+          create_end = page.find("async function loadReport(){", create_start)
+          create_fn = page[create_start:create_end]
+          if create_start < 0 or create_end < 0 or "admin_create_rental_global" not in create_fn:
+              raise SystemExit("Global DB create function missing")
+          for blocked in ("selectedDeviceId", "rentalDevice", "uiStatus", "waitDeviceCommand", "admin_command"):
+              if blocked in create_fn:
+                  raise SystemExit("Global rental create still depends on PC: " + blocked)
+          print("PASS: Rental form is in Rental tab, no PC selector remains, and global save does not wait for a PC.")
+          PY
+          grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin.html
+          grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin-control.html
+          grep -q "Login Billing masuk antrean" android/app/src/main/assets/web/admin.html
+          grep -q "Antrekan Restart Billing agar watchdog" android/app/src/main/assets/web/admin-control.html
+          python3 - <<'PY'
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          start = page.find("async function readDualDbRoute(target){")
+          end = page.find("\nfunction rememberDualDbRoute", start)
+          if start < 0 or end < 0:
+              raise SystemExit("Missing route-status reader")
+          route_fn = page[start:end]
+          if "headers:{apikey:cfg.key}" in route_fn:
+              raise SystemExit("Route status still sends apikey and triggers CORS preflight")
+          if "data?.projectRef!==cfg.ref" not in route_fn:
+              raise SystemExit("Route project identity validation missing")
+          PY
+          grep -q "const DB_ROUTE_CACHE_MS=15000;" android/app/src/main/assets/web/admin.html
+          grep -q "DB_ROUTE_STATUS_TIMEOUT:" android/app/src/main/assets/web/admin.html
+          grep -q "selectedDevice=rows.find(x=>x.id===selectedDeviceId)||null;renderGlobalDeviceSelector(rows);" android/app/src/main/assets/web/admin.html
+          ! grep -q "devicesCache=rows;refreshShutdownTargetOptions(rows);renderRecoveryDeviceOptions();" android/app/src/main/assets/web/admin.html
+
+          ! grep -q "shutdownSeconds" android/app/src/main/assets/web/admin.html
+          ! grep -q "pcShutdownTimerCard\\|shutdownTimerNav\\|schedulePcShutdown\\|cancelPcShutdown\\|schedule_shutdown\\|cancel_shutdown_timer" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.40-ADMIN-NO-SHUTDOWN" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.41-DASHBOARD-30D-REPORT" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.42-RENTAL-LEASE-EDIT-FIX" android/app/src/main/assets/web/admin.html
+          grep -q "rentalAdminFriendlyError" android/app/src/main/assets/web/admin.html
+          grep -q "color-scheme:dark" android/app/src/main/assets/web/admin.html
+          grep -q "Reservasi PC sebelumnya tetap dijaga" android/app/src/main/assets/web/admin.html
+          grep -q "async function loadDashboardReport30d()" android/app/src/main/assets/web/admin.html
+          grep -q 'id="dashboardReportRows"' android/app/src/main/assets/web/admin.html
+          grep -Fq "loadDevices(),loadDashboardReport30d()" android/app/src/main/assets/web/admin.html
+          grep -Fq "rpc('report_monthly_rental_summary'" android/app/src/main/assets/web/admin.html
+          grep -q "ID Rental" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.45-BILLING-LOGOUT-LOGIN-TOGGLE" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.46-MONTHLY-YEARLY-PC-REPORT-EXPORT" android/app/src/main/assets/web/admin.html
+          grep -q "report_rental_period_breakdown" android/app/src/main/assets/web/admin.html
+          grep -q "Tabel Gabungan Semua PC" android/app/src/main/assets/web/admin.html
+          grep -q "Tabel Terpisah Per PC" android/app/src/main/assets/web/admin.html
+          grep -q "Ranking PC Tahunan" android/app/src/main/assets/web/admin.html
+          grep -q "prevMonthRange=reportRangeForDays" android/app/src/main/assets/web/admin.html
+          grep -q "selectedBillingToggle" android/app/src/main/assets/web/admin.html
+          grep -q "function toggleBillingUi" android/app/src/main/assets/web/admin.html
+          grep -q "Login Billing" android/app/src/main/assets/web/admin.html
+          grep -q "billingUiState" android/app/src/main/assets/web/admin.html
+          grep -q "waitDeviceCommand(commandId,timeout)" android/app/src/main/assets/web/admin.html
+          echo "PASS: Admin Logout stops session and toggles to Login Billing; Login uses refresh/show or the offline watchdog restart queue."
+          grep -q "Total Bermain" android/app/src/main/assets/web/admin.html
+          grep -q "Total Sesi" android/app/src/main/assets/web/admin.html
+          grep -q "RENTAL_ACTIVE_TIME_REDUCTION_BLOCKED" android/app/src/main/assets/web/admin.html
+          grep -q "RENTAL_ACTIVE_DEVICE_OFFLINE" android/app/src/main/assets/web/admin.html
+          grep -q "time_command_queued" android/app/src/main/assets/web/admin.html
+          grep -q "admin_get_free_test_policy" android/app/src/main/assets/web/admin.html
+          grep -q "admin_set_free_test_policy" android/app/src/main/assets/web/admin.html
+          ! grep -q "/galtys/i" android/app/src/main/assets/web/admin.html
+          grep -q "admin_get_free_test_policy" android/app/src/main/assets/web/admin.html
+          grep -q "admin_set_free_test_policy" android/app/src/main/assets/web/admin.html
+          grep -q "applicationId 'com.anigames.billingadmin.v150'" android/app/build.gradle
+          ! grep -q "com.anigames.billingadmin.v12test" android/app/build.gradle
+          grep -q 'android:label="AniGames Admin V12.1.50"' android/app/src/main/AndroidManifest.xml
+          ! grep -q "AniGames Admin V12 Test" android/app/src/main/AndroidManifest.xml
+          ! grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
+          grep -q "dbSyncCall('start')" android/app/src/main/assets/web/admin.html
+          grep -q "dbSyncCall('apply-page'" android/app/src/main/assets/web/admin.html
+          grep -q "dbSyncCall('verify-table'" android/app/src/main/assets/web/admin.html
+          grep -q "dbSyncCall('mark-ready'" android/app/src/main/assets/web/admin.html
+          grep -q "requestSharedDbRouteSwitch" android/app/src/main/assets/web/admin.html
+          grep -q "refreshGatewayReadiness" android/app/src/main/assets/web/admin.html
+          grep -q "db-route-readiness" android/app/src/main/assets/web/admin.html
+          grep -q "Verifikasi login" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.21-ROUTE-CUTOVER-WITHOUT-FORCED-SYNC" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.22-FULL-12-TABLE-INCREMENTAL-SYNC" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.23-FINAL-ADMIN-PACKAGE" android/app/src/main/assets/web/admin.html
+          grep -q "V12.1.24-CROSS-PROJECT-OWNER-PROOF" android/app/src/main/assets/web/admin.html
+          grep -q "ownerProof=state.proof" android/app/src/main/assets/web/admin.html
+          grep -q "reconcile-active-sessions" android/app/src/main/assets/web/admin.html
+          grep -q "TARGET_OWNER_LOGIN_TEST_REQUIRED" android/app/src/main/assets/web/admin.html
+          grep -q "Perpindahan ini TIDAK menjalankan Sync" android/app/src/main/assets/web/admin.html
+          grep -q "rental_sessions" android/app/src/main/assets/web/admin.html
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          page = Path("android/app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          if len(scripts) != 1:
+              raise SystemExit(f"Expected one inline admin app script after V12.1.17 core patch, found {len(scripts)}")
+          Path("/tmp/admin-inline-check-v12-1-17.js").write_text(scripts[0], encoding="utf-8")
+          PY
+          node --check /tmp/admin-inline-check-v12-1-17.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          web = Path("android/app/src/main/assets/web")
+          for name in ("admin.html", "admin-control.html"):
+              page = (web / name).read_text(encoding="utf-8")
+              scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+              if not scripts:
+                  raise SystemExit("No inline JavaScript found in " + name)
+              Path("/tmp/" + name.replace(".html", "-v12133-check.js")).write_text("\n".join(scripts), encoding="utf-8")
+          PY
+          node --check /tmp/admin-v12133-check.js
+          node --check /tmp/admin-control-v12133-check.js
+          grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin.html
+          grep -q "offlineRestart=command==='restart_billing'" android/app/src/main/assets/web/admin-control.html
+          echo "PASS: only Restart Billing may be queued when offline; normal offline commands remain blocked; both Admin WebView scripts pass syntax validation."
+          echo "PASS: Admin V12.1.27 refreshes active route on auth actions; DB1 login independent of DB2 readiness; DB2 cutover remains strictly guarded; browser JS syntax passes."
+
+      - name: Inspect reconstructed V12.1.50 login flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          root = Path(os.environ["ADMIN_PROJECT_DIR"])
+          web = root / "android/app/src/main/assets/web"
+          gradle = (root / "android/app/build.gradle").read_text(encoding="utf-8")
+          manifest = (root / "android/app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+          print("=== SOURCE IDENTITY ===")
+          for line in gradle.splitlines():
+              if any(k in line for k in ("applicationId", "versionCode", "versionName")):
+                  print(line.strip())
+          for line in manifest.splitlines():
+              if "android:label=" in line:
+                  print(line.strip())
+          print("=== HTML FILE INVENTORY ===")
+          for p in sorted(web.glob("*.html")):
+              print(p.name, p.stat().st_size)
+          for name in ("admin.html", "admin-control.html"):
+              p = web / name
+              if not p.exists():
+                  continue
+              html = p.read_text(encoding="utf-8")
+              print(f"=== {name}: LOGIN ELEMENTS / WIRING ===")
+              lines = html.splitlines()
+              needles = re.compile(r"(masuk|login|btnLogin|loginBtn|signIn|addEventListener\(['\"]click|onclick=)", re.I)
+              selected = []
+              for i, line in enumerate(lines):
+                  if needles.search(line):
+                      selected.append((i + 1, line[:900]))
+              for n, line in selected[:80]:
+                  print(f"L{n}: {line}")
+              print(f"LOGIN RELATED LINE COUNT: {len(selected)}")
+              for sig in ("async function login()", "function login()", "async function boot()", "function loginMsg("):
+                  m = re.search(r"(?ms)^" + re.escape(sig) + r".*?^\}", html)
+                  if m:
+                      print(f"=== FUNCTION {sig} ===")
+                      print(m.group(0)[:12000])
+              scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', html, re.I | re.S)
+              if not scripts:
+                  raise SystemExit(f"No inline script found in {name}")
+              out = Path("/tmp") / (name.replace(".html", "") + "-audit.js")
+              out.write_text("\n".join(scripts), encoding="utf-8")
+              print(f"INLINE_SCRIPT_COUNT {name}: {len(scripts)}")
+          print("=== API/AUTH TOKENS ===")
+          all_html = "\n".join(p.read_text(encoding="utf-8") for p in web.glob("*.html"))
+          for token in ("signInWithPassword", "fetch(", "supabase.auth", "login()", "setAdminAuthEnabled", "startDualDbAdmin", "DB1_URL", "127.0.0.1:8788"):
+              print(token, all_html.count(token))
+          PY
+          for js in /tmp/admin-audit.js /tmp/admin-control-audit.js; do
+            if [ -f "$js" ]; then node --check "$js"; fi
+          done
+          echo "PASS: V12.1.50 source reconstructed and login wiring inventory completed; no runtime source was modified."
