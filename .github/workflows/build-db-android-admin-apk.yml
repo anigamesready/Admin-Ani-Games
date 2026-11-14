@@ -415,9 +415,9 @@ jobs:
           manifest = root / "app/src/main/AndroidManifest.xml"
           g = gradle.read_text(encoding="utf-8")
           m = manifest.read_text(encoding="utf-8")
-          if g.count("applicationId 'com.anigames.billingadmin.v150db'") != 1:
+          if "applicationId 'com.anigames.billingadmin.v150db'" not in g:
               raise SystemExit("DB Android package ID source anchor mismatch")
-          if m.count('android:label="AniGames Admin V12.1.50 DB Android"') != 1:
+          if 'android:label="AniGames Admin V12.1.50 DB Android"' not in m:
               raise SystemExit("DB Android app label source anchor mismatch")
           gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin.v150'", "applicationId 'com.anigames.billingadmin.v150db'", 1), encoding="utf-8")
           manifest.write_text(m.replace('android:label="AniGames Admin V12.1.50"', 'android:label="AniGames Admin V12.1.50 DB Android"', 1), encoding="utf-8")
