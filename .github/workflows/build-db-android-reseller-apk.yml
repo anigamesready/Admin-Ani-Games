@@ -387,6 +387,11 @@ jobs:
               raise SystemExit("Reseller base label anchor missing")
           gradle.write_text(g.replace("applicationId 'com.anigames.reseller'", "applicationId 'com.anigames.reseller.dbandroid'", 1), encoding="utf-8")
           manifest.write_text(m.replace('android:label="Ani-Games Reseller"', 'android:label="Ani-Games Reseller DB Android"', 1), encoding="utf-8")
+          for strings in root.glob("app/src/main/res/values*/strings.xml"):
+              body = strings.read_text(encoding="utf-8")
+              body = re.sub(r'(<string\s+name="app_name"[^>]*>).*?(</string>)',
+                            r'\1Ani-Games Reseller DB Android\2', body, count=1, flags=re.S)
+              strings.write_text(body, encoding="utf-8")
           web = root / "app/src/main/assets/web"
           login = (web / "index.html").read_text(encoding="utf-8")
           dashboard = (web / "admin-control.html").read_text(encoding="utf-8")
@@ -449,17 +454,17 @@ jobs:
           cp "$APK" output/Ani-Games-Reseller-DB-Android-v1.0.6-debug.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
-          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
-          unzip -t output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
-          sha256sum output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
+          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-DB-Android-v1.0.6-debug.apk
+          unzip -t output/Ani-Games-Reseller-DB-Android-v1.0.6-debug.apk
+          sha256sum output/Ani-Games-Reseller-DB-Android-v1.0.6-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-DB-Android-v1.0.6-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Ani-Games-Reseller-DB-Android-v1.0.6
           path: |
-            output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
+            output/Ani-Games-Reseller-DB-Android-v1.0.6-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
