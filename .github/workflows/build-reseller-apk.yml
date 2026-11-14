@@ -8,6 +8,7 @@ on:
       - feature/reseller-global-rental-v1.1
       - release/reseller-v1.0.5-global-rental-delete
       - release/reseller-v1.0.6-remember-login-rental-status
+      - hotfix/reseller-v1.0.7-db1-only-20261114
     paths:
       - 'Ani-Games-Reseller-Android-SOURCE-v11.30.0.zip'
       - 'scripts/patch_reseller_global_db_route.py'
@@ -271,9 +272,8 @@ jobs:
               raise SystemExit(f'Expected one patched reseller UI pair, found {len(files)}')
           for path in [files[0], files[0].parent/'admin-control.html']:
               text = path.read_text(encoding='utf-8')
-              for marker in ('resolveResellerGlobalRoute','DB_ROUTE_NOT_FINALIZED','DB_ROUTE_STAMP_KEY',
-                             'DB_ROUTE_SPLIT_BRAIN','DB_SYNC_IN_PROGRESS','DB2_ROUTE_URL','DB2_ROUTE_KEY',
-                             'DB2_ROUTE_REF','DB_ROUTE_CHANGED_LOGIN_REQUIRED'):
+              for marker in ('resolveResellerGlobalRoute','DB2_HOLD_PRIMARY_ONLY','DB_ROUTE_STAMP_KEY',
+                             'DB1_ROUTE_URL','DB1_ROUTE_KEY','DB_ROUTE_CHANGED_LOGIN_REQUIRED'):
                   if marker not in text:
                       raise SystemExit(f'Route guard marker {marker} missing in {path.name}')
               scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', text, re.I|re.S)
@@ -281,7 +281,7 @@ jobs:
                   raise SystemExit(f'Expected one inline script in {path.name}, got {len(scripts)}')
               out = Path('/tmp') / (path.stem + '-reseller-route.js')
               out.write_text(scripts[0], encoding='utf-8')
-          print('PASS: reseller resolves both DB route controls and forces a re-login after route/epoch change.')
+          print('PASS: reseller is pinned to DB1; no DB2 route fetch or periodic router polling remains.')
           PY
           node --check /tmp/index-reseller-route.js
           node --check /tmp/admin-control-reseller-route.js
@@ -371,13 +371,33 @@ jobs:
               if token not in login: raise SystemExit("Remember-login feature missing: "+token)
           for token in ('id="editStatus"','value="active">ACTIVE','value="disabled">DISABLE','value="expired">EXPIRED',"p_status:status"):
               if token not in page: raise SystemExit("Rental status editor missing: "+token)
-          if "DB_ROUTE_SPLIT_BRAIN" not in login or "DB_ROUTE_SPLIT_BRAIN" not in page:
-              raise SystemExit("Global DB route guard regression detected")
+          if "DB2_HOLD_PRIMARY_ONLY" not in login or "DB2_HOLD_PRIMARY_ONLY" not in page:
+              raise SystemExit("DB1-only hold route regression detected")
           gradle=(root/"app/build.gradle").read_text(encoding="utf-8")
           if not re.search(r"\bversionCode\s+136\b",gradle) or not re.search(r"""versionName\s*=?\s*['"]1\.0\.6['"]""",gradle):
               raise SystemExit("Expected Reseller V1.0.6 / versionCode 136")
           print("PASS: remembered credentials, editable ACTIVE/DISABLE/EXPIRED status, DB route guards and version 1.0.6.")
           PY
+
+      - name: Bump Reseller hotfix to V1.0.7
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, os
+          from pathlib import Path
+          root=Path(os.environ["ANDROID_DIR"])
+          p=root/"app/build.gradle"
+          if not p.is_file(): raise SystemExit("Reseller Gradle file missing")
+          s=p.read_text(encoding="utf-8")
+          s,n1=re.subn(r"\bversionCode\s+136\b","versionCode 137",s,count=1)
+          s,n2=re.subn(r"""(\bversionName\s*=?\s*['"])1\.0\.6(['"])""",r"\g<1>1.0.7\2",s,count=1)
+          if n1!=1 or n2!=1: raise SystemExit("Unexpected Reseller baseline; expected V1.0.6 / code 136")
+          p.write_text(s,encoding="utf-8")
+          print("PASS: Reseller V1.0.7 / versionCode 137")
+          PY
+          grep -q "versionCode 137" "$ANDROID_DIR/app/build.gradle"
+          grep -q "1.0.7" "$ANDROID_DIR/app/build.gradle"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v6
@@ -407,21 +427,21 @@ jobs:
           mkdir -p output
           "$AAPT" dump badging "$APK" > output/apk-badging.txt
           cat output/apk-badging.txt | head -8
-          grep -q "package: name='com.anigames.reseller' versionCode='136' versionName='1.0.6'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
-          cp "$APK" output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
+          grep -q "package: name='com.anigames.reseller' versionCode='137' versionName='1.0.7'" output/apk-badging.txt || { echo "::error::Built package/version is not the final reseller patch"; exit 1; }
+          cp "$APK" output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$APKSIGNER" || { echo "::error::apksigner not found"; exit 1; }
-          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
-          unzip -t output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
-          sha256sum output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk | tee output/SHA256SUMS.txt
-          ls -lh output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
+          "$APKSIGNER" verify --verbose output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
+          unzip -t output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
+          sha256sum output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk | tee output/SHA256SUMS.txt
+          ls -lh output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ani-Games-Reseller-Android-v1.0.6-remember-login-rental-status-debug
+          name: Ani-Games-Reseller-Android-v1.0.7-DB1-only-debug
           path: |
-            output/Ani-Games-Reseller-v1.0.6-remember-login-rental-status-debug.apk
+            output/Ani-Games-Reseller-v1.0.7-DB1-only-debug.apk
             output/SHA256SUMS.txt
             output/apk-badging.txt
           if-no-files-found: error
