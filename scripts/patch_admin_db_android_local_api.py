@@ -169,9 +169,10 @@ html = html.replace("const r=await fetchIoTWithTimeout(SB_FUNCTION_URL+'/iot/pow
   const r=await fetchIoTWithTimeout(SB_FUNCTION_URL+'/iot/power',{method:'POST',headers:{'content-type':'application/json',apikey:SB_KEY,authorization:'Bearer '+relayToken},body:JSON.stringify({deviceId:selectedDeviceId})},15000);""")
 
 # Remove later legacy RPC/boot declarations so they cannot override the local adapter above.
-legacy_start = html.find("function v12DbTargetChanged(){")
+relay_functions_end = html.find("async function sendIoTPower")
+legacy_start = html.find("function v12DbTargetChanged(){", relay_functions_end)
 legacy_end = html.find("function renderOrgs()", legacy_start)
-if legacy_start < 0 or legacy_end < 0:
+if relay_functions_end < 0 or legacy_start < 0 or legacy_end < 0:
     raise SystemExit("ADMIN_LEGACY_RPC_BOOT_SECTION_NOT_FOUND")
 html = html[:legacy_start] + html[legacy_end:]
 
