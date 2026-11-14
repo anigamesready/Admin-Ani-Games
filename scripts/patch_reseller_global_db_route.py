@@ -113,8 +113,8 @@ for name, source in (("index.html", index_html), ("admin-control.html", dashboar
                                 "if(/SESSION|TOKEN|ACCESS_DENIED|INVALID|AUTHENTICATED/.test((e.message||'').toUpperCase()))return logout(true);if(String(e?.message||'').includes('DB_ROUTE_CHANGED_LOGIN_REQUIRED'))return;", 1)
     if "const SB_URL=" in source or "const SB_KEY=" in source or "const sb=supabase.createClient" in source:
         raise SystemExit(f"{name}: immutable DB1-only client declaration remains")
-    if "DB_ROUTE_SPLIT_BRAIN" not in source or "DB_ROUTE_NOT_FINALIZED" not in source or "DB_ROUTE_STAMP_KEY" not in source:
-        raise SystemExit(f"{name}: global route guards missing")
+    if "DB2_HOLD_PRIMARY_ONLY" not in source or "DB_ROUTE_STAMP_KEY" not in source or "ensureCurrentDbRoute" not in source:
+        raise SystemExit(f"{name}: DB1-only hold route markers missing")
     if source.count("await ensureCurrentDbRoute(false)") < 1:
         raise SystemExit(f"{name}: DB RPC calls do not follow global route")
     if name == "index.html":
@@ -141,4 +141,4 @@ for marker in ("DB2_HOLD_PRIMARY_ONLY", "DB1_ROUTE_URL", "DB1_ROUTE_KEY", "DB_RO
 
 index_path.write_text(index_html, encoding="utf-8")
 dashboard_path.write_text(dashboard_html, encoding="utf-8")
-print("PASS: V11.30.2 route readiness, DB target aliases, final login refresh and version bump validated.")
+print("PASS: Reseller DB1-only route hold, no DB2 polling, and route stamp validation.")
