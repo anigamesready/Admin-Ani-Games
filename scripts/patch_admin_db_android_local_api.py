@@ -168,6 +168,13 @@ html = html.replace("const r=await fetchIoTWithTimeout(SB_FUNCTION_URL+'/iot/pow
 """const relayToken=await relayAccessToken();if(!relayToken)throw new Error('RELAY_AUTH_REQUIRED');
   const r=await fetchIoTWithTimeout(SB_FUNCTION_URL+'/iot/power',{method:'POST',headers:{'content-type':'application/json',apikey:SB_KEY,authorization:'Bearer '+relayToken},body:JSON.stringify({deviceId:selectedDeviceId})},15000);""")
 
+# Remove later legacy RPC/boot declarations so they cannot override the local adapter above.
+legacy_start = html.find("function v12DbTargetChanged(){")
+legacy_end = html.find("function renderOrgs()", legacy_start)
+if legacy_start < 0 or legacy_end < 0:
+    raise SystemExit("ADMIN_LEGACY_RPC_BOOT_SECTION_NOT_FOUND")
+html = html[:legacy_start] + html[legacy_end:]
+
 # Remove every active DB1/DB2 sync/cutover function from this isolated branch.
 sync_start = html.find("function updateDbSyncDirection(){")
 sync_end = html.find("function v12SyncMobileActiveTab", sync_start)
