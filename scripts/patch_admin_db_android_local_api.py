@@ -34,7 +34,7 @@ html = html.replace("Supabase Direct • multi-tenant • audit • reporting",
                     "DB Android Lokal • multi-tenant • audit • reporting")
 style = """
 /* DB Android branch: legacy Supabase DB1/DB2 route UI is intentionally unavailable. */
-.db-switch,#databaseTools,.nav [data-tab="databaseTools"],#recovery{display:none!important}
+.db-switch,#databaseTools,.nav [data-tab="databaseTools"],button[onclick*="databaseTools"],#recovery{display:none!important}
 """
 if "</style>" not in html:
     raise SystemExit("ADMIN_STYLE_END_NOT_FOUND")
@@ -50,9 +50,6 @@ const DB1_URL='https://wzkjpycjizexxcxrfdvr.supabase.co';
 const DB1_KEY='sb_publishable_DobdCrOd43-vluON5gV7hg_6Js2Ea5V';
 const DB2_URL='',DB2_KEY='',DB1_ROUTE_KEY='',DB2_ROUTE_KEY='';
 const DB_ROUTE_NOTICE_KEY='ani_games_db_android_notice_v1';
-const GLOBAL_DEVICE_KEY='ani_games_admin_selected_device_v1';
-const $=id=>document.getElementById(id);
-const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 function localApiBase(){
  const raw=String(localStorage.getItem(LOCAL_API_KEY)||'http://127.0.0.1:8787').trim();
  const u=new URL(raw);
@@ -200,6 +197,7 @@ html_path.write_text(html, encoding="utf-8")
 main = main_path.read_text(encoding="utf-8")
 imports = [
     "import android.content.SharedPreferences;",
+    "import android.util.Base64;",
     "import android.security.keystore.KeyGenParameterSpec;",
     "import android.security.keystore.KeyProperties;",
     "import java.security.KeyStore;",
