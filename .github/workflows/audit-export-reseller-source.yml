@@ -367,6 +367,11 @@ jobs:
           print("PASS: remembered credentials, editable ACTIVE/DISABLE/EXPIRED status, DB route guards and version 1.0.6.")
           PY
 
+      - name: Apply DB Android local API and Keystore adapter
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_reseller_db_android_local_api.py source
+
       - name: Upload patched Reseller source for read-only audit
         uses: actions/upload-artifact@v4
         with:
