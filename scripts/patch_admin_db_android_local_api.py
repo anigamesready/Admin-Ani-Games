@@ -7,7 +7,7 @@ import re
 import sys
 
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
-html_path = next(ROOT.rglob("admin.html"), None)
+html_path = next((p for p in ROOT.rglob("admin.html") if p.as_posix().endswith("/android/app/src/main/assets/web/admin.html")), None)
 main_path = next(ROOT.rglob("MainActivity.java"), None)
 manifest_path = next(ROOT.rglob("AndroidManifest.xml"), None)
 if not html_path or not main_path or not manifest_path:
