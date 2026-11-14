@@ -401,6 +401,11 @@ jobs:
           echo "PASS: only Restart Billing may be queued when offline; normal offline commands remain blocked; both Admin WebView scripts pass syntax validation."
           echo "PASS: Admin V12.1.27 refreshes active route on auth actions; DB1 login independent of DB2 readiness; DB2 cutover remains strictly guarded; browser JS syntax passes."
 
+      - name: Apply DB Android local API, Keystore and relay-isolation adapter
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_admin_db_android_local_api.py source-bundle
+
       - name: Upload patched Admin source for read-only audit
         uses: actions/upload-artifact@v4
         with:
