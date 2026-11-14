@@ -17,6 +17,13 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Checkout DB Android backend contract
+        uses: actions/checkout@v4
+        with:
+          repository: anigamesready/PC-Billing
+          ref: backend/db-android-core-v1
+          path: backend-contract
+
       - name: Extract Android source bundle
         run: |
           set -euo pipefail
@@ -387,7 +394,7 @@ jobs:
           import re
           from pathlib import Path
           web = Path("android/app/src/main/assets/web")
-          for name in ("admin.html", "admin-control.html"):
+          for name in ("admin.html", "admin-control.html", "index.html"):
               page = (web / name).read_text(encoding="utf-8")
               scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
               if not scripts:
@@ -448,6 +455,29 @@ jobs:
               out = Path("/tmp") / (name.replace(".html", "") + "-audit.js")
               out.write_text("\n".join(scripts), encoding="utf-8")
               print(f"INLINE_SCRIPT_COUNT {name}: {len(scripts)}")
+          print("=== ANDROID WEBVIEW BRIDGE / NETWORK POLICY ===")
+          main = root / "android/app/src/main/java/com/anigames/billingadmin/MainActivity.java"
+          if main.exists():
+              for i, line in enumerate(main.read_text(encoding="utf-8").splitlines(), 1):
+                  if re.search(r"(loadUrl|setJavaScriptEnabled|setDomStorageEnabled|MIXED_CONTENT|addJavascriptInterface|usesCleartextTraffic|networkSecurityConfig)", line, re.I):
+                      print(f"MainActivity L{i}: {line.strip()[:500]}")
+          for p in (root / "android/app/src/main/res/xml").glob("*.xml"):
+              print("NETWORK XML", p.name, p.read_text(encoding="utf-8")[:3000])
+          print("=== BACKEND API CONTRACT ===")
+          backend_server = Path("backend-contract/db-android-core/server/server.mjs")
+          if not backend_server.exists():
+              raise SystemExit("Backend server source missing from checked out backend branch")
+          server_source = backend_server.read_text(encoding="utf-8")
+          rpc_match = re.search(r"const RPC = \\{(.*?)\\n\\};", server_source, re.S)
+          if not rpc_match:
+              raise SystemExit("Cannot parse backend RPC allowlist")
+          backend_rpc = set(re.findall(r"^\\s*([A-Za-z0-9_]+): \\{ auth:", rpc_match.group(1), re.M))
+          client_rpc = set(re.findall(r"\\brpc\\(\\s*['\\\"]([^'\\\"]+)", all_html))
+          print("BACKEND_RPC_COUNT", len(backend_rpc))
+          print("CLIENT_RPC_COUNT", len(client_rpc))
+          print("CLIENT_RPC_NAMES", sorted(client_rpc))
+          print("CLIENT_RPC_NOT_IN_LOCAL_SERVER", sorted(client_rpc - backend_rpc - {"admin_login","admin_login_lookup","billing_login"}))
+          print("DIRECT_SUPABASE_FUNCTION_CALLS", sorted(set(re.findall(r"\\.functions\\.invoke\\(\\s*['\\\"]([^'\\\"]+)", all_html))))
           print("=== API/AUTH TOKENS ===")
           all_html = "\n".join(p.read_text(encoding="utf-8") for p in web.glob("*.html"))
           for token in ("signInWithPassword", "fetch(", "supabase.auth", "login()", "setAdminAuthEnabled", "startDualDbAdmin", "DB1_URL", "127.0.0.1:8788"):
