@@ -405,6 +405,8 @@ jobs:
               raise SystemExit("Username-only remember login storage missing")
           if "saveResellerLogin(username,d.refresh_token)" not in login:
               raise SystemExit("Refresh token is not the remembered login credential")
+          if "127.0.0.1:8788" not in login or "127.0.0.1:8787" in login:
+              raise SystemExit("Reseller default is not the isolated Redmi staging API on port 8788")
           if "p_password:password" not in login:
               raise SystemExit("Password is not submitted to local login API")
           java = next(root.rglob("MainActivity.java")).read_text(encoding="utf-8")
