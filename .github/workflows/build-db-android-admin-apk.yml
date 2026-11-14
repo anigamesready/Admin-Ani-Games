@@ -442,7 +442,7 @@ jobs:
           if "127.0.0.1:8788" not in control or "AniAdminNative" not in control:
               raise SystemExit("Admin Billing Control local API / Keystore integration missing")
           for page_name, html in (("index.html", entry), ("admin-control.html", control)):
-              scripts = re.findall(r'<script\\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>', html, re.I | re.S)
+              scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', html, re.I | re.S)
               if len(scripts) != 1:
                   raise SystemExit(f"Expected one inline Admin script in {page_name}, found {len(scripts)}")
               Path("/tmp/admin-db-android-" + page_name.replace(".html", "") + ".js").write_text(scripts[0], encoding="utf-8")
