@@ -431,6 +431,8 @@ jobs:
           page = (root / "app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
           if "startLocalAdmin();" not in page or "startDualDbAdmin();" in page:
               raise SystemExit("Local Admin startup adapter not active")
+          if "127.0.0.1:8788" not in page or "127.0.0.1:8787" in page:
+              raise SystemExit("Admin default is not the isolated Redmi staging API on port 8788")
           if "sb.from('devices')" in page or "sb.from('device_commands')" in page:
               raise SystemExit("Direct Supabase table reads remain")
           if "admin_command_status" not in page:
