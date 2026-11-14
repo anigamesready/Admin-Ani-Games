@@ -352,9 +352,9 @@ jobs:
           ! grep -q "/galtys/i" android/app/src/main/assets/web/admin.html
           grep -q "admin_get_free_test_policy" android/app/src/main/assets/web/admin.html
           grep -q "admin_set_free_test_policy" android/app/src/main/assets/web/admin.html
-          grep -q "applicationId 'com.anigames.billingadmin.v150db'" android/app/build.gradle
+          grep -q "applicationId 'com.anigames.billingadmin.v150'" android/app/build.gradle
           ! grep -q "com.anigames.billingadmin.v12test" android/app/build.gradle
-          grep -q 'android:label="AniGames Admin V12.1.50 DB Android"' android/app/src/main/AndroidManifest.xml
+          grep -q 'android:label="AniGames Admin V12.1.50"' android/app/src/main/AndroidManifest.xml
           ! grep -q "AniGames Admin V12 Test" android/app/src/main/AndroidManifest.xml
           ! grep -q "coreDbCall('sync-core')" android/app/src/main/assets/web/admin.html
           grep -q "dbSyncCall('start')" android/app/src/main/assets/web/admin.html
@@ -415,9 +415,9 @@ jobs:
           manifest = root / "app/src/main/AndroidManifest.xml"
           g = gradle.read_text(encoding="utf-8")
           m = manifest.read_text(encoding="utf-8")
-          if g.count("applicationId 'com.anigames.billingadmin.v150'") != 1:
+          if g.count("applicationId 'com.anigames.billingadmin.v150db'") != 1:
               raise SystemExit("DB Android package ID source anchor mismatch")
-          if m.count('android:label="AniGames Admin V12.1.50"') != 1:
+          if m.count('android:label="AniGames Admin V12.1.50 DB Android"') != 1:
               raise SystemExit("DB Android app label source anchor mismatch")
           gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin.v150'", "applicationId 'com.anigames.billingadmin.v150db'", 1), encoding="utf-8")
           manifest.write_text(m.replace('android:label="AniGames Admin V12.1.50"', 'android:label="AniGames Admin V12.1.50 DB Android"', 1), encoding="utf-8")
@@ -520,8 +520,8 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.50-SAFE-TEST.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-ANDROID-WOL-RELAY-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v150test' versionCode='78' versionName='12.1.50'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.50 TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v150dbtest' versionCode='78' versionName='12.1.50'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.50 DB Android TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-ANDROID-WOL-RELAY-SAFE-TEST.apk"
           "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-ANDROID-WOL-RELAY-SAFE-TEST.apk"
           sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-V12.1.50-ANDROID-WOL-RELAY-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
