@@ -443,7 +443,7 @@ jobs:
           if 'android:networkSecurityConfig="@xml/network_security_config"' not in m:
               raise SystemExit("Localhost network security config missing")
           import re
-          scripts = re.findall(r'<script\\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
           if len(scripts) != 1:
               raise SystemExit(f"Expected one inline Admin script, found {len(scripts)}")
           Path("/tmp/admin-db-android-check.js").write_text(scripts[0], encoding="utf-8")
