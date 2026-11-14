@@ -20,7 +20,7 @@ login_pattern = re.compile(
 )
 login_replacement = """<div class="muted">Admin Dashboard • DB Android Lokal</div>
 <div class="msg" style="margin-top:12px">Login memakai database lokal Ani Games Ready. Alamat awal adalah server di perangkat ini.</div>
-<div class="field"><label>Alamat API Lokal</label><input id="localApiInput" type="url" value="http://127.0.0.1:8787" autocomplete="url"></div>
+<div class="field"><label>Alamat API Lokal</label><input id="localApiInput" type="url" value="http://127.0.0.1:8788" autocomplete="url"></div>
 <div class="row"><button type="button" onclick="saveLocalApiUrl()">Simpan Alamat Server</button></div>
 <div class="field"><label>Username / Email Admin</label><input id="email" type="text" autocomplete="username" autocapitalize="none"></div>
 <div class="field"><label>Password Admin</label><input id="password" type="password" autocomplete="current-password"></div>
@@ -51,7 +51,7 @@ const DB1_KEY='sb_publishable_DobdCrOd43-vluON5gV7hg_6Js2Ea5V';
 const DB2_URL='',DB2_KEY='',DB1_ROUTE_KEY='',DB2_ROUTE_KEY='';
 const DB_ROUTE_NOTICE_KEY='ani_games_db_android_notice_v1';
 function localApiBase(){
- const raw=String(localStorage.getItem(LOCAL_API_KEY)||'http://127.0.0.1:8787').trim();
+ const raw=String(localStorage.getItem(LOCAL_API_KEY)||'http://127.0.0.1:8788').trim();
  const u=new URL(raw);
  if(!['http:','https:'].includes(u.protocol))throw new Error('Alamat API harus memakai HTTP/HTTPS.');
  const loopback=['127.0.0.1','localhost','::1'].includes(u.hostname);
