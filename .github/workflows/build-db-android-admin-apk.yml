@@ -415,12 +415,19 @@ jobs:
           manifest = root / "app/src/main/AndroidManifest.xml"
           g = gradle.read_text(encoding="utf-8")
           m = manifest.read_text(encoding="utf-8")
-          if "applicationId 'com.anigames.billingadmin.v150db'" not in g:
-              raise SystemExit("DB Android package ID source anchor mismatch")
-          if 'android:label="AniGames Admin V12.1.50 DB Android"' not in m:
-              raise SystemExit("DB Android app label source anchor mismatch")
-          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin.v150'", "applicationId 'com.anigames.billingadmin.v150db'", 1), encoding="utf-8")
-          manifest.write_text(m.replace('android:label="AniGames Admin V12.1.50"', 'android:label="AniGames Admin V12.1.50 DB Android"', 1), encoding="utf-8")
+          gradle_lines = g.splitlines()
+          app_idx = next((i for i,line in enumerate(gradle_lines) if "applicationId" in line), None)
+          if app_idx is None:
+              raise SystemExit("DB Android applicationId setting not found: " + str(gradle))
+          gradle_lines[app_idx] = "        applicationId 'com.anigames.billingadmin.v150db'"
+          g = "\n".join(gradle_lines) + "\n"
+          import re
+          m, label_count = re.subn(r'android:label="[^"]+"',
+                                   'android:label="AniGames Admin V12.1.50 DB Android"', m, count=1)
+          if label_count != 1:
+              raise SystemExit("DB Android app label could not be isolated: " + str(manifest))
+          gradle.write_text(g, encoding="utf-8")
+          manifest.write_text(m, encoding="utf-8")
           page = (root / "app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
           if "startLocalAdmin();" not in page or "startDualDbAdmin();" in page:
               raise SystemExit("Local Admin startup adapter not active")
