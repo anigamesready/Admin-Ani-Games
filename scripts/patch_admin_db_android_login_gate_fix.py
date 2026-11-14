@@ -72,9 +72,12 @@ if code_count != 1 or name_count != 1:
 
 label_old = 'android:label="AniGames Admin V12.1.50 DB Android"'
 label_new = 'android:label="AniGames Admin V12.1.51 DB Android"'
-if manifest.count(label_old) != 1:
+if manifest.count(label_new) == 1:
+    pass
+elif manifest.count(label_old) == 1:
+    manifest = manifest.replace(label_old, label_new, 1)
+else:
     raise SystemExit("V12.1.51 manifest label anchor mismatch")
-manifest = manifest.replace(label_old, label_new, 1)
 
 if "setAdminAuthEnabled" not in html or html.count(MARKER) != 1:
     raise SystemExit("V12.1.51 helper insertion failed")
