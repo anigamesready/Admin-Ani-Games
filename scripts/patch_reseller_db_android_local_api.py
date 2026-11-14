@@ -18,7 +18,7 @@ const LOCAL_API_KEY='ani_games_ready_db_android_api_url_v1';
 const SESSION_KEY='ani_games_billing_control_session_v1';
 const $=id=>document.getElementById(id);
 function localApiBase(){
- const raw=String(localStorage.getItem(LOCAL_API_KEY)||'http://127.0.0.1:8787').trim(),u=new URL(raw);
+ const raw=String(localStorage.getItem(LOCAL_API_KEY)||'http://127.0.0.1:8788').trim(),u=new URL(raw);
  if(!['http:','https:'].includes(u.protocol))throw new Error('Alamat API harus HTTP/HTTPS.');
  const loopback=['127.0.0.1','localhost','::1'].includes(u.hostname);
  if(!loopback&&u.protocol!=='https:')throw new Error('Server di luar perangkat wajib memakai HTTPS.');
@@ -118,7 +118,7 @@ index = index.replace("Simpan ID &amp; Password di perangkat ini",
                       "Tetap masuk di perangkat ini (token aman)")
 # Add local API URL control before the username field.
 login_anchor = '  <form id="loginForm" autocomplete="on">\n'
-api_field = """  <div class="field"><label for="localApiInput">ALAMAT SERVER API LOKAL</label><input id="localApiInput" type="url" value="http://127.0.0.1:8787" autocomplete="url"></div>
+api_field = """  <div class="field"><label for="localApiInput">ALAMAT SERVER API LOKAL</label><input id="localApiInput" type="url" value="http://127.0.0.1:8788" autocomplete="url"></div>
   <button type="button" class="btn secondary" style="margin-top:8px" onclick="saveLocalApiUrl()">SIMPAN ALAMAT SERVER</button>
 """
 if login_anchor not in index:
