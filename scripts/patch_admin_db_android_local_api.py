@@ -183,7 +183,7 @@ if sync_start < 0 or sync_end < 0:
     raise SystemExit("ADMIN_DB_SYNC_BLOCK_NOT_FOUND")
 html = html[:sync_start] + html[sync_end:]
 
-old_tab = re.compile(r"const v12BaseTab=tab;tab=function\\(id\\)\\{.*?\\};", re.S)
+old_tab = re.compile(r"const v12BaseTab=tab;tab=function\(id\)\{.*?\};", re.S)
 tab_replacement = "const v12BaseTab=tab;tab=function(id){if(id==='databaseTools'){msg('Database & Sync DB1/DB2 tidak tersedia pada cabang DB Android.',true);return;}v12BaseTab(id);closeMobileNav();v12SyncMobileActiveTab(id);if(id==='windowsChat'){loadDevices().then(refreshChatTargets)}};"
 html, n = old_tab.subn(tab_replacement, html, count=1)
 if n != 1:
