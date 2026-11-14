@@ -407,6 +407,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 "$GITHUB_WORKSPACE/scripts/patch_admin_db_android_local_api.py" "$ADMIN_PROJECT_DIR"
+          python3 "$GITHUB_WORKSPACE/scripts/patch_admin_db_android_entry_control.py" "$ADMIN_PROJECT_DIR"
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -428,6 +429,24 @@ jobs:
               raise SystemExit("DB Android app label could not be isolated: " + str(manifest))
           gradle.write_text(g, encoding="utf-8")
           manifest.write_text(m, encoding="utf-8")
+          entry = (root / "app/src/main/assets/web/index.html").read_text(encoding="utf-8")
+          control = (root / "app/src/main/assets/web/admin-control.html").read_text(encoding="utf-8")
+          if "127.0.0.1:8788" not in entry or "127.0.0.1:8787" in entry:
+              raise SystemExit("Admin login entry does not default to the isolated Redmi staging API")
+          if "billing_login" not in entry or "billing_refresh" not in entry:
+              raise SystemExit("Admin Billing Control local login or refresh-token flow missing")
+          if "supabase.createClient" in entry or "sb.schema" in entry:
+              raise SystemExit("Supabase client remains in Admin login entry")
+          if "supabase.createClient" in control or "sb.schema" in control or "sb.from(" in control:
+              raise SystemExit("Supabase dependency remains in Admin Billing Control page")
+          if "127.0.0.1:8788" not in control or "AniAdminNative" not in control:
+              raise SystemExit("Admin Billing Control local API / Keystore integration missing")
+          for page_name, html in (("index.html", entry), ("admin-control.html", control)):
+              scripts = re.findall(r'<script\\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>', html, re.I | re.S)
+              if len(scripts) != 1:
+                  raise SystemExit(f"Expected one inline Admin script in {page_name}, found {len(scripts)}")
+              Path("/tmp/admin-db-android-" + page_name.replace(".html", "") + ".js").write_text(scripts[0], encoding="utf-8")
+          main = (root / "app/src/main/java/com/anigames/billingadmin/MainActivity.java").read_text(encoding="utf-8")
           page = (root / "app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
           if "startLocalAdmin();" not in page or "startDualDbAdmin();" in page:
               raise SystemExit("Local Admin startup adapter not active")
@@ -452,6 +471,8 @@ jobs:
           print("PASS: local Admin API, Keystore token storage, relay-only Supabase, and isolated package")
           PY
           node --check /tmp/admin-db-android-check.js
+          node --check /tmp/admin-db-android-index.js
+          node --check /tmp/admin-db-android-admin-control.js
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
