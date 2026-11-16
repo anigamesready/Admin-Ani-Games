@@ -107,7 +107,7 @@ if CLEAN_MARKER not in admin:
         "const dbLabel=String(DB_TARGET||'primary');\n const seenKey='ani_admin_alert_seen_v1_'+dbLabel+'_'+String(currentOrg.id);":
             "const seenKey='ani_admin_alert_seen_v1_'+String(currentOrg.id);",
         "Sinkronisasi alert rental bermasalah • '+(DB_TARGET==='backup'?'DB2':'DB1')":
-            "Sinkronisasi alert rental DB Android bermasalah",
+            "Sinkronisasi alert rental DB Android bermasalah'",
         "Enrollment pemulihan berhasil dibuat pada database yang sedang dipilih. Pastikan DB2 sudah menerima migrasi SQL pemulihan jika DB2 digunakan.":
             "Enrollment pemulihan berhasil dibuat pada database DB Android."
     }
