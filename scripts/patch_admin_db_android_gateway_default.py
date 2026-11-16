@@ -76,9 +76,14 @@ for name in PAGES:
     if "127.0.0.1:8787" in source:
         raise SystemExit("LEGACY_MAIN_SERVER_PORT_REFERENCED: " + name)
 
-admin = (WEB / "admin.html").read_text(encoding="utf-8")
+admin_path = WEB / "admin.html"
+admin = admin_path.read_text(encoding="utf-8")
 if "startLocalAdmin();" not in admin or "startDualDbAdmin();" in admin:
     raise SystemExit("DB_ANDROID_SINGLE_DATABASE_STARTUP_REGRESSION")
+# Remove the now-unused DB2/route credentials from the legacy adapter scaffold.
+legacy_route_constants = "const DB2_URL='',DB2_KEY='',DB1_ROUTE_KEY='',DB2_ROUTE_KEY='';"
+admin = admin.replace(legacy_route_constants, "")
+admin_path.write_text(admin, encoding="utf-8")
 for required in (
     "admin_rental_accounts_global", "admin_create_rental_global",
     "admin_update_rental_global", "admin_delete_rental_global",
@@ -90,7 +95,7 @@ for required in (
     if required not in admin:
         raise SystemExit("ADMIN_CORE_OR_SEPARATE_WOL_FUNCTION_MISSING: " + required)
 
-for forbidden in ("startDualDbAdmin();", "DB2_ROUTE_KEY", "requestSharedDbRouteSwitch"):
+for forbidden in ("startDualDbAdmin();", "DB2_ROUTE_KEY", "DB2_URL", "DB2_KEY", "requestSharedDbRouteSwitch", "updateDbSyncDirection"):
     if forbidden in admin:
         raise SystemExit("LEGACY_DB1_DB2_ROUTING_RETURNED: " + forbidden)
 
