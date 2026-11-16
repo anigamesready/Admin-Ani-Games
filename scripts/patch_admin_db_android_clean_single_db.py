@@ -67,15 +67,15 @@ if CLEAN_MARKER not in admin:
         raise SystemExit("LEGACY_DATABASE_TAB_GUARD_NOT_UNIQUE")
     admin = admin.replace(legacy_tab, "", 1)
 
-    legacy_stub = (
-        "function requestGlobalDbSwitch(){msg('Perpindahan DB1/DB2 tidak tersedia pada cabang DB Android.',true)}"
-        "function v12DbTargetChanged(){}"
-        "function v12InitDbSwitch(){}"
-        "async function v12SaveDbTarget(){msg('DB Android memakai satu server lokal; menu perpindahan DB dinonaktifkan.',true)}"
+    legacy_stub = re.compile(
+        r"function\\s+requestGlobalDbSwitch\\(\\)\\{msg\\('Perpindahan DB1/DB2 tidak tersedia pada cabang DB Android\\.',true\\)\\}\\s*"
+        r"function\\s+v12DbTargetChanged\\(\\)\\{\\}\\s*"
+        r"function\\s+v12InitDbSwitch\\(\\)\\{\\}\\s*"
+        r"async\\s+function\\s+v12SaveDbTarget\\(\\)\\{msg\\('DB Android memakai satu server lokal; menu perpindahan DB dinonaktifkan\\.',true\\)\\}"
     )
-    if admin.count(legacy_stub) != 1:
-        raise SystemExit("LEGACY_DB_SWITCH_STUB_BLOCK_NOT_UNIQUE")
-    admin = admin.replace(legacy_stub, "", 1)
+    admin, stub_count = legacy_stub.subn("", admin, count=1)
+    if stub_count != 1:
+        raise SystemExit(f"LEGACY_DB_SWITCH_STUB_BLOCK_NOT_UNIQUE: {stub_count}")
 
     if admin.count("function openDbSelector(){requestGlobalDbSwitch()}") != 1:
         raise SystemExit("LEGACY_DB_SELECTOR_STUB_NOT_UNIQUE")
