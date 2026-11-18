@@ -157,11 +157,10 @@ jobs:
           python3 patch_admin_v12_1_48_android_wol_relay_fix.py
           python3 patch_admin_v12_1_49_wol_master_role.py
           python3 patch_admin_v12_1_50_relay_manual_probe.py
-          python3 patch_admin_v12_1_51_stop_pause_policy.py
           python3 -m py_compile patch_admin_cutover_without_sync.py patch_admin_v12_1_22_full_sync.py patch_admin_v12_1_23_final_package.py patch_admin_v12_1_24_owner_proof.py patch_admin_v12_1_25_login_route_boot_fix.py patch_admin_v12_1_26_primary_login_authority.py patch_admin_v12_1_27_login_click_route_refresh.py patch_admin_shutdown_timer.py patch_admin_v12_1_28_free_test_gate.py patch_admin_v12_1_29_free_test_status_fix.py patch_admin_v12_1_30_device_list_init_fix.py patch_admin_v12_1_31_route_auth_fast_cache.py patch_admin_v12_1_32_route_no_preflight.py patch_admin_v12_1_33_offline_restart_queue.py patch_admin_v12_1_34_global_rentals.py patch_admin_v12_1_36_pc_wol_relay.py patch_admin_report_daily_v12_1_37.py patch_admin_v12_1_38_auto_wol_metadata.py patch_admin_v12_1_39_auto_relay_target_only.py patch_admin_v12_1_40_remove_shutdown_timer.py patch_admin_v12_1_41_dashboard_report_30d.py patch_admin_v12_1_42_rental_edit_ui_fix.py patch_admin_v12_1_43_monthly_report_active_edit.py patch_admin_v12_1_44_rental_delete_pc_id_windows_ack.py patch_admin_v12_1_45_billing_logout_login_toggle.py patch_admin_v12_1_46_monthly_yearly_report_pc.py patch_admin_v12_1_46_rank_period_alignment.py patch_admin_v12_1_47_android_wol_relay.py patch_admin_v12_1_48_android_wol_relay_fix.py patch_admin_v12_1_49_wol_master_role.py patch_admin_v12_1_50_relay_manual_probe.py patch_admin_v12_1_51_stop_pause_policy.py
-          grep -q "versionCode 79" android/app/build.gradle
-          grep -q "versionName '12.1.51'" android/app/build.gradle
-          grep -q "ANI-WOL-RELAY V12.1.51" android/app/src/main/assets/web/admin.html
+          grep -q "versionCode 78" android/app/build.gradle
+          grep -q "versionName '12.1.50'" android/app/build.gradle
+          grep -q "ANI-WOL-RELAY V12.1.50" android/app/src/main/assets/web/admin.html
           grep -q "probeWakeRelayNow" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_probe_request" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_probe_status" android/app/src/main/assets/web/admin.html
@@ -413,6 +412,7 @@ jobs:
           set -euo pipefail
           python3 "$GITHUB_WORKSPACE/scripts/patch_admin_db_android_local_api.py" "$ADMIN_PROJECT_DIR"
           python3 "$GITHUB_WORKSPACE/scripts/patch_admin_db_android_entry_control.py" "$ADMIN_PROJECT_DIR"
+          python3 "$ADMIN_PROJECT_DIR/patch_admin_v12_1_51_stop_pause_policy.py"
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -457,6 +457,12 @@ jobs:
               raise SystemExit("Local Admin startup adapter not active")
           if "127.0.0.1:8788" not in page or "127.0.0.1:8787" in page:
               raise SystemExit("Admin default is not the isolated Redmi staging API on port 8788")
+          if "billingStopPausePolicyNav" not in page or "admin_get_billing_stop_pause_policy" not in page or "admin_set_billing_stop_pause_policy" not in page:
+              raise SystemExit("Admin PAUSE/STOP policy menu/RPC wiring missing")
+          if "V12.1.51-BILLING-STOP-PAUSE-POLICY" not in page:
+              raise SystemExit("Admin V12.1.51 policy patch marker missing")
+          if "versionCode 79" not in (root / "app/build.gradle").read_text(encoding="utf-8") or "versionName '12.1.51'" not in (root / "app/build.gradle").read_text(encoding="utf-8"):
+              raise SystemExit("Admin V12.1.51 version metadata missing")
           if "sb.from('devices')" in page or "sb.from('device_commands')" in page:
               raise SystemExit("Direct Supabase table reads remain")
           if "admin_command_status" not in page:
