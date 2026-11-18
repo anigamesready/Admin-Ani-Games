@@ -165,9 +165,6 @@ jobs:
           grep -q "wol_relay_probe_request" android/app/src/main/assets/web/admin.html
           grep -q "wol_relay_probe_status" android/app/src/main/assets/web/admin.html
           grep -q "Akses pairing WoL hanya untuk Master/Owner" android/app/src/main/assets/web/admin.html
-          grep -q "billingStopPausePolicyNav" android/app/src/main/assets/web/admin.html
-          grep -q "admin_get_billing_stop_pause_policy" android/app/src/main/assets/web/admin.html
-          grep -q "admin_set_billing_stop_pause_policy" android/app/src/main/assets/web/admin.html
 
           python3 - <<'PY'
           import re
@@ -457,6 +454,8 @@ jobs:
               raise SystemExit("Local Admin startup adapter not active")
           if "127.0.0.1:8788" not in page or "127.0.0.1:8787" in page:
               raise SystemExit("Admin default is not the isolated Redmi staging API on port 8788")
+          if "billingStopPausePolicyNav" not in page or "admin_get_billing_stop_pause_policy" not in page or "admin_set_billing_stop_pause_policy" not in page:
+              raise SystemExit("Admin PAUSE/STOP policy menu/RPC wiring missing")
           if "billingStopPausePolicyNav" not in page or "admin_get_billing_stop_pause_policy" not in page or "admin_set_billing_stop_pause_policy" not in page:
               raise SystemExit("Admin PAUSE/STOP policy menu/RPC wiring missing")
           if "V12.1.51-BILLING-STOP-PAUSE-POLICY" not in page:
