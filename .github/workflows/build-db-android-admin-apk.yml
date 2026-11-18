@@ -409,7 +409,9 @@ jobs:
           set -euo pipefail
           python3 "$GITHUB_WORKSPACE/scripts/patch_admin_db_android_local_api.py" "$ADMIN_PROJECT_DIR"
           python3 "$GITHUB_WORKSPACE/scripts/patch_admin_db_android_entry_control.py" "$ADMIN_PROJECT_DIR"
-          python3 "$ADMIN_PROJECT_DIR/patch_admin_v12_1_51_stop_pause_policy.py"
+          pushd "$ADMIN_PROJECT_DIR"
+          python3 patch_admin_v12_1_51_stop_pause_policy.py
+          popd
           python3 - <<'PY'
           import os
           from pathlib import Path
