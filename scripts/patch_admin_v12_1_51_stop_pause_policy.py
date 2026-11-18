@@ -38,7 +38,7 @@ role="const freeTestCard=$('freeTestPolicyCard');if(freeTestCard)freeTestCard.cl
 if page.count(role)!=1: raise SystemExit("Owner visibility anchor mismatch")
 page=page.replace(role,role+"const stopPauseNav=$('billingStopPausePolicyNav');if(stopPauseNav)stopPauseNav.classList.toggle('hidden',!owner);const stopPauseCard=$('billingStopPausePolicyCard');if(stopPauseCard)stopPauseCard.classList.toggle('hidden',!owner);",1)
 
-anchor=re.search(r"const LOCAL_API_KEY\\s*=\\s*'ani_games_ready_db_android_api_url_v1';",page)
+anchor=re.search(r"const LOCAL_API_KEY\s*=\s*'ani_games_ready_db_android_api_url_v1';",page)
 if not anchor: raise SystemExit("Admin JS insertion anchor mismatch")
 functions=r"""
 // V12.1.51-BILLING-STOP-PAUSE-POLICY — Owner-only DB-backed policy.
@@ -88,7 +88,7 @@ async function saveBillingStopPausePolicy(){
  finally{save.disabled=!billingStopPausePolicyIsOwner();}
 }
 """
-page=page[:anchor.start()]+"\\n\\n"+functions+"\\n\\n"+page[anchor.start():]
+page=page[:anchor.start()]+"\n\n"+functions+"\n\n"+page[anchor.start():]
 
 if gradle.count("versionCode 78")!=1 or gradle.count("versionName '12.1.50'")!=1: raise SystemExit("Admin Gradle version anchor mismatch")
 gradle=gradle.replace("versionCode 78","versionCode 79",1).replace("versionName '12.1.50'","versionName '12.1.51'",1)
