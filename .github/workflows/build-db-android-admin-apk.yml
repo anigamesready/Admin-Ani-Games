@@ -473,8 +473,8 @@ jobs:
                         "if(id==='remotePlay'&&!isRemotePlayOwner())return;"):
               if token not in page:
                   raise SystemExit("Admin Remote Play integration missing: " + token)
-          if "navigator.clipboard" in page:
-              raise SystemExit("Remote Play one-time code display must not depend on clipboard permission")
+          if "function copyRemotePlayOneTimeCode()" not in page or "document.execCommand('copy')" not in page:
+              raise SystemExit("Remote Play one-time code copy fallback is missing")
           if "versionCode 80" not in (root / "app/build.gradle").read_text(encoding="utf-8") or "versionName '12.1.52'" not in (root / "app/build.gradle").read_text(encoding="utf-8"):
               raise SystemExit("Admin V12.1.51 version metadata missing")
           if "sb.from('devices')" in page or "sb.from('device_commands')" in page:
