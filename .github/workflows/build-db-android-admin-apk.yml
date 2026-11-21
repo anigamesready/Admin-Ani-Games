@@ -1,9 +1,9 @@
-name: Build Ani Games Admin V12.1.52 DB Android APK
+name: Build Ani Games Admin V12.1.53 DB Android APK
 
 on:
   push:
     branches:
-      - feature/admin-v12.1.52-remote-play-controls-20261120
+      - feature/admin-v12.1.53-remote-play-shared-db-20261121
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build Ani Games Admin V12.1.52 DB Android APK
+    name: Build Ani Games Admin V12.1.53 DB Android APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -413,6 +413,8 @@ jobs:
           python3 patch_admin_v12_1_51_stop_pause_policy.py
           popd
           python3 "$GITHUB_WORKSPACE/scripts/patch_admin_v12_1_52_remote_play.py" "$ADMIN_PROJECT_DIR"
+          python3 "$GITHUB_WORKSPACE/scripts/patch_admin_v12_1_53_shared_db_port.py" "$ADMIN_PROJECT_DIR"
+          python3 -m py_compile "$GITHUB_WORKSPACE/scripts/patch_admin_v12_1_53_shared_db_port.py"
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -425,18 +427,18 @@ jobs:
           app_idx = next((i for i,line in enumerate(gradle_lines) if "applicationId" in line), None)
           if app_idx is None:
               raise SystemExit("DB Android applicationId setting not found: " + str(gradle))
-          gradle_lines[app_idx] = "        applicationId 'com.anigames.billingadmin.v152db'"
+          gradle_lines[app_idx] = "        applicationId 'com.anigames.billingadmin.v153db'"
           g = "\n".join(gradle_lines) + "\n"
           import re
           m, label_count = re.subn(r'android:label="[^"]+"',
-                                   'android:label="AniGames Admin V12.1.52 DB Android"', m, count=1)
+                                   'android:label="AniGames Admin V12.1.53 DB Android"', m, count=1)
           if label_count != 1:
               raise SystemExit("DB Android app label could not be isolated: " + str(manifest))
           gradle.write_text(g, encoding="utf-8")
           manifest.write_text(m, encoding="utf-8")
           entry = (root / "app/src/main/assets/web/index.html").read_text(encoding="utf-8")
           control = (root / "app/src/main/assets/web/admin-control.html").read_text(encoding="utf-8")
-          if "127.0.0.1:8788" not in entry or "127.0.0.1:8787" in entry:
+          if "127.0.0.1:8787" not in entry or "127.0.0.1:8788" in entry:
               raise SystemExit("Admin login entry does not default to the isolated Redmi staging API")
           if "billing_login" not in entry or "billing_refresh" not in entry:
               raise SystemExit("Admin Billing Control local login or refresh-token flow missing")
@@ -444,7 +446,7 @@ jobs:
               raise SystemExit("Supabase client remains in Admin login entry")
           if "supabase.createClient" in control or "sb.schema" in control or "sb.from(" in control:
               raise SystemExit("Supabase dependency remains in Admin Billing Control page")
-          if "127.0.0.1:8788" not in control or "AniAdminNative" not in control:
+          if "127.0.0.1:8787" not in control or "127.0.0.1:8788" in control or "AniAdminNative" not in control:
               raise SystemExit("Admin Billing Control local API / Keystore integration missing")
           for page_name, html in (("index.html", entry), ("admin-control.html", control)):
               scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', html, re.I | re.S)
@@ -455,7 +457,7 @@ jobs:
           page = (root / "app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
           if "startLocalAdmin();" not in page or "startDualDbAdmin();" in page:
               raise SystemExit("Local Admin startup adapter not active")
-          if "127.0.0.1:8788" not in page or "127.0.0.1:8787" in page:
+          if "127.0.0.1:8787" not in page or "127.0.0.1:8788" in page:
               raise SystemExit("Admin default is not the isolated Redmi staging API on port 8788")
           if "billingStopPausePolicyNav" not in page or "admin_get_billing_stop_pause_policy" not in page or "admin_set_billing_stop_pause_policy" not in page:
               raise SystemExit("Admin PAUSE/STOP policy menu/RPC wiring missing")
@@ -464,6 +466,7 @@ jobs:
           if "V12.1.51-BILLING-STOP-PAUSE-POLICY" not in page:
               raise SystemExit("Admin V12.1.51 policy patch marker missing")
           for token in ("V12.1.52-REMOTE-PLAY-ADMIN-CONTROLS",
+                        "V12.1.53-REMOTE-PLAY-SHARED-DB-PORT-8787",
                         "remotePlayAdminNav",
                         "admin_remote_play_dashboard",
                         "admin_remote_play_set_host_permission",
@@ -475,7 +478,7 @@ jobs:
                   raise SystemExit("Admin Remote Play integration missing: " + token)
           if "function copyRemotePlayOneTimeCode()" not in page or "document.execCommand('copy')" not in page:
               raise SystemExit("Remote Play one-time code copy fallback is missing")
-          if "versionCode 80" not in (root / "app/build.gradle").read_text(encoding="utf-8") or "versionName '12.1.52'" not in (root / "app/build.gradle").read_text(encoding="utf-8"):
+          if "versionCode 81" not in (root / "app/build.gradle").read_text(encoding="utf-8") or "versionName '12.1.53'" not in (root / "app/build.gradle").read_text(encoding="utf-8"):
               raise SystemExit("Admin V12.1.51 version metadata missing")
           if "sb.from('devices')" in page or "sb.from('device_commands')" in page:
               raise SystemExit("Direct Supabase table reads remain")
@@ -529,15 +532,15 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v152db' versionCode='80' versionName='12.1.52'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.52 DB Android'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52.apk"
-          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v153db' versionCode='80' versionName='12.1.52'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.53 DB Android'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53.apk"
+          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53.apk"
 
       - name: Build side-by-side safe test APK without replacing installed app
         shell: bash
@@ -560,12 +563,12 @@ jobs:
           manifest = root / "app/src/main/AndroidManifest.xml"
           g = gradle.read_text(encoding="utf-8")
           m = manifest.read_text(encoding="utf-8")
-          if g.count("applicationId 'com.anigames.billingadmin.v152db'") != 1:
+          if g.count("applicationId 'com.anigames.billingadmin.v153db'") != 1:
               raise SystemExit("Safe-test package ID anchor mismatch")
-          if m.count('android:label="AniGames Admin V12.1.52 DB Android"') != 1:
+          if m.count('android:label="AniGames Admin V12.1.53 DB Android"') != 1:
               raise SystemExit("Safe-test app label anchor mismatch")
-          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin.v152db'", "applicationId 'com.anigames.billingadmin.v152dbtest'", 1), encoding="utf-8")
-          manifest.write_text(m.replace('android:label="AniGames Admin V12.1.52 DB Android"', 'android:label="AniGames Admin V12.1.52 DB Android TEST"', 1), encoding="utf-8")
+          gradle.write_text(g.replace("applicationId 'com.anigames.billingadmin.v153db'", "applicationId 'com.anigames.billingadmin.v153dbtest'", 1), encoding="utf-8")
+          manifest.write_text(m.replace('android:label="AniGames Admin V12.1.53 DB Android"', 'android:label="AniGames Admin V12.1.53 DB Android TEST"', 1), encoding="utf-8")
           PY
           gradle --no-daemon --stacktrace -p "$ANDROID_PROJECT_DIR" assembleDebug
           TEST_APK="$ANDROID_PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
@@ -573,20 +576,20 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v152dbtest' versionCode='80' versionName='12.1.52'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.52 DB Android TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52-SAFE-TEST.apk"
-          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.52-SAFE-TEST.apk"
+          cp "$TEST_APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v153dbtest' versionCode='80' versionName='12.1.52'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          grep -q "application-label:'AniGames Admin V12.1.53 DB Android TEST'" "$GITHUB_WORKSPACE/output/safe-test-apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53-SAFE-TEST.apk"
+          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53-SAFE-TEST.apk" >> "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.53-SAFE-TEST.apk"
           echo "PASS: side-by-side test package verified; original application package source restored."
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-DB-Android-v12.1.52
+          name: AniGames-Admin-DB-Android-v12.1.53
           path: output/*
           if-no-files-found: error
           retention-days: 30
