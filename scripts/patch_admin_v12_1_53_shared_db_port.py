@@ -4,7 +4,6 @@ import sys
 ROOT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
 WEB = ROOT / "android/app/src/main/assets/web"
 GRADLE = ROOT / "android/app/build.gradle"
-MANIFEST = ROOT / "android/app/src/main/AndroidManifest.xml"
 VERSION = ROOT / "VERSION.txt"
 MARKER = "V12.1.53-REMOTE-PLAY-SHARED-DB-PORT-8787"
 
@@ -32,30 +31,22 @@ for name, expected in pages.items():
         page += "\n<!-- " + MARKER + " -->\n"
     path.write_text(page, encoding="utf-8")
 
-if not GRADLE.is_file() or not MANIFEST.is_file():
-    raise SystemExit("Admin V12.1.53 Gradle or manifest missing")
+if not GRADLE.is_file():
+    raise SystemExit("Admin V12.1.53 Gradle file missing")
 gradle = GRADLE.read_text(encoding="utf-8")
-manifest = MANIFEST.read_text(encoding="utf-8")
 replacements = [
     ("versionCode 80", "versionCode 81"),
     ("versionName '12.1.52'", "versionName '12.1.53'"),
-    ("applicationId 'com.anigames.billingadmin.v152db'", "applicationId 'com.anigames.billingadmin.v153db'"),
+
 ]
 for old, new in replacements:
     if gradle.count(old) == 1:
         gradle = gradle.replace(old, new, 1)
     elif new not in gradle:
         raise SystemExit("Admin Gradle metadata anchor missing: " + old)
-old_label = 'android:label="AniGames Admin V12.1.52 DB Android"'
-new_label = 'android:label="AniGames Admin V12.1.53 DB Android"'
-if manifest.count(old_label) == 1:
-    manifest = manifest.replace(old_label, new_label, 1)
-elif new_label not in manifest:
-    raise SystemExit("Admin manifest label anchor missing")
-if "versionCode 81" not in gradle or "versionName '12.1.53'" not in gradle or "com.anigames.billingadmin.v153db" not in gradle:
-    raise SystemExit("Admin V12.1.53 package metadata verification failed")
+if "versionCode 81" not in gradle or "versionName '12.1.53'" not in gradle:
+    raise SystemExit("Admin V12.1.53 version metadata verification failed")
 GRADLE.write_text(gradle, encoding="utf-8")
-MANIFEST.write_text(manifest, encoding="utf-8")
 VERSION.write_text(
     "AniGames Admin Android V12.1.53 — Remote Play owner controls using the shared DB Android API on localhost port 8787.\n",
     encoding="utf-8",
