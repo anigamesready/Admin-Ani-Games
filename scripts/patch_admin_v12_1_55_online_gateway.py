@@ -35,7 +35,7 @@ for name in PAGES:
         anchor = "function localApiBase(){"
         if source.count(anchor) != 1:
             raise SystemExit("LOCAL_API_BASE_ANCHOR_NOT_UNIQUE: " + name)
-        source = source.replace(anchor, "// " + MARKER + "\\n" + anchor, 1)
+        source = source.replace(anchor, "// " + MARKER + "\n" + anchor, 1)
 
     source = source.replace(
         "Login memakai database lokal Ani Games Ready. Alamat awal adalah server di perangkat ini.",
@@ -84,7 +84,7 @@ if "applicationId 'com.anigames.billingadmin.v155online'" not in gradle:
 GRADLE.write_text(gradle, encoding="utf-8")
 MANIFEST.write_text(manifest, encoding="utf-8")
 VERSION.write_text(
-    "AniGames Admin Online V12.1.55 — V12.1.53/V12.1.54 core preserved; remote DB Android HTTPS gateway default; separate install package for safe testing.\\n",
+    "AniGames Admin Online V12.1.55 — V12.1.53/V12.1.54 core preserved; remote DB Android HTTPS gateway default; separate install package for safe testing.\n",
     encoding="utf-8"
 )
 
