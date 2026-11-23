@@ -76,8 +76,20 @@ const relaySecureStorage={
  async setItem(key,value){if(!window.AniAdminNative?.setSecureValue('relay_'+key,String(value)))throw new Error('ANDROID_KEYSTORE_UNAVAILABLE')},
  async removeItem(key){try{window.AniAdminNative?.removeSecureValue('relay_'+key)}catch(_){}}
 };
-// Supabase is retained only for the independent Blynk/WoL relay sidecar.
-let sb=supabase.createClient(DB1_URL,DB1_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storage:relaySecureStorage,storageKey:'ani_admin_relay_auth_v1'}});
+// Supabase is an optional, independent Blynk/WoL relay sidecar.
+// A CDN/network failure must never stop the local Admin login or dashboard script.
+let sb=null;
+try{
+ const relaySdk=window.supabase;
+ if(relaySdk&&typeof relaySdk.createClient==='function'){
+  sb=relaySdk.createClient(DB1_URL,DB1_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,storage:relaySecureStorage,storageKey:'ani_admin_relay_auth_v1'}});
+ }else{
+  console.warn('Supabase JS CDN unavailable; local Admin remains available, relay features are disabled.');
+ }
+}catch(e){
+ sb=null;
+ console.warn('Optional relay client initialization failed; local Admin remains available:',String(e?.message||e).slice(0,120));
+}
 """
 html = html[:start] + config + html[end:]
 
@@ -102,7 +114,7 @@ async function ensureActiveDbRouteForAuth(){
 }
 async function storeAdminRefreshToken(value){if(value)secureSet('admin_refresh_token',value);else secureRemove('admin_refresh_token')}
 async function refreshLocalAdminSession(refreshToken){const data=await localJson('/auth/v1/token?grant_type=refresh_token',{refresh_token:refreshToken});if(!data.access_token||!data.refresh_token)throw new Error('ADMIN_REFRESH_SESSION_INVALID');await storeAdminRefreshToken(data.refresh_token);return data}
-async function relayAccessToken(){try{const r=await sb.auth.getSession();return r?.data?.session?.access_token||''}catch(_){return ''}}
+async function relayAccessToken(){try{if(!sb?.auth?.getSession)return '';const r=await sb.auth.getSession();return r?.data?.session?.access_token||''}catch(_){return ''}}
 async function login(){
  if(!(await ensureActiveDbRouteForAuth()))return;
  const btn=document.querySelector('#login button.primary');if(btn)btn.disabled=true;
@@ -110,17 +122,19 @@ async function login(){
   session=await localJson('/auth/v1/token?grant_type=password',{email:$('email').value.trim(),password:$('password').value});
   if(!session.access_token)throw new Error('ADMIN_LOGIN_FAILED');
   await storeAdminRefreshToken(session.refresh_token);
-  try{await sb.auth.signInWithPassword({email:session.user?.email||$('email').value.trim(),password:$('password').value})}
-  catch(e){console.warn('Separate relay authentication unavailable:',String(e?.message||e).slice(0,100))}
+  if(sb?.auth?.signInWithPassword){
+   try{await sb.auth.signInWithPassword({email:session.user?.email||$('email').value.trim(),password:$('password').value})}
+   catch(e){console.warn('Separate relay authentication unavailable:',String(e?.message||e).slice(0,100))}
+  }
   await boot();
  }catch(e){session=null;loginMsg(String(e?.message||e||'Login lokal gagal.'))}
  finally{if(btn)btn.disabled=false}
 }
 async function signup(){loginMsg('Pembuatan akun Admin dilakukan melalui halaman Setup lokal server.')}
-async function logout(){try{if(session?.access_token)await localJson('/auth/v1/logout',{},'POST',session.access_token)}catch(_){}try{await sb.auth.signOut()}catch(_){}await storeAdminRefreshToken('');session=null;ctx=null;location.reload()}
+async function logout(){try{if(session?.access_token)await localJson('/auth/v1/logout',{},'POST',session.access_token)}catch(_){}try{await sb?.auth?.signOut?.()}catch(_){}await storeAdminRefreshToken('');session=null;ctx=null;location.reload()}
 async function resetPassword(){loginMsg('Reset password lokal dilakukan oleh Owner melalui pengaturan akun/server. Email reset Supabase tidak digunakan untuk database rental lokal.')}
 async function rpc(name,args={}){
- if(RELAY_RPC_NAMES.has(name)){const r=await sb.schema('api').rpc(name,args);if(r.error)throw r.error;return r.data}
+ if(RELAY_RPC_NAMES.has(name)){if(!sb||typeof sb.schema!=='function')throw new Error('RELAY_AUTH_CLIENT_UNAVAILABLE');const r=await sb.schema('api').rpc(name,args);if(r.error)throw r.error;return r.data}
  const token=session?.access_token||args?.p_session_token||'',payload={...args};delete payload.p_session_token;
  const headers={'content-type':'application/json'};if(token)headers.authorization='Bearer '+token;
  const response=await fetch(localApiBase()+'/rest/v1/rpc/'+encodeURIComponent(name),{method:'POST',headers,cache:'no-store',body:JSON.stringify(payload)});
@@ -138,7 +152,7 @@ async function boot(){
   if(orgs.length){currentOrg=orgs[0];$('orgSelect').value=currentOrg.id;await refresh()}
  }catch(e){$('app').classList.add('hidden');$('login').classList.remove('hidden');loginMsg('Gagal memuat dashboard lokal: '+String(e?.message||e).slice(0,180))}
 }
-async function startLocalAdmin(){setAdminAuthEnabled(true);try{sb.auth.onAuthStateChange(()=>setTimeout(()=>{if(session)refreshIoTStatus()},0))}catch(_){}await boot()}
+async function startLocalAdmin(){setAdminAuthEnabled(true);try{sb?.auth?.onAuthStateChange?.(()=>setTimeout(()=>{if(session)refreshIoTStatus()},0))}catch(_){}await boot()}
 function requestGlobalDbSwitch(){msg('Perpindahan DB1/DB2 tidak tersedia pada cabang DB Android.',true)}
 function v12DbTargetChanged(){}
 function v12InitDbSwitch(){}
@@ -302,4 +316,12 @@ if "sb.from('devices')" in html or "sb.from('device_commands')" in html:
     raise SystemExit("ADMIN_DIRECT_POSTGREST_READ_REMAINS")
 if "startDualDbAdmin();" in html or "resolveDualDbRoute(" in html:
     raise SystemExit("ADMIN_DUAL_DB_BOOT_REFERENCE_REMAINS")
-print("PASS: Admin local API adapter, Android Keystore bridge, relay isolation and DB1/DB2 UI removal")
+if "let sb=null;" not in html or "typeof relaySdk.createClient==='function'" not in html:
+    raise SystemExit("ADMIN_OPTIONAL_RELAY_CLIENT_GUARD_MISSING")
+if "RELAY_AUTH_CLIENT_UNAVAILABLE" not in html:
+    raise SystemExit("ADMIN_RELAY_FAILURE_IS_NOT_ISOLATED")
+if 'onclick="login()"' not in html or 'onclick="saveLocalApiUrl()"' not in html:
+    raise SystemExit("ADMIN_LOGIN_BUTTON_BINDINGS_MISSING")
+if "async function login()" not in html or "function saveLocalApiUrl()" not in html:
+    raise SystemExit("ADMIN_LOGIN_BUTTON_HANDLERS_MISSING")
+print("PASS: Admin local API adapter, Keystore bridge, optional relay isolation, and login/save button bindings")
