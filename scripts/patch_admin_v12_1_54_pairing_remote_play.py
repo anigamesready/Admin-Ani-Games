@@ -49,11 +49,11 @@ for old, new in replacements:
 if "versionCode 82" not in gradle or "versionName '12.1.54'" not in gradle:
     raise SystemExit("Admin V12.1.54 Gradle metadata verification failed")
 
-label_old = 'android:label="AniGames Admin V12.1.53 DB Android"'
+import re
 label_new = 'android:label="AniGames Admin V12.1.54 DB Android"'
-if manifest.count(label_old) != 1:
-    raise SystemExit("Admin manifest label anchor mismatch")
-manifest = manifest.replace(label_old, label_new, 1)
+manifest, label_count = re.subn(r'android:label="[^"]+"', label_new, manifest, count=1)
+if label_count != 1:
+    raise SystemExit("Admin manifest must contain exactly one application label to update")
 
 PAGE.write_text(page, encoding="utf-8")
 GRADLE.write_text(gradle, encoding="utf-8")
