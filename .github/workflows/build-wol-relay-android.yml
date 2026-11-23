@@ -1,0 +1,83 @@
+name: Build Ani WoL Relay Android APK
+on:
+  push:
+    branches:
+      - feature/ani-wol-relay-android-v1
+      - fix/ani-wol-relay-reliability-20261112
+      - fix/ani-wol-master-pairing-guard-20261112
+    paths:
+      - 'relay-android/**'
+      - '.github/workflows/build-wol-relay-android.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Configure Android SDK
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Verify source
+        run: |
+          test -f relay-android/app/src/main/AndroidManifest.xml
+          grep -q 'wol/relay/poll' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt
+          grep -q 'wol/relay/probe-ack' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt
+          grep -q 'acknowledgeProbe' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
+          ! grep -q 'RelayApi.heartbeat' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
+          grep -q 'MagicPacketSender' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayService.kt
+      - name: Smoke-test live relay API with an invalid one-time code
+        run: |
+          ANON_KEY=$(sed -n 's/.*ANON_KEY = "\([^"]*\)".*/\1/p' relay-android/app/src/main/java/com/anigames/aniwolrelay/RelayApi.kt)
+          test -n "$ANON_KEY"
+          HTTP_CODE=$(curl -sS -X POST "https://wzkjpycjizexxcxrfdvr.supabase.co/functions/v1/ani-games-api/wol/relay/register" \
+            -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+            -d '{"code":"000000000000","relayName":"CI smoke test","installationId":"ci-smoke-test-0001","appVersion":"ci","model":"GitHub Actions"}' \
+            -o /tmp/ani-wol-relay-smoke.json -w "%{http_code}")
+          test "$HTTP_CODE" = "401"
+          grep -q '"error":"WOL_RELAY_ENROLLMENT_INVALID"' /tmp/ani-wol-relay-smoke.json
+      - name: Test standard Magic Packet payload
+        run: gradle -p relay-android :app:testDebugUnitTest --no-daemon
+      - name: Build debug APK
+        run: gradle -p relay-android :app:assembleDebug --no-daemon
+      - name: Verify APK
+        run: |
+          APK=relay-android/app/build/outputs/apk/debug/app-debug.apk
+          META=relay-android/app/build/outputs/apk/debug/output-metadata.json
+          test -s "$APK"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          meta = json.loads(Path("relay-android/app/build/outputs/apk/debug/output-metadata.json").read_text())
+          assert meta["applicationId"] == "com.anigames.aniwolrelay.v102", meta
+          assert meta["variantName"] == "debug", meta
+          assert meta["elements"][0]["versionName"] == "1.0.2", meta
+          assert meta["elements"][0]["versionCode"] == 3, meta
+          print("APK metadata verified:", meta["applicationId"], meta["elements"][0]["versionName"])
+          PY
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          unzip -t "$APK" >/dev/null
+      - name: Upload relay APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ani-WoL-Relay-Android-v1.0.2
+          path: relay-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
