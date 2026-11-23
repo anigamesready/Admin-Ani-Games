@@ -223,19 +223,20 @@ control_path.write_text(control, encoding="utf-8")
 # so this patch replaces it on every app launch, not only the HTML input's default value.
 GATEWAY_BASE_URL = "https://ani-games-db-android-stage-gateway.anigamesready.workers.dev"
 gateway_override = r"""
-const ANI_DB_ANDROID_GATEWAY_URL='https://ani-games-db-android-stage-gateway.anigamesready.workers.dev';
 function localApiBase(){
+  const gatewayUrl='https://ani-games-db-android-stage-gateway.anigamesready.workers.dev';
   try{
     const stored=String(localStorage.getItem(LOCAL_API_KEY)||'').trim();
-    if(stored!==ANI_DB_ANDROID_GATEWAY_URL)localStorage.setItem(LOCAL_API_KEY,ANI_DB_ANDROID_GATEWAY_URL);
-    return ANI_DB_ANDROID_GATEWAY_URL;
+    if(stored!==gatewayUrl)localStorage.setItem(LOCAL_API_KEY,gatewayUrl);
+    return gatewayUrl;
   }catch(e){throw new Error('CLOUDFLARE_API_URL_STORAGE_UNAVAILABLE')}
 }
 function saveLocalApiUrl(){
+  const gatewayUrl='https://ani-games-db-android-stage-gateway.anigamesready.workers.dev';
   try{
-    localStorage.setItem(LOCAL_API_KEY,ANI_DB_ANDROID_GATEWAY_URL);
+    localStorage.setItem(LOCAL_API_KEY,gatewayUrl);
     const field=document.getElementById('localApiInput');
-    if(field)field.value=ANI_DB_ANDROID_GATEWAY_URL;
+    if(field)field.value=gatewayUrl;
     if(typeof loginMsg==='function'){
       loginMsg('Memeriksa koneksi Cloudflare Worker...');
       return ensureActiveDbRouteForAuth();
@@ -251,9 +252,10 @@ function saveLocalApiUrl(){
   }
 }
 try{
-  localStorage.setItem(LOCAL_API_KEY,ANI_DB_ANDROID_GATEWAY_URL);
+  const gatewayUrl='https://ani-games-db-android-stage-gateway.anigamesready.workers.dev';
+  localStorage.setItem(LOCAL_API_KEY,gatewayUrl);
   const field=document.getElementById('localApiInput');
-  if(field)field.value=ANI_DB_ANDROID_GATEWAY_URL;
+  if(field)field.value=gatewayUrl;
 }catch(_){}
  // Legacy migration assertion: 127.0.0.1:8788 is upgraded to the Worker URL.
 """
