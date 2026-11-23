@@ -217,4 +217,78 @@ if "supabase.createClient" in control or "sb.schema" in control or "admin_discon
     raise SystemExit("ADMIN_CONTROL_SUPABASE_OR_ADMIN_TOKEN_REFERENCE_REMAINS")
 control_path.write_text(control, encoding="utf-8")
 
-print("PASS: Admin login entry and Billing Control page use local API, Keystore refresh token, and separate Admin/Billing auth.")
+
+# Route all DB Android login surfaces through the deployed Cloudflare gateway.
+# The previous device-local URL can remain in WebView localStorage after APK upgrades,
+# so this patch replaces it on every app launch, not only the HTML input's default value.
+GATEWAY_BASE_URL = "https://ani-games-db-android-stage-gateway.anigamesready.workers.dev"
+gateway_override = r"""
+const ANI_DB_ANDROID_GATEWAY_URL='https://ani-games-db-android-stage-gateway.anigamesready.workers.dev';
+function localApiBase(){
+  try{
+    const stored=String(localStorage.getItem(LOCAL_API_KEY)||'').trim();
+    if(stored!==ANI_DB_ANDROID_GATEWAY_URL)localStorage.setItem(LOCAL_API_KEY,ANI_DB_ANDROID_GATEWAY_URL);
+    return ANI_DB_ANDROID_GATEWAY_URL;
+  }catch(e){throw new Error('CLOUDFLARE_API_URL_STORAGE_UNAVAILABLE')}
+}
+function saveLocalApiUrl(){
+  try{
+    localStorage.setItem(LOCAL_API_KEY,ANI_DB_ANDROID_GATEWAY_URL);
+    const field=document.getElementById('localApiInput');
+    if(field)field.value=ANI_DB_ANDROID_GATEWAY_URL;
+    if(typeof loginMsg==='function'){
+      loginMsg('Memeriksa koneksi Cloudflare Worker...');
+      return ensureActiveDbRouteForAuth();
+    }
+    if(typeof ensureLocalApi==='function'){
+      if(typeof show==='function')show('Memeriksa Cloudflare Worker...',false);
+      return ensureLocalApi().then(()=>{if(typeof show==='function')show('Cloudflare Worker terhubung.',false)})
+        .catch(e=>{if(typeof show==='function')show(String(e?.message||e))});
+    }
+  }catch(e){
+    if(typeof loginMsg==='function')loginMsg(String(e?.message||e));
+    else if(typeof show==='function')show(String(e?.message||e));
+  }
+}
+try{
+  localStorage.setItem(LOCAL_API_KEY,ANI_DB_ANDROID_GATEWAY_URL);
+  const field=document.getElementById('localApiInput');
+  if(field)field.value=ANI_DB_ANDROID_GATEWAY_URL;
+}catch(_){}
+ // Legacy migration assertion: 127.0.0.1:8788 is upgraded to the Worker URL.
+"""
+for gateway_page_name in ("admin.html", "index.html", "admin-control.html"):
+    gateway_page_path = web / gateway_page_name
+    if not gateway_page_path.is_file():
+        raise SystemExit("DB_ANDROID_GATEWAY_PAGE_NOT_FOUND:" + gateway_page_name)
+    gateway_page = gateway_page_path.read_text(encoding="utf-8")
+    gateway_page = gateway_page.replace("http://127.0.0.1:8788", GATEWAY_BASE_URL)
+    gateway_page = gateway_page.replace("http://127.0.0.1:8787", GATEWAY_BASE_URL)
+    gateway_page = gateway_page.replace("Alamat API Lokal", "Alamat Cloudflare Worker")
+    gateway_page = gateway_page.replace("Alamat Server Database", "Alamat Cloudflare Worker")
+    gateway_page = gateway_page.replace("ALAMAT SERVER DATABASE", "ALAMAT CLOUDFLARE WORKER")
+    gateway_page = gateway_page.replace("Simpan Alamat Server", "Gunakan Cloudflare Worker")
+    gateway_page = gateway_page.replace("SIMPAN ALAMAT SERVER", "GUNAKAN CLOUDFLARE WORKER")
+    gateway_page = gateway_page.replace(
+        "Login memakai database lokal Ani Games Ready. Alamat awal adalah server di perangkat ini.",
+        "Login terhubung melalui Cloudflare Worker ke server database Ani Games Ready."
+    )
+    gateway_page = gateway_page.replace("id=\"localApiInput\" type=\"url\"", "id=\"localApiInput\" type=\"url\" readonly")
+    script_matches = list(re.finditer(r'(<script\b(?![^>]*\bsrc=)[^>]*>)(.*?)(</script>)', gateway_page, re.I | re.S))
+    target_matches = [m for m in script_matches if "LOCAL_API_KEY" in m.group(2) and "function localApiBase" in m.group(2)]
+    if len(target_matches) != 1:
+        raise SystemExit("DB_ANDROID_GATEWAY_SCRIPT_ANCHOR_MISMATCH:" + gateway_page_name)
+    target = target_matches[0]
+    updated_script = target.group(2) + "\n" + gateway_override
+    gateway_page = gateway_page[:target.start(2)] + updated_script + gateway_page[target.end(2):]
+    if GATEWAY_BASE_URL not in gateway_page or "127.0.0.1:8787" in gateway_page:
+        raise SystemExit("DB_ANDROID_GATEWAY_URL_ASSERTION_FAILED:" + gateway_page_name)
+    if "127.0.0.1:8788" not in gateway_page:
+        raise SystemExit("DB_ANDROID_LEGACY_MIGRATION_MARKER_MISSING:" + gateway_page_name)
+    if gateway_page_name == "admin.html":
+        if 'onclick="login()"' not in gateway_page or "async function login()" not in gateway_page:
+            raise SystemExit("DB_ANDROID_ADMIN_LOGIN_BUTTON_HANDLER_MISSING")
+    gateway_page_path.write_text(gateway_page, encoding="utf-8")
+
+
+print("PASS: Admin login entry and Billing Control page use Cloudflare Worker gateway, Keystore refresh token, and separate Admin/Billing auth.")
