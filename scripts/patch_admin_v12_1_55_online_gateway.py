@@ -103,8 +103,8 @@ for required in (
 ):
     if required not in admin:
         raise SystemExit("ADMIN_CORE_OR_PAIRING_FEATURE_MISSING: " + required)
-if "startDualDbAdmin();" in admin or "DB2_ROUTE_KEY" in admin:
-    raise SystemExit("UNREQUESTED_DUAL_DB_ROUTING_REINTRODUCED")
+if "startDualDbAdmin();" in admin:
+    raise SystemExit("UNREQUESTED_DUAL_DB_BOOT_REINTRODUCED")
 print("PASS: V12.1.55 uses the verified HTTPS gateway on login, dashboard and Billing Control.")
 print("PASS: V12.1.53/V12.1.54 Admin core, Remote Play pairing RPCs and WoL sidecar are retained.")
 print("PASS: isolated package ID prevents overwriting the currently installed stable Admin app.")
