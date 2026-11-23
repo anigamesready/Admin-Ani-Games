@@ -573,14 +573,14 @@ jobs:
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-Online-V12.1.55.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.54.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-Online-V12.1.55.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "package: name='com.anigames.billingadmin.v155online' versionCode='83' versionName='12.1.55'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin Online V12.1.55'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.54.apk"
-          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.54.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.54.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.54.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.54.apk"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-Online-V12.1.55.apk"
+          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-Online-V12.1.55.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-Online-V12.1.55.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-Online-V12.1.55.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-Online-V12.1.55.apk"
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
