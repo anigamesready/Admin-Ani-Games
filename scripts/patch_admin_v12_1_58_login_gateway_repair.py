@@ -216,8 +216,15 @@ login_fn = r"""async function login(){
 }"""
 login_start = admin.find("async function login(){")
 login_end = admin.find("async function signup(){", login_start)
-if login_start < 0 or login_end <= login_start or admin.count("async function login(){") != 1:
-    raise SystemExit("ADMIN_LOGIN_FUNCTION_BOUNDARY_MISMATCH")
+login_count = admin.count("async function login(){")
+signup_count = admin.count("async function signup(){")
+if login_start < 0 or login_end <= login_start or login_count != 1 or signup_count != 1:
+    raise SystemExit(
+        "ADMIN_LOGIN_FUNCTION_BOUNDARY_MISMATCH:"
+        + str({"login_count":login_count,"signup_count":signup_count,
+               "login_start":login_start,"signup_end":login_end,
+               "near_login":admin[max(0,login_start-80):login_start+160] if login_start>=0 else ""})
+    )
 admin = admin[:login_start] + login_fn + "\n" + admin[login_end:]
 
 boot_fn = r"""async function boot(){
