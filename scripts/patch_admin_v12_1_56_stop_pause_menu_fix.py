@@ -191,7 +191,7 @@ page += "\n<!-- " + MARKER + " -->\n"
 for token in (
     MARKER,
     "function billingStopPausePolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}",
-    "const stopPauseOwner=billingStopPausePolicyIsOwner();",
+    "const owner=billingStopPausePolicyIsOwner();",
     "if(!billingStopPausePolicyIsOwner())return msg('Akses PAUSE / STOP BILLING hanya untuk Master/Owner.',true);",
     "admin_get_billing_stop_pause_policy",
     "admin_set_billing_stop_pause_policy",
