@@ -630,7 +630,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/output"
           cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-MULTI-SITE-WOL-SAFE-TEST.apk"
           "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-MULTI-SITE-WOL-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v156dbtest' versionCode='84' versionName='12.1.57'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v157dbtest' versionCode='84' versionName='12.1.57'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           grep -q "application-label:'AniGames Admin DB Android V12.1.57 MULTI-SITE WoL SAFE TEST'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
           "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-MULTI-SITE-WOL-SAFE-TEST.apk"
           "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-MULTI-SITE-WOL-SAFE-TEST.apk"
