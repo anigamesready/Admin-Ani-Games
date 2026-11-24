@@ -17,7 +17,9 @@ VERSION = ROOT / "VERSION.txt"
 
 MARKER = "V12.1.56-STOP-PAUSE-OWNER-ROLE-VISIBILITY"
 BASE_MARKER = "V12.1.54-PAIRING-REMOTE-PLAY-LABEL"
-PACKAGE_ID = "com.anigames.billingadmin.v153db"
+BASE_PACKAGE_ID = "com.anigames.billingadmin.v153db"
+TEST_PACKAGE_ID = "com.anigames.billingadmin.v156dbtest"
+PACKAGE_ID = TEST_PACKAGE_ID
 
 for p in (PAGE, GRADLE, MANIFEST):
     if not p.is_file():
@@ -171,13 +173,15 @@ if "admin_get_billing_stop_pause_policy" in page and "admin_set_billing_stop_pau
 # Version up without changing applicationId or the saved local API port.
 if gradle.count("versionCode 82") != 1 or gradle.count("versionName '12.1.54'") != 1:
     raise SystemExit("ADMIN_GRADLE_V12_1_54_VERSION_ANCHOR_MISMATCH")
-if gradle.count(f"applicationId '{PACKAGE_ID}'") != 1:
-    raise SystemExit("ADMIN_DB_ANDROID_PACKAGE_ID_MISMATCH")
+if gradle.count(f"applicationId '{BASE_PACKAGE_ID}'") != 1:
+    raise SystemExit("ADMIN_DB_ANDROID_BASE_PACKAGE_ID_MISMATCH")
+# Keep V12.1.53 installed. This APK is side-by-side SAFE TEST because CI debug signing differs.
+gradle = gradle.replace(f"applicationId '{BASE_PACKAGE_ID}'", f"applicationId '{TEST_PACKAGE_ID}'", 1)
 gradle = gradle.replace("versionCode 82", "versionCode 83", 1)
 gradle = gradle.replace("versionName '12.1.54'", "versionName '12.1.56'", 1)
 
 label_old = 'android:label="AniGames Admin V12.1.54 DB Android"'
-label_new = 'android:label="AniGames Admin V12.1.56 DB Android"'
+label_new = 'android:label="AniGames Admin DB Android V12.1.56 SAFE TEST"'
 if manifest.count(label_old) != 1:
     raise SystemExit("ADMIN_MANIFEST_V12_1_54_LABEL_MISMATCH")
 manifest = manifest.replace(label_old, label_new, 1)
@@ -215,9 +219,10 @@ PAGE.write_text(page, encoding="utf-8")
 GRADLE.write_text(gradle, encoding="utf-8")
 MANIFEST.write_text(manifest, encoding="utf-8")
 VERSION.write_text(
-    "AniGames Admin DB Android V12.1.56 — fixes Master/Owner alias visibility for the DB-backed PC Billing PAUSE / STOP permission; retains the V12.1.53 package ID and localhost API port 8787.\n",
+    "AniGames Admin DB Android V12.1.56 SAFE TEST — isolated package com.anigames.billingadmin.v156dbtest; V12.1.53 stable app and data remain installed; local API port 8787.\n",
     encoding="utf-8",
 )
 print("PASS: Master/Owner aliases show PAUSE / STOP menu through the canonical role resolver.")
 print("PASS: menu open, policy read, and save are Owner-gated; failed saves re-read the last DB-confirmed value.")
-print("PASS: existing DB Android package ID, port 8787, Remote Play, Blynk/WoL sidecar and Admin core remain unchanged.")
+print("PASS: V12.1.53 stable package remains installed; SAFE TEST uses a separate package ID and local API port 8787.")
+print("PASS: Remote Play, Blynk/WoL sidecar and Admin core remain unchanged.")
