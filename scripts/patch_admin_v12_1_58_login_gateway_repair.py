@@ -363,8 +363,10 @@ for name in PAGES:
     source=(WEB/name).read_text(encoding="utf-8")
     if GATEWAY not in source or GATEWAY_MARKER not in source:
         raise SystemExit("GATEWAY_MARKER_OR_URL_MISSING:" + name)
-    if LEGACY_RELAY_HOST in source:
+    if ("https://" + LEGACY_RELAY_HOST) in source:
         raise SystemExit("LEGACY_DIRECT_RELAY_URL_REMAINS:" + name)
+    if source.count(LEGACY_RELAY_HOST) != 1:
+        raise SystemExit("LEGACY_RELAY_MIGRATION_GUARD_COUNT_INVALID_FINAL:" + name)
     for old in OLD_LOOPBACKS:
         if old in source:
             raise SystemExit("LOOPBACK_DEFAULT_REMAINS_FINAL:" + name)
