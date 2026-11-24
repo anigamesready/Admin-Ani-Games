@@ -58,10 +58,11 @@ test('DB Android localhost endpoint and install identity are preserved', () => {
   assert.doesNotMatch(page, /http:\/\/127\.0\.0\.1:8788/);
   assert.match(index, /http:\/\/127\.0\.0\.1:8787/);
   assert.match(control, /http:\/\/127\.0\.0\.1:8787/);
-  assert.match(gradle, /applicationId 'com\.anigames\.billingadmin\.v153db'/);
+  assert.match(gradle, /applicationId 'com\.anigames\.billingadmin\.v156dbtest'/);
+  assert.doesNotMatch(gradle, /applicationId 'com\.anigames\.billingadmin\.v153db'/);
   assert.match(gradle, /versionCode 83/);
   assert.match(gradle, /versionName '12\.1\.56'/);
-  assert.match(manifest, /android:label="AniGames Admin V12\.1\.56 DB Android"/);
+  assert.match(manifest, /android:label="AniGames Admin DB Android V12\.1\.56 SAFE TEST"/);
 });
 
 test('Remote Play, reports, rental, Billing Control and WoL functions remain present', () => {
