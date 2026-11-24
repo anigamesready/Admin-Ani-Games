@@ -18,7 +18,8 @@ test('All DB Android pages use the public stage-gateway and migrate old relay/lo
     assert.ok(source.includes(gateway), name + ' is missing the canonical gateway URL');
     assert.ok(source.includes('ANI-ADMIN-V12.1.58-CANONICAL-STAGE-GATEWAY'), name + ' is missing gateway marker');
     assert.doesNotMatch(source, /http:\/\/127\.0\.0\.1:878[78]/, name + ' still has a loopback URL');
-    assert.ok(!source.includes(legacyRelay), name + ' still targets the internal ws-relay hostname');
+    assert.ok(!source.includes('https://' + legacyRelay), name + ' still targets the internal ws-relay URL');
+    assert.ok(source.includes(legacyRelay), name + ' lost the one-time legacy URL migration guard');
     assert.match(source, /function localApiBase\(\)/);
     assert.match(source, /localStorage\.setItem\(LOCAL_API_KEY,ONLINE_GATEWAY_URL\)/);
   }
