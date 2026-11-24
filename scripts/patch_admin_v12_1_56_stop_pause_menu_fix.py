@@ -86,28 +86,26 @@ if page.count(old_owner_fn) != 1:
     raise SystemExit("STOP_PAUSE_OWNER_GUARD_ANCHOR_MISMATCH")
 page = page.replace(old_owner_fn, new_owner_fn, 1)
 
-# The old visibility block inherited the narrower local 'owner' boolean. Use
-# the same canonical Owner resolver for both the menu and the settings card.
-old_visibility = (
-    "const freeTestCard=$('freeTestPolicyCard');if(freeTestCard)freeTestCard.classList.toggle('hidden',!owner);"
-    "const stopPauseNav=$('billingStopPausePolicyNav');"
-    "if(stopPauseNav)stopPauseNav.classList.toggle('hidden',!owner);"
-    "const stopPauseCard=$('billingStopPausePolicyCard');"
-    "if(stopPauseCard)stopPauseCard.classList.toggle('hidden',!owner);"
-)
-new_visibility = (
-    "const policyOwner=billingStopPausePolicyIsOwner();"
-    "const freeTestNav=$('freeTestPolicyNav');if(freeTestNav)freeTestNav.classList.toggle('hidden',!policyOwner);"
-    "const freeTestCard=$('freeTestPolicyCard');if(freeTestCard)freeTestCard.classList.toggle('hidden',!policyOwner);"
-    "const stopPauseOwner=billingStopPausePolicyIsOwner();"
-    "const stopPauseNav=$('billingStopPausePolicyNav');"
-    "if(stopPauseNav)stopPauseNav.classList.toggle('hidden',!stopPauseOwner);"
-    "const stopPauseCard=$('billingStopPausePolicyCard');"
-    "if(stopPauseCard)stopPauseCard.classList.toggle('hidden',!stopPauseOwner);"
-)
-if page.count(old_visibility) != 1:
-    raise SystemExit("STOP_PAUSE_MENU_VISIBILITY_ANCHOR_MISMATCH")
-page = page.replace(old_visibility, new_visibility, 1)
+# Replace the complete Owner-only menu visibility function. The old body declared
+# freeTestNav once from a narrow role check; patching only part of it caused a
+# duplicate const declaration. Rebuild this one function with a single resolver.
+apply_ui_start = page.find("function applyPairingRoleUI(){")
+apply_ui_end = page.find("function selectOrg(){", apply_ui_start)
+if apply_ui_start < 0 or apply_ui_end <= apply_ui_start:
+    raise SystemExit("ADMIN_OWNER_MENU_VISIBILITY_FUNCTION_BOUNDARY_MISMATCH")
+new_apply_ui = """function applyPairingRoleUI(){
+ const owner=billingStopPausePolicyIsOwner();
+ const freeTestNav=$('freeTestPolicyNav');if(freeTestNav)freeTestNav.classList.toggle('hidden',!owner);
+ const freeTestCard=$('freeTestPolicyCard');if(freeTestCard)freeTestCard.classList.toggle('hidden',!owner);
+ const stopPauseNav=$('billingStopPausePolicyNav');if(stopPauseNav)stopPauseNav.classList.toggle('hidden',!owner);
+ const stopPauseCard=$('billingStopPausePolicyCard');if(stopPauseCard)stopPauseCard.classList.toggle('hidden',!owner);
+ const nav=$('pairingNav'),sec=$('pairing');
+ if(nav)nav.classList.toggle('hidden',!owner);
+ if(sec)sec.classList.toggle('hidden',!owner);
+ if(owner)$('enrollOrg').innerHTML=orgs.map(o=>'<option value="'+o.id+'">'+esc(o.name)+' • '+o.kind+'</option>').join('');
+}
+"""
+page = page[:apply_ui_start] + new_apply_ui + page[apply_ui_end:]
 
 # Guard the custom menu entry point and read RPC as well as the save action.
 open_anchor = "function openBillingStopPausePolicyMenu(){\n"
