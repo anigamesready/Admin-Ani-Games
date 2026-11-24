@@ -19,15 +19,15 @@ test('All login/admin/control endpoints default to the HTTPS Redmi gateway', () 
     assert.doesNotMatch(source, /http:\/\/127\.0\.0\.1:878[78]/, name + ' still has loopback default');
     assert.doesNotMatch(source, /DB Android Lokal|Alamat API Lokal/, name + ' still displays local mode');
   }
-  assert.match(pages.login, /Alamat Gateway DB Android/);
-  assert.match(pages.control, /Alamat Gateway DB Android/);
+  assert.match(pages.login, /ALAMAT GATEWAY DB ANDROID/i);
+  assert.match(pages.control, /function localApiBase\(\)/);
   assert.match(page, /DB Android Online/);
 });
 
 test('Gateway routing preserves the V12.1.53 DB Android RPC adapter', () => {
   assert.match(page, /function localApiBase\(\)/);
   assert.match(page, /async function localJson\(/);
-  assert.match(page, /localJson\(localApiBase\(\)/);
+  assert.match(page, /fetch\(localApiBase\(\)\+path/);
   assert.match(page, /localApiBase\(\)\+'\/rest\/v1\/rpc\//);
   assert.match(page, /startLocalAdmin\(\);/);
   assert.doesNotMatch(page, /startDualDbAdmin\(\);/);
