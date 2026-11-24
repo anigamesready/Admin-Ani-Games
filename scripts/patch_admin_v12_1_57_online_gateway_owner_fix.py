@@ -121,7 +121,7 @@ page = page.replace(
     "if(id==='pairing'&&!isWakeRelayOwner())return;"
 )
 
-open_pattern = re.compile(r"(?m)^function openBillingStopPausePolicyMenu\(\)\s*\{")
+open_pattern = re.compile(r"function openBillingStopPausePolicyMenu\s*\(\s*\)\s*\{")
 page, open_count = open_pattern.subn(
     "function openBillingStopPausePolicyMenu(){\n if(!billingStopPausePolicyIsOwner())return msg('Akses PAUSE / STOP BILLING hanya untuk Master/Owner.',true);",
     page, count=1
