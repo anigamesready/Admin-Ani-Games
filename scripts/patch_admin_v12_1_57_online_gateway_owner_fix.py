@@ -83,10 +83,13 @@ def replace_function(source: str, name: str, replacement: str) -> str:
     return source
 
 page = (WEB / "admin.html").read_text(encoding="utf-8")
-page = replace_function(
-    page, "billingStopPausePolicyIsOwner",
-    "function billingStopPausePolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}"
+inline_stop_pause_owner = re.compile(r"(?m)^function billingStopPausePolicyIsOwner\(\)\{[^\r\n]*\}$")
+page, stop_owner_count = inline_stop_pause_owner.subn(
+    "function billingStopPausePolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}",
+    page, count=1
 )
+if stop_owner_count != 1:
+    raise SystemExit("STOP_PAUSE_OWNER_INLINE_FUNCTION_ANCHOR_MISMATCH")
 page = replace_function(
     page, "freeTestPolicyIsOwner",
     "function freeTestPolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}"
