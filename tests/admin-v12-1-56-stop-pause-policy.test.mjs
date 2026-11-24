@@ -53,7 +53,7 @@ test('Policy RPCs use the local DB Android API, not the Blynk/WoL Supabase sidec
   assert.match(page, /admin_set_billing_stop_pause_policy/);
 });
 
-test('DB Android localhost endpoint and install identity are preserved', () => {
+test('DB Android localhost endpoint and side-by-side SAFE TEST package are preserved', () => {
   assert.match(page, /http:\/\/127\.0\.0\.1:8787/);
   assert.doesNotMatch(page, /http:\/\/127\.0\.0\.1:8788/);
   assert.match(index, /http:\/\/127\.0\.0\.1:8787/);
