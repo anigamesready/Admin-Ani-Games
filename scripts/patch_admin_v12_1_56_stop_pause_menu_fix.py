@@ -170,7 +170,7 @@ if "admin_get_billing_stop_pause_policy" in page and "admin_set_billing_stop_pau
         if name in allow:
             raise SystemExit("POLICY_RPC_MUST_USE_LOCAL_DB_ANDROID_API:" + name)
 
-# Version up without changing applicationId or the saved local API port.
+# Bump the package version and use a side-by-side test applicationId; leave the saved local API port unchanged.
 if gradle.count("versionCode 82") != 1 or gradle.count("versionName '12.1.54'") != 1:
     raise SystemExit("ADMIN_GRADLE_V12_1_54_VERSION_ANCHOR_MISMATCH")
 if gradle.count(f"applicationId '{BASE_PACKAGE_ID}'") != 1:
