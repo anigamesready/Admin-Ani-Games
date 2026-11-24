@@ -174,10 +174,11 @@ refresh_fn = r"""async function refreshLocalAdminSession(refreshToken){
  if(!(await storeAdminRefreshToken(data.refresh_token)))throw new Error('ADMIN_REFRESH_STORAGE_FAILED');
  return data;
 }"""
-refresh_pattern = re.compile(r"(?ms)^async function refreshLocalAdminSession\(refreshToken\)\s*\{.*?^\}")
-admin, n = refresh_pattern.subn(lambda _: refresh_fn, admin, count=1)
-if n != 1:
-    raise SystemExit("ADMIN_REFRESH_SESSION_FUNCTION_ANCHOR_MISMATCH")
+refresh_start = admin.find("async function refreshLocalAdminSession(refreshToken){")
+refresh_end = admin.find("async function relayAccessToken(){", refresh_start)
+if refresh_start < 0 or refresh_end <= refresh_start or admin.count("async function refreshLocalAdminSession(refreshToken){") != 1:
+    raise SystemExit("ADMIN_REFRESH_SESSION_FUNCTION_BOUNDARY_MISMATCH")
+admin = admin[:refresh_start] + refresh_fn + "\\n" + admin[refresh_end:]
 
 login_fn = r"""async function login(){
  const btn=$('login')?.querySelector('button.primary');
