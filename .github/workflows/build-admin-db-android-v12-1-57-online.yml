@@ -5,6 +5,9 @@ on:
     branches:
       - fix/admin-v12.1.57-v1253-online-gateway-20261124
   workflow_dispatch:
+  pull_request:
+    branches:
+      - feature/admin-v12.1.53-remote-play-shared-db-20261121
 
 permissions:
   contents: read
