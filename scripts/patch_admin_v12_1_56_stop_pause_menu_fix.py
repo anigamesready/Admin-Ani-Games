@@ -121,6 +121,12 @@ if page.count(old_catch) != 1:
     raise SystemExit("STOP_PAUSE_SAVE_FAILURE_ANCHOR_MISMATCH")
 page = page.replace(old_catch, new_catch, 1)
 
+old_finally = " finally{save.disabled=!billingStopPausePolicyIsOwner();}"
+new_finally = " finally{const state=$('billingStopPausePolicyState');save.disabled=!billingStopPausePolicyIsOwner()||state?.textContent==='GAGAL MEMUAT';}"
+if page.count(old_finally) != 1:
+    raise SystemExit("STOP_PAUSE_SAVE_FINAL_STATE_ANCHOR_MISMATCH")
+page = page.replace(old_finally, new_finally, 1)
+
 # Verify the local RPC adapter stays on DB Android (not the Supabase/Blynk
 # sidecar) and that both policy RPCs are routed through the Admin token.
 if "const RELAY_RPC_NAMES=new Set(['wol_relay_status'" not in page:
