@@ -526,7 +526,7 @@ jobs:
               raise SystemExit("Admin V12.1.56 manifest label missing")
           if "V12.1.56-STOP-PAUSE-OWNER-ROLE-VISIBILITY" not in page:
               raise SystemExit("V12.1.56 source marker missing")
-          scripts = re.findall(r'<script\\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
           if len(scripts) != 1:
               raise SystemExit(f"Expected exactly one inline Admin script after V12.1.56 patch, found {len(scripts)}")
           Path("/tmp/admin-db-android-v1256-check.js").write_text(scripts[0], encoding="utf-8")
