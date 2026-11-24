@@ -574,12 +574,16 @@ jobs:
           import os, re
           from pathlib import Path
           root = Path(os.environ["ANDROID_PROJECT_DIR"])
-          page = (root / "app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
-          for token in ("databaseTools", "db-switch", "DB1", "DB2", "DB_TARGET", "DB_ROUTE_EPOCH",
-                        "DB_ROUTE_SWITCH_ID", "dualDbRouteReady", "dualDbRouteLocked",
-                        "requestGlobalDbSwitch", "openDbSelector", "ensureActiveDbRouteForAuth"):
-              if token in page:
-                  raise SystemExit("Legacy dual-DB UI/code remains: " + token)
+          web = root / "app/src/main/assets/web"
+          page = (web / "admin.html").read_text(encoding="utf-8")
+          obsolete = ("databaseTools", "db-switch", "DB1", "DB2", "DB_TARGET", "DB_ROUTE_EPOCH",
+                      "DB_ROUTE_SWITCH_ID", "dualDbRouteReady", "dualDbRouteLocked",
+                      "requestGlobalDbSwitch", "openDbSelector", "ensureActiveDbRouteForAuth")
+          for candidate in web.rglob("*.html"):
+              html = candidate.read_text(encoding="utf-8")
+              for token in obsolete:
+                  if token in html:
+                      raise SystemExit("Legacy dual-DB UI/code remains in " + str(candidate) + ": " + token)
           for token in ("checkAndroidDbReady", "localJson('/auth/v1/token?grant_type=password'",
                         "async function rpc(name,args={})", "http://127.0.0.1:8787",
                         "admin_remote_play_dashboard", "admin_get_billing_stop_pause_policy",
@@ -599,7 +603,7 @@ jobs:
               raise SystemExit("Admin V12.1.57 isolated SAFE TEST package missing")
           if 'android:label="AniGames Admin DB Android V12.1.57 SAFE TEST"' not in manifest:
               raise SystemExit("Admin V12.1.57 app label missing")
-          print("PASS: Admin DB1/DB2 menu and route concepts removed; Android DB login and core features retained.")
+          print("PASS: all Admin HTML assets are free of legacy DB1/DB2 menu and routing remnants.")
           print("PASS: Remote Play, rental, reports, FREE TEST, PAUSE/STOP and WOL UI still present.")
           print("NOTE: WOL/Blynk remains the explicitly separate relay sidecar until local API migration is implemented.")
           PY
