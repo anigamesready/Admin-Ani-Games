@@ -178,7 +178,7 @@ refresh_start = admin.find("async function refreshLocalAdminSession(refreshToken
 refresh_end = admin.find("async function relayAccessToken(){", refresh_start)
 if refresh_start < 0 or refresh_end <= refresh_start or admin.count("async function refreshLocalAdminSession(refreshToken){") != 1:
     raise SystemExit("ADMIN_REFRESH_SESSION_FUNCTION_BOUNDARY_MISMATCH")
-admin = admin[:refresh_start] + refresh_fn + "\\n" + admin[refresh_end:]
+admin = admin[:refresh_start] + refresh_fn + "\n" + admin[refresh_end:]
 
 login_fn = r"""async function login(){
  const btn=$('login')?.querySelector('button.primary');
