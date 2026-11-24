@@ -15,6 +15,7 @@ PAGE = WEB / "admin.html"
 GRADLE = ROOT / "android/app/build.gradle"
 MANIFEST = ROOT / "android/app/src/main/AndroidManifest.xml"
 VERSION = ROOT / "VERSION.txt"
+ICON_PAGE = WEB / "icon/admin.html"
 MARKER = "V12.1.57-SINGLE-ANDROID-DB-ADMIN"
 
 for path in (PAGE, GRADLE, MANIFEST):
@@ -231,6 +232,15 @@ if manifest.count(old_label) != 1:
     raise SystemExit("ADMIN_MANIFEST_V12_1_56_LABEL_ANCHOR_MISMATCH")
 manifest = manifest.replace(old_label, new_label, 1)
 
+# The APK contained a stale duplicate Admin HTML under icon/ from an older UI.
+# It still carried DB1/DB2 password-reset/routing code. Preserve all image assets,
+# but turn this obsolete HTML into a redirect to the cleaned canonical Admin page.
+if ICON_PAGE.exists():
+    ICON_PAGE.write_text(
+        "<!doctype html><html lang=\"id\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Ani Games Ready Admin</title><script>location.replace('../admin.html');</script><noscript><a href=\"../admin.html\">Buka Admin Ani Games Ready</a></noscript></html>\n",
+        encoding="utf-8",
+    )
+
 page += "\n<!-- " + MARKER + " -->\n"
 PAGE.write_text(page, encoding="utf-8")
 GRADLE.write_text(gradle, encoding="utf-8")
@@ -239,7 +249,7 @@ VERSION.write_text(
     "AniGames Admin DB Android V12.1.57 SAFE TEST — single local Android DB; isolated package com.anigames.billingadmin.v157dbtest; legacy dual-DB UI/handlers removed; Blynk/WoL relay remains a separate sidecar.\n",
     encoding="utf-8",
 )
-print("PASS: DB1/DB2 switch strip, nav entry and sync/preflight section removed from Admin APK.")
+print("PASS: legacy DB1/DB2 UI, route handlers, sync panel and stale duplicate HTML removed.")
 print("PASS: legacy DB1/DB2 routing constants, variables, no-op handlers and login naming removed.")
 print("PASS: login, dashboard and core RPC continue through the local Android DB API on port 8787.")
 print("PASS: Remote Play, rental, reporting, Free Test, PAUSE/STOP and WoL relay controls retained.")
