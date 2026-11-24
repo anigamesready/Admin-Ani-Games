@@ -91,10 +91,15 @@ page = replace_function(
     page, "freeTestPolicyIsOwner",
     "function freeTestPolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}"
 )
-page = replace_function(
-    page, "isRemotePlayOwner",
-    "function isRemotePlayOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}"
+inline_remote_owner = re.compile(r"(?m)^function isRemotePlayOwner\(\)\{[^\r\n]*\}$")
+page, remote_count = inline_remote_owner.subn(
+    "function isRemotePlayOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}",
+    page, count=1
 )
+if remote_count != 1:
+    raise SystemExit("REMOTE_PLAY_OWNER_INLINE_FUNCTION_ANCHOR_MISMATCH")
+if "function openBillingStopPausePolicyMenu()" not in page or "async function loadBillingStopPausePolicy()" not in page:
+    raise SystemExit("STOP_PAUSE_POLICY_FUNCTIONS_MISSING_AFTER_ROLE_NORMALIZATION")
 
 # The V12.1.53 UI contains the Owner-only pairing, Free Test and Stop/Pause entries.
 apply_start = page.find("function applyPairingRoleUI(){")
