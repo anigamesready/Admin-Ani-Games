@@ -29,7 +29,7 @@ test('All DB Android pages use the public stage-gateway and migrate old relay/lo
 
 test('V12.1.53 startup helper is now defined before it is called', () => {
   assert.equal((page.match(/function setAdminAuthEnabled\(enabled\)/g) || []).length, 1);
-  assert.equal((page.match(/setAdminAuthEnabled\(/g) || []).length, 5);
+  assert.equal((page.match(/setAdminAuthEnabled\(/g) || []).length, 6);
   assert.ok(page.indexOf('function setAdminAuthEnabled(enabled)') < page.indexOf('async function ensureActiveDbRouteForAuth()'));
   assert.ok(page.indexOf('function setAdminAuthEnabled(enabled)') < page.indexOf('async function startLocalAdmin()'));
   assert.match(page, /function setAdminAuthEnabled\(enabled\)\{[\s\S]*?loginSubmitting==='true'/);
