@@ -11,7 +11,7 @@ const control = readFileSync('android/app/src/main/assets/web/admin-control.html
 const policyOwnerFn = page.match(/function billingStopPausePolicyIsOwner\(\)\{[^}]*\}/)?.[0] || '';
 const freeTestOwnerFn = page.match(/function freeTestPolicyIsOwner\(\)\{[^}]*\}/)?.[0] || '';
 const remotePlayOwnerFn = page.match(/function isRemotePlayOwner\(\)\{[^}]*\}/)?.[0] || '';
-const visibilityBlock = page.match(/const policyOwner=billingStopPausePolicyIsOwner\(\);[\s\S]{0,520}?stopPauseCard\.classList\.toggle\('hidden',!stopPauseOwner\);/)?.[0] || '';
+const visibilityBlock = page.match(/function applyPairingRoleUI\(\)\{[\s\S]*?\n\}/)?.[0] || '';
 const openFn = page.match(/function openBillingStopPausePolicyMenu\(\)\{[\s\S]*?\n\}/)?.[0] || '';
 const tabFn = page.match(/function tab\(id\)\{[^\n]*\}/)?.[0] || '';
 const loadFn = page.match(/async function loadBillingStopPausePolicy\(\)\{[\s\S]*?\n\}/)?.[0] || '';
@@ -27,9 +27,11 @@ test('Stop/Pause menu is present exactly once and uses canonical Master/Owner ro
   assert.match(freeTestOwnerFn, /isWakeRelayOwner\(\)===true/);
   assert.match(remotePlayOwnerFn, /isWakeRelayOwner\(\)===true/);
   assert.match(page, /function isWakeRelayOwner\(\)[\s\S]*?master_owner[\s\S]*?master_admin/);
-  assert.match(visibilityBlock, /const policyOwner=billingStopPausePolicyIsOwner\(\)/);
-  assert.match(visibilityBlock, /!policyOwner/);
-  assert.match(visibilityBlock, /!stopPauseOwner/);
+  assert.match(visibilityBlock, /const owner=billingStopPausePolicyIsOwner\(\)/);
+  assert.match(visibilityBlock, /freeTestNav\.classList\.toggle\('hidden',!owner\)/);
+  assert.match(visibilityBlock, /stopPauseNav\.classList\.toggle\('hidden',!owner\)/);
+  assert.match(visibilityBlock, /pairingNav/);
+  assert.equal((visibilityBlock.match(/const freeTestNav=/g) || []).length, 1);
   assert.match(tabFn, /id==='pairing'&&!isWakeRelayOwner\(\)/);
   assert.doesNotMatch(tabFn, /ctx\?\.role!=='owner'/);
 });
