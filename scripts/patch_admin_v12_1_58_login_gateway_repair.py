@@ -214,10 +214,11 @@ login_fn = r"""async function login(){
   setAdminAuthEnabled(true);
  }
 }"""
-login_pattern = re.compile(r"(?ms)^async function login\(\)\s*\{.*?^\}")
-admin, n = login_pattern.subn(lambda _: login_fn, admin, count=1)
-if n != 1:
-    raise SystemExit("ADMIN_LOGIN_FUNCTION_ANCHOR_MISMATCH")
+login_start = admin.find("async function login(){")
+login_end = admin.find("async function signup(){", login_start)
+if login_start < 0 or login_end <= login_start or admin.count("async function login(){") != 1:
+    raise SystemExit("ADMIN_LOGIN_FUNCTION_BOUNDARY_MISMATCH")
+admin = admin[:login_start] + login_fn + "\\n" + admin[login_end:]
 
 boot_fn = r"""async function boot(){
  let stage='memulihkan sesi Admin';
