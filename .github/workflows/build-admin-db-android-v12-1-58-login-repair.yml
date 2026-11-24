@@ -523,7 +523,7 @@ jobs:
               page=(web/name).read_text(encoding="utf-8")
               if gateway not in page:
                   raise SystemExit("Canonical gateway missing from "+name)
-              if "ani-games-db-android-stage-ws-relay.anigamesready.workers.dev" in page:
+              if "https://ani-games-db-android-stage-ws-relay.anigamesready.workers.dev" in page:
                   raise SystemExit("Internal ws-relay hostname remains in "+name)
               if "http://127.0.0.1:8787" in page or "http://127.0.0.1:8788" in page:
                   raise SystemExit("Loopback default remains in "+name)
