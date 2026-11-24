@@ -54,6 +54,30 @@ for token in (
     if token not in page:
         raise SystemExit("REQUIRED_POLICY_OR_OWNER_RESOLVER_MISSING:" + token)
 
+# Normalize the other Owner-only feature controls to the same canonical resolver.
+# This fixes aliases consistently across Free Test, Pairing PC, Remote Play and Stop/Pause.
+free_test_owner = "function freeTestPolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}"
+page, free_test_count = re.subn(
+    r"(?ms)^function freeTestPolicyIsOwner\(\)\s*\{.*?^\}",
+    lambda _: free_test_owner,
+    page,
+    count=1,
+)
+if free_test_count != 1:
+    raise SystemExit("FREE_TEST_OWNER_ROLE_ANCHOR_MISMATCH")
+
+remote_owner_old = "function isRemotePlayOwner(){return String(ctx?.role||'').trim().toLowerCase()==='owner';}"
+remote_owner_new = "function isRemotePlayOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}"
+if page.count(remote_owner_old) != 1:
+    raise SystemExit("REMOTE_PLAY_OWNER_ROLE_ANCHOR_MISMATCH")
+page = page.replace(remote_owner_old, remote_owner_new, 1)
+
+pairing_tab_old = "function tab(id){if(id==='pairing'&&ctx?.role!=='owner')return;if(id==='remotePlay'&&!isRemotePlayOwner())return;"
+pairing_tab_new = "function tab(id){if(id==='pairing'&&!isWakeRelayOwner())return;if(id==='remotePlay'&&!isRemotePlayOwner())return;"
+if page.count(pairing_tab_old) != 1:
+    raise SystemExit("PAIRING_TAB_OWNER_ROLE_ANCHOR_MISMATCH")
+page = page.replace(pairing_tab_old, pairing_tab_new, 1)
+
 # V12.1.49 owns the canonical role aliases. Reuse it instead of maintaining a
 # narrower copy that only recognizes 'owner'/'super_admin'.
 old_owner_fn = "function billingStopPausePolicyIsOwner(){const role=String(ctx?.role||'').trim().toLowerCase();return role==='owner'||role==='super_admin';}"
@@ -65,12 +89,16 @@ page = page.replace(old_owner_fn, new_owner_fn, 1)
 # The old visibility block inherited the narrower local 'owner' boolean. Use
 # the same canonical Owner resolver for both the menu and the settings card.
 old_visibility = (
+    "const freeTestCard=$('freeTestPolicyCard');if(freeTestCard)freeTestCard.classList.toggle('hidden',!owner);"
     "const stopPauseNav=$('billingStopPausePolicyNav');"
     "if(stopPauseNav)stopPauseNav.classList.toggle('hidden',!owner);"
     "const stopPauseCard=$('billingStopPausePolicyCard');"
     "if(stopPauseCard)stopPauseCard.classList.toggle('hidden',!owner);"
 )
 new_visibility = (
+    "const policyOwner=billingStopPausePolicyIsOwner();"
+    "const freeTestNav=$('freeTestPolicyNav');if(freeTestNav)freeTestNav.classList.toggle('hidden',!policyOwner);"
+    "const freeTestCard=$('freeTestPolicyCard');if(freeTestCard)freeTestCard.classList.toggle('hidden',!policyOwner);"
     "const stopPauseOwner=billingStopPausePolicyIsOwner();"
     "const stopPauseNav=$('billingStopPausePolicyNav');"
     "if(stopPauseNav)stopPauseNav.classList.toggle('hidden',!stopPauseOwner);"
