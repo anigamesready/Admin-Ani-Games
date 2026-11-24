@@ -328,7 +328,7 @@ admin = admin.replace(
 # Confirm auth contracts and ensure the Supabase relay request is not awaited.
 if "function setAdminAuthEnabled(enabled)" not in admin:
     raise SystemExit("MISSING_SET_ADMIN_AUTH_ENABLED_DEFINITION")
-if admin.count("setAdminAuthEnabled(") != 5:
+if admin.count("setAdminAuthEnabled(") != 6:
     raise SystemExit("ADMIN_AUTH_ENABLE_CALL_COUNT_UNEXPECTED")
 if "await sb.auth.signInWithPassword" in admin:
     raise SystemExit("RELAY_SUPABASE_LOGIN_STILL_BLOCKS_ADMIN_LOGIN")
