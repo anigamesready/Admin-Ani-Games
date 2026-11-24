@@ -97,8 +97,10 @@ for name in PAGES:
     for old in OLD_LOOPBACKS:
         if old in source:
             raise SystemExit("LOOPBACK_DEFAULT_REMAINS:" + name + ":" + old)
-    if ("https://" + LEGACY_RELAY_HOST) in source:
-        raise SystemExit("LEGACY_DIRECT_RELAY_URL_REMAINS:" + name)
+    legacy_url = "https://" + LEGACY_RELAY_HOST
+    if legacy_url in source:
+        pos = source.find(legacy_url)
+        raise SystemExit("LEGACY_DIRECT_RELAY_URL_REMAINS:" + name + ":" + repr(source[max(0,pos-120):pos+len(legacy_url)+120]))
     if source.count(LEGACY_RELAY_HOST) != 1:
         raise SystemExit("LEGACY_RELAY_MIGRATION_GUARD_COUNT_INVALID:" + name)
     path.write_text(source, encoding="utf-8")
