@@ -562,7 +562,7 @@ jobs:
               raise SystemExit("V12.1.57 SAFE TEST manifest label missing")
           if "V12.1.57-MULTI-SITE-WOL-ROUTING" not in page:
               raise SystemExit("V12.1.57 source marker missing")
-          scripts = re.findall(r'<script\\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
           if len(scripts) != 1:
               raise SystemExit(f"Expected one inline app script, found {len(scripts)}")
           Path("/tmp/admin-db-android-v1257-check.js").write_text(scripts[0], encoding="utf-8")
