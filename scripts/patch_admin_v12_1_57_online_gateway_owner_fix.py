@@ -61,6 +61,7 @@ for name in PAGES:
     )
     source = source.replace("Admin Dashboard • DB Android Lokal", "Admin Dashboard • DB Android Online")
     source = source.replace("Billing Control • DB Android Lokal", "Billing Control • DB Android Online")
+    source = source.replace("DB Android Lokal", "DB Android Online")
     source = source.replace("Alamat API Lokal", "Alamat Gateway DB Android")
     source = source.replace("Server lokal terhubung.", "Gateway DB Android terhubung.")
 
