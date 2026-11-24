@@ -1,9 +1,9 @@
-name: Build Ani Games Admin DB Android V12.1.56 SAFE TEST APK
+name: Build Ani Games Admin DB Android V12.1.57 Single DB SAFE TEST APK
 
 on:
   push:
     branches:
-      - fix/admin-v12.1.56-stop-pause-policy-visibility-20261124
+      - admin-v12.1.57-single-android-db-cleanup
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build Ani Games Admin V12.1.56 DB Android SAFE TEST APK
+    name: Build Ani Games Admin V12.1.57 Single Android DB SAFE TEST APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -564,6 +564,47 @@ jobs:
           print("PASS: DB Android local build retains package ID and localhost API port 8787.")
           PY
 
+      - name: Remove legacy dual DB UI and verify single Android DB
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/scripts/patch_admin_v12_1_57_single_android_db_cleanup.py" "$ADMIN_PROJECT_DIR"
+          python3 -m py_compile "$GITHUB_WORKSPACE/scripts/patch_admin_v12_1_57_single_android_db_cleanup.py"
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          root = Path(os.environ["ANDROID_PROJECT_DIR"])
+          page = (root / "app/src/main/assets/web/admin.html").read_text(encoding="utf-8")
+          for token in ("databaseTools", "db-switch", "DB1", "DB2", "DB_TARGET", "DB_ROUTE_EPOCH",
+                        "DB_ROUTE_SWITCH_ID", "dualDbRouteReady", "dualDbRouteLocked",
+                        "requestGlobalDbSwitch", "openDbSelector", "ensureActiveDbRouteForAuth"):
+              if token in page:
+                  raise SystemExit("Legacy dual-DB UI/code remains: " + token)
+          for token in ("checkAndroidDbReady", "localJson('/auth/v1/token?grant_type=password'",
+                        "async function rpc(name,args={})", "http://127.0.0.1:8787",
+                        "admin_remote_play_dashboard", "admin_get_billing_stop_pause_policy",
+                        "report_detailed_usage_page", "admin_rental_accounts_global",
+                        "wakeRelayCard", "wol_relay_enqueue", "startLocalAdmin();"):
+              if token not in page:
+                  raise SystemExit("Required Android DB/admin feature missing: " + token)
+          scripts = re.findall(r'<script\\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          if len(scripts) != 1:
+              raise SystemExit("Expected one final Admin inline script, found " + str(len(scripts)))
+          Path("/tmp/admin-v1257-final.js").write_text(scripts[0], encoding="utf-8")
+          gradle = (root / "app/build.gradle").read_text(encoding="utf-8")
+          manifest = (root / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
+          if "versionCode 84" not in gradle or "versionName '12.1.57'" not in gradle:
+              raise SystemExit("Admin V12.1.57 version metadata mismatch")
+          if "applicationId 'com.anigames.billingadmin.v157dbtest'" not in gradle:
+              raise SystemExit("Admin V12.1.57 isolated SAFE TEST package missing")
+          if 'android:label="AniGames Admin DB Android V12.1.57 SAFE TEST"' not in manifest:
+              raise SystemExit("Admin V12.1.57 app label missing")
+          print("PASS: Admin DB1/DB2 menu and route concepts removed; Android DB login and core features retained.")
+          print("PASS: Remote Play, rental, reports, FREE TEST, PAUSE/STOP and WOL UI still present.")
+          print("NOTE: WOL/Blynk remains the explicitly separate relay sidecar until local API migration is implemented.")
+          PY
+          node --check /tmp/admin-v1257-final.js
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -595,20 +636,20 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v156dbtest' versionCode='83' versionName='12.1.56'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "application-label:'AniGames Admin DB Android V12.1.56 SAFE TEST'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
-          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v157dbtest' versionCode='84' versionName='12.1.57'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "application-label:'AniGames Admin DB Android V12.1.57 SAFE TEST'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-SAFE-TEST.apk"
+          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-SAFE-TEST.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.57-SAFE-TEST.apk"
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-DB-Android-v12.1.56-SAFE-TEST
+          name: AniGames-Admin-DB-Android-v12.1.57-SAFE-TEST
           path: output/*
           if-no-files-found: error
           retention-days: 30
