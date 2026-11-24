@@ -46,6 +46,8 @@ test('Primary Admin login keeps the V12.1.53 Auth endpoint and token contract', 
   assert.match(loginFn, /await boot\(\)/);
   assert.match(page, /async function rpc\(name,args=\{\}\)[\s\S]*?\/rest\/v1\/rpc\//);
   assert.match(page, /rpc\('admin_context'\)/);
+  assert.match(page, /async function relayAccessToken\(\)/);
+  assert.match(page, /async function signup\(\)/);
 });
 
 test('Separate Supabase Blynk/WoL authentication cannot block Admin login', () => {
