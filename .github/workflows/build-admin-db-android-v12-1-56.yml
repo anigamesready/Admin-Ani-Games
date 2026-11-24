@@ -1,4 +1,4 @@
-name: Build Ani Games Admin DB Android V12.1.56 APK
+name: Build Ani Games Admin DB Android V12.1.56 SAFE TEST APK
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build Ani Games Admin V12.1.56 DB Android APK
+    name: Build Ani Games Admin V12.1.56 DB Android SAFE TEST APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -520,17 +520,19 @@ jobs:
           manifest = (root / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
           if "versionCode 83" not in gradle or "versionName '12.1.56'" not in gradle:
               raise SystemExit("Admin V12.1.56 metadata missing after patch")
-          if "applicationId 'com.anigames.billingadmin.v153db'" not in gradle:
-              raise SystemExit("Stable DB Android applicationId changed")
-          if 'android:label="AniGames Admin V12.1.56 DB Android"' not in manifest:
-              raise SystemExit("Admin V12.1.56 manifest label missing")
+          if "applicationId 'com.anigames.billingadmin.v156dbtest'" not in gradle:
+              raise SystemExit("Admin V12.1.56 side-by-side SAFE TEST package ID missing")
+          if "applicationId 'com.anigames.billingadmin.v153db'" in gradle:
+              raise SystemExit("SAFE TEST must not overwrite the V12.1.53 stable application ID")
+          if 'android:label="AniGames Admin DB Android V12.1.56 SAFE TEST"' not in manifest:
+              raise SystemExit("Admin V12.1.56 SAFE TEST manifest label missing")
           if "V12.1.56-STOP-PAUSE-OWNER-ROLE-VISIBILITY" not in page:
               raise SystemExit("V12.1.56 source marker missing")
           scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
           if len(scripts) != 1:
               raise SystemExit(f"Expected exactly one inline Admin script after V12.1.56 patch, found {len(scripts)}")
           Path("/tmp/admin-db-android-v1256-check.js").write_text(scripts[0], encoding="utf-8")
-          print("PASS: Admin V12.1.56 local DB package, version, Owner visibility and policy RPCs.")
+          print("PASS: Admin V12.1.56 SAFE TEST uses an isolated package ID; stable V12.1.53 remains installed.")
           PY
           node --check /tmp/admin-db-android-v1256-check.js
 
@@ -551,12 +553,14 @@ jobs:
                   raise SystemExit("Unexpected online gateway overlay in local DB Android APK: " + name)
           gradle = (root / "app/build.gradle").read_text(encoding="utf-8")
           manifest = (root / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8")
-          if "applicationId 'com.anigames.billingadmin.v153db'" not in gradle:
-              raise SystemExit("DB Android stable package ID missing")
+          if "applicationId 'com.anigames.billingadmin.v156dbtest'" not in gradle:
+              raise SystemExit("DB Android SAFE TEST package ID missing")
+          if "applicationId 'com.anigames.billingadmin.v153db'" in gradle:
+              raise SystemExit("Stable V12.1.53 appId must not be reused by differently signed SAFE TEST")
           if "versionCode 83" not in gradle or "versionName '12.1.56'" not in gradle:
               raise SystemExit("DB Android V12.1.56 version metadata missing")
-          if 'android:label="AniGames Admin V12.1.56 DB Android"' not in manifest:
-              raise SystemExit("DB Android V12.1.56 label missing")
+          if 'android:label="AniGames Admin DB Android V12.1.56 SAFE TEST"' not in manifest:
+              raise SystemExit("DB Android V12.1.56 SAFE TEST label missing")
           print("PASS: DB Android local build retains package ID and localhost API port 8787.")
           PY
 
@@ -591,20 +595,20 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -1)"
           test -n "$AAPT" && test -n "$APKSIGNER"
           mkdir -p "$GITHUB_WORKSPACE/output"
-          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56.apk"
-          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "package: name='com.anigames.billingadmin.v153db' versionCode='83' versionName='12.1.56'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          grep -q "application-label:'AniGames Admin V12.1.56 DB Android'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
-          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56.apk"
-          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56.apk"
-          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
-          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56.apk"
-          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
+          "$AAPT" dump badging "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "package: name='com.anigames.billingadmin.v156dbtest' versionCode='83' versionName='12.1.56'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          grep -q "application-label:'AniGames Admin DB Android V12.1.56 SAFE TEST'" "$GITHUB_WORKSPACE/output/apk-badging.txt"
+          "$APKSIGNER" verify --verbose "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
+          "$APKSIGNER" verify --print-certs "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
+          sha256sum "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk" | tee "$GITHUB_WORKSPACE/output/SHA256SUMS.txt"
+          unzip -t "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
+          ls -lh "$GITHUB_WORKSPACE/output/AniGames-Admin-DB-Android-V12.1.56-SAFE-TEST.apk"
 
       - name: Upload final Admin APK
         uses: actions/upload-artifact@v4
         with:
-          name: AniGames-Admin-DB-Android-v12.1.56
+          name: AniGames-Admin-DB-Android-v12.1.56-SAFE-TEST
           path: output/*
           if-no-files-found: error
           retention-days: 30
