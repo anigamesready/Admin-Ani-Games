@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""Admin DB Android V12.1.56: restore Owner PAUSE/STOP menu visibility safely.
+
+Uses the canonical V12.1.49 Master/Owner resolver, retains the V12.1.53
+local DB Android package/port, and does not alter any database or relay config.
+"""
+from pathlib import Path
+import re
+import sys
+
+ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
+WEB = ROOT / "android/app/src/main/assets/web"
+PAGE = WEB / "admin.html"
+GRADLE = ROOT / "android/app/build.gradle"
+MANIFEST = ROOT / "android/app/src/main/AndroidManifest.xml"
+VERSION = ROOT / "VERSION.txt"
+
+MARKER = "V12.1.56-STOP-PAUSE-OWNER-ROLE-VISIBILITY"
+BASE_MARKER = "V12.1.54-PAIRING-REMOTE-PLAY-LABEL"
+PACKAGE_ID = "com.anigames.billingadmin.v153db"
+
+for p in (PAGE, GRADLE, MANIFEST):
+    if not p.is_file():
+        raise SystemExit("REQUIRED_ADMIN_DB_ANDROID_FILE_MISSING:" + str(p))
+
+page = PAGE.read_text(encoding="utf-8")
+gradle = GRADLE.read_text(encoding="utf-8")
+manifest = MANIFEST.read_text(encoding="utf-8")
+
+if MARKER in page:
+    if (
+        "function billingStopPausePolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}" in page
+        and "versionCode 83" in gradle
+        and "versionName '12.1.56'" in gradle
+        and f"applicationId '{PACKAGE_ID}'" in gradle
+    ):
+        print("PASS: Admin V12.1.56 Stop/Pause Owner visibility fix already applied")
+        raise SystemExit(0)
+    raise SystemExit("V12.1.56_MARKER_METADATA_MISMATCH")
+
+if BASE_MARKER not in page:
+    raise SystemExit("EXPECTED_V12_1_54_BASELINE_MISSING")
+if "V12.1.51-BILLING-STOP-PAUSE-POLICY" not in page:
+    raise SystemExit("V12.1.51_POLICY_MENU_NOT_PRESENT_IN_BASELINE")
+for token in (
+    "billingStopPausePolicyNav",
+    "billingStopPausePolicyCard",
+    "billingStopPausePolicySwitch",
+    "billingStopPausePolicySave",
+    "admin_get_billing_stop_pause_policy",
+    "admin_set_billing_stop_pause_policy",
+    "function isWakeRelayOwner()",
+):
+    if token not in page:
+        raise SystemExit("REQUIRED_POLICY_OR_OWNER_RESOLVER_MISSING:" + token)
+
+# V12.1.49 owns the canonical role aliases. Reuse it instead of maintaining a
+# narrower copy that only recognizes 'owner'/'super_admin'.
+old_owner_fn = "function billingStopPausePolicyIsOwner(){const role=String(ctx?.role||'').trim().toLowerCase();return role==='owner'||role==='super_admin';}"
+new_owner_fn = "function billingStopPausePolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}"
+if page.count(old_owner_fn) != 1:
+    raise SystemExit("STOP_PAUSE_OWNER_GUARD_ANCHOR_MISMATCH")
+page = page.replace(old_owner_fn, new_owner_fn, 1)
+
+# The old visibility block inherited the narrower local 'owner' boolean. Use
+# the same canonical Owner resolver for both the menu and the settings card.
+old_visibility = (
+    "const stopPauseNav=$('billingStopPausePolicyNav');"
+    "if(stopPauseNav)stopPauseNav.classList.toggle('hidden',!owner);"
+    "const stopPauseCard=$('billingStopPausePolicyCard');"
+    "if(stopPauseCard)stopPauseCard.classList.toggle('hidden',!owner);"
+)
+new_visibility = (
+    "const stopPauseOwner=billingStopPausePolicyIsOwner();"
+    "const stopPauseNav=$('billingStopPausePolicyNav');"
+    "if(stopPauseNav)stopPauseNav.classList.toggle('hidden',!stopPauseOwner);"
+    "const stopPauseCard=$('billingStopPausePolicyCard');"
+    "if(stopPauseCard)stopPauseCard.classList.toggle('hidden',!stopPauseOwner);"
+)
+if page.count(old_visibility) != 1:
+    raise SystemExit("STOP_PAUSE_MENU_VISIBILITY_ANCHOR_MISMATCH")
+page = page.replace(old_visibility, new_visibility, 1)
+
+# Guard the custom menu entry point and read RPC as well as the save action.
+open_anchor = "function openBillingStopPausePolicyMenu(){\n"
+open_guard = "function openBillingStopPausePolicyMenu(){\n if(!billingStopPausePolicyIsOwner())return msg('Akses PAUSE / STOP BILLING hanya untuk Master/Owner.',true);\n"
+if page.count(open_anchor) != 1:
+    raise SystemExit("STOP_PAUSE_OPEN_MENU_ANCHOR_MISMATCH")
+page = page.replace(open_anchor, open_guard, 1)
+
+load_anchor = "async function loadBillingStopPausePolicy(){\n"
+load_guard = (
+    "async function loadBillingStopPausePolicy(){\n"
+    " if(!billingStopPausePolicyIsOwner()){"
+    "billingStopPausePolicyMessage('Hanya Master/Owner yang boleh melihat dan mengubah izin PAUSE / STOP.',true);"
+    "return null;"
+    "}\n"
+)
+if page.count(load_anchor) != 1:
+    raise SystemExit("STOP_PAUSE_LOAD_FUNCTION_ANCHOR_MISMATCH")
+page = page.replace(load_anchor, load_guard, 1)
+
+# Keep the control fail-closed if a save fails: read the server's last confirmed
+# value again, and only display that value as authoritative.
+old_catch = (
+    " }catch(e){if(sw)sw.disabled=true;"
+    "billingStopPausePolicyMessage('SIMPAN GAGAL / STATUS TIDAK DIKETAHUI. Muat ulang status dari database. Detail: '+String(e?.message||e).slice(0,180),true);}"
+)
+new_catch = (
+    " }catch(e){"
+    "const detail=String(e?.message||e).slice(0,160);"
+    "if(sw)sw.disabled=true;"
+    "const confirmed=await loadBillingStopPausePolicy();"
+    "billingStopPausePolicyMessage("
+    "'SIMPAN GAGAL: '+detail+'. '+(confirmed?'Status dikembalikan ke nilai terakhir yang dikonfirmasi database.':'Status database belum dapat diverifikasi; kontrol tetap dikunci.'),"
+    "true"
+    ");"
+    "}"
+)
+if page.count(old_catch) != 1:
+    raise SystemExit("STOP_PAUSE_SAVE_FAILURE_ANCHOR_MISMATCH")
+page = page.replace(old_catch, new_catch, 1)
+
+# Verify the local RPC adapter stays on DB Android (not the Supabase/Blynk
+# sidecar) and that both policy RPCs are routed through the Admin token.
+if "const RELAY_RPC_NAMES=new Set(['wol_relay_status'" not in page:
+    raise SystemExit("RELAY_ONLY_SUPABASE_ALLOWLIST_MISSING")
+if "admin_get_billing_stop_pause_policy" in page and "admin_set_billing_stop_pause_policy" in page:
+    # The Admin local adapter is expected to keep these RPC names outside the
+    # RELAY_RPC_NAMES allow-list so rpc() uses the local DB Android API.
+    m = re.search(r"const RELAY_RPC_NAMES=new Set\(\[(.*?)\]\);", page, re.S)
+    if not m:
+        raise SystemExit("RELAY_RPC_ALLOWLIST_NOT_FOUND")
+    allow = m.group(1)
+    for name in ("admin_get_billing_stop_pause_policy", "admin_set_billing_stop_pause_policy"):
+        if name in allow:
+            raise SystemExit("POLICY_RPC_MUST_USE_LOCAL_DB_ANDROID_API:" + name)
+
+# Version up without changing applicationId or the saved local API port.
+if gradle.count("versionCode 82") != 1 or gradle.count("versionName '12.1.54'") != 1:
+    raise SystemExit("ADMIN_GRADLE_V12_1_54_VERSION_ANCHOR_MISMATCH")
+if gradle.count(f"applicationId '{PACKAGE_ID}'") != 1:
+    raise SystemExit("ADMIN_DB_ANDROID_PACKAGE_ID_MISMATCH")
+gradle = gradle.replace("versionCode 82", "versionCode 83", 1)
+gradle = gradle.replace("versionName '12.1.54'", "versionName '12.1.56'", 1)
+
+label_old = 'android:label="AniGames Admin V12.1.54 DB Android"'
+label_new = 'android:label="AniGames Admin V12.1.56 DB Android"'
+if manifest.count(label_old) != 1:
+    raise SystemExit("ADMIN_MANIFEST_V12_1_54_LABEL_MISMATCH")
+manifest = manifest.replace(label_old, label_new, 1)
+
+for name in ("admin.html", "index.html", "admin-control.html"):
+    source = (WEB / name).read_text(encoding="utf-8")
+    if "http://127.0.0.1:8787" not in source or "http://127.0.0.1:8788" in source:
+        raise SystemExit("ADMIN_DB_ANDROID_PORT_8787_MUST_BE_PRESERVED:" + name)
+
+page += "\n<!-- " + MARKER + " -->\n"
+for token in (
+    MARKER,
+    "function billingStopPausePolicyIsOwner(){try{return typeof isWakeRelayOwner==='function'&&isWakeRelayOwner()===true}catch(_){return false}}",
+    "const stopPauseOwner=billingStopPausePolicyIsOwner();",
+    "if(!billingStopPausePolicyIsOwner())return msg('Akses PAUSE / STOP BILLING hanya untuk Master/Owner.',true);",
+    "admin_get_billing_stop_pause_policy",
+    "admin_set_billing_stop_pause_policy",
+    "SIMPAN GAGAL:",
+):
+    if token not in page:
+        raise SystemExit("V12.1.56_ASSERTION_FAILED:" + token)
+
+if page.count('id="billingStopPausePolicyNav"') != 1:
+    raise SystemExit("STOP_PAUSE_NAV_DUPLICATE_OR_MISSING")
+if page.count('id="billingStopPausePolicyCard"') != 1:
+    raise SystemExit("STOP_PAUSE_CARD_DUPLICATE_OR_MISSING")
+if page.count('id="billingStopPausePolicySwitch"') != 1:
+    raise SystemExit("STOP_PAUSE_SWITCH_DUPLICATE_OR_MISSING")
+if page.count('id="billingStopPausePolicySave"') != 1:
+    raise SystemExit("STOP_PAUSE_SAVE_BUTTON_DUPLICATE_OR_MISSING")
+if "owner==='super_admin'" in page or "role==='owner'||role==='super_admin'" in page:
+    raise SystemExit("NARROW_STOP_PAUSE_OWNER_CHECK_REMAINS")
+
+PAGE.write_text(page, encoding="utf-8")
+GRADLE.write_text(gradle, encoding="utf-8")
+MANIFEST.write_text(manifest, encoding="utf-8")
+VERSION.write_text(
+    "AniGames Admin DB Android V12.1.56 — fixes Master/Owner alias visibility for the DB-backed PC Billing PAUSE / STOP permission; retains the V12.1.53 package ID and localhost API port 8787.\n",
+    encoding="utf-8",
+)
+print("PASS: Master/Owner aliases show PAUSE / STOP menu through the canonical role resolver.")
+print("PASS: menu open, policy read, and save are Owner-gated; failed saves re-read the last DB-confirmed value.")
+print("PASS: existing DB Android package ID, port 8787, Remote Play, Blynk/WoL sidecar and Admin core remain unchanged.")
