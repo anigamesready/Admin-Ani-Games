@@ -57,7 +57,7 @@ for name in PAGES:
 
     source = source.replace(
         "Login memakai database lokal Ani Games Ready. Alamat awal adalah server di perangkat ini.",
-        "Login memakai DB Android Ani Games Ready melalui gateway HTTPS."
+        "Login memakai DB Android Ani Games Ready melalui gateway aman menuju Redmi."
     )
     source = source.replace("Admin Dashboard • DB Android Lokal", "Admin Dashboard • DB Android Online")
     source = source.replace("Billing Control • DB Android Lokal", "Billing Control • DB Android Online")
