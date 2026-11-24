@@ -587,7 +587,7 @@ jobs:
                         "wakeRelayCard", "wol_relay_enqueue", "startLocalAdmin();"):
               if token not in page:
                   raise SystemExit("Required Android DB/admin feature missing: " + token)
-          scripts = re.findall(r'<script\b(?![^>]*\\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
+          scripts = re.findall(r'<script\b(?![^>]*\bsrc=)[^>]*>(.*?)</script>', page, re.I | re.S)
           if len(scripts) != 1:
               raise SystemExit("Expected one final Admin inline script, found " + str(len(scripts)))
           Path("/tmp/admin-v1257-final.js").write_text(scripts[0], encoding="utf-8")
