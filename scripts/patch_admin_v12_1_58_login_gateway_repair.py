@@ -218,7 +218,7 @@ login_start = admin.find("async function login(){")
 login_end = admin.find("async function signup(){", login_start)
 if login_start < 0 or login_end <= login_start or admin.count("async function login(){") != 1:
     raise SystemExit("ADMIN_LOGIN_FUNCTION_BOUNDARY_MISMATCH")
-admin = admin[:login_start] + login_fn + "\\n" + admin[login_end:]
+admin = admin[:login_start] + login_fn + "\n" + admin[login_end:]
 
 boot_fn = r"""async function boot(){
  let stage='memulihkan sesi Admin';
