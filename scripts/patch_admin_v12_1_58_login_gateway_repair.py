@@ -97,8 +97,10 @@ for name in PAGES:
     for old in OLD_LOOPBACKS:
         if old in source:
             raise SystemExit("LOOPBACK_DEFAULT_REMAINS:" + name + ":" + old)
-    if LEGACY_RELAY_HOST in source:
-        raise SystemExit("LEGACY_DIRECT_RELAY_HOST_REMAINS:" + name)
+    if ("https://" + LEGACY_RELAY_HOST) in source:
+        raise SystemExit("LEGACY_DIRECT_RELAY_URL_REMAINS:" + name)
+    if source.count(LEGACY_RELAY_HOST) != 1:
+        raise SystemExit("LEGACY_RELAY_MIGRATION_GUARD_COUNT_INVALID:" + name)
     path.write_text(source, encoding="utf-8")
 
 # 2. Define the JavaScript helper already called by V12.1.53 startup and
