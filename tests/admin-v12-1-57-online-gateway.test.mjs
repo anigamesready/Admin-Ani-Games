@@ -22,6 +22,7 @@ test('All login/admin/control endpoints default to the HTTPS Redmi gateway', () 
   assert.match(pages.login, /ALAMAT GATEWAY DB ANDROID/i);
   assert.match(pages.control, /function localApiBase\(\)/);
   assert.match(page, /DB Android Online/);
+  assert.ok(page.includes('Login memakai DB Android Ani Games Ready melalui gateway aman menuju Redmi.'));
 });
 
 test('Gateway routing preserves the V12.1.53 DB Android RPC adapter', () => {
