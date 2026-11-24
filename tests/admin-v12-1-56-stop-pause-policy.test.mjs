@@ -9,8 +9,11 @@ const index = readFileSync('android/app/src/main/assets/web/index.html', 'utf8')
 const control = readFileSync('android/app/src/main/assets/web/admin-control.html', 'utf8');
 
 const policyOwnerFn = page.match(/function billingStopPausePolicyIsOwner\(\)\{[^}]*\}/)?.[0] || '';
-const visibilityBlock = page.match(/const stopPauseOwner=billingStopPausePolicyIsOwner\(\);[\s\S]{0,260}?stopPauseCard\.classList\.toggle\('hidden',!stopPauseOwner\);/)?.[0] || '';
+const freeTestOwnerFn = page.match(/function freeTestPolicyIsOwner\(\)\{[^}]*\}/)?.[0] || '';
+const remotePlayOwnerFn = page.match(/function isRemotePlayOwner\(\)\{[^}]*\}/)?.[0] || '';
+const visibilityBlock = page.match(/const policyOwner=billingStopPausePolicyIsOwner\(\);[\s\S]{0,520}?stopPauseCard\.classList\.toggle\('hidden',!stopPauseOwner\);/)?.[0] || '';
 const openFn = page.match(/function openBillingStopPausePolicyMenu\(\)\{[\s\S]*?\n\}/)?.[0] || '';
+const tabFn = page.match(/function tab\(id\)\{[^\n]*\}/)?.[0] || '';
 const loadFn = page.match(/async function loadBillingStopPausePolicy\(\)\{[\s\S]*?\n\}/)?.[0] || '';
 const saveFn = page.match(/async function saveBillingStopPausePolicy\(\)\{[\s\S]*?\n\}/)?.[0] || '';
 const relayAllow = page.match(/const RELAY_RPC_NAMES=new Set\(\[([^\]]*)\]\);/)?.[1] || '';
@@ -21,9 +24,14 @@ test('Stop/Pause menu is present exactly once and uses canonical Master/Owner ro
   assert.equal((page.match(/id="billingStopPausePolicySwitch"/g) || []).length, 1);
   assert.equal((page.match(/id="billingStopPausePolicySave"/g) || []).length, 1);
   assert.match(policyOwnerFn, /isWakeRelayOwner\(\)===true/);
+  assert.match(freeTestOwnerFn, /isWakeRelayOwner\(\)===true/);
+  assert.match(remotePlayOwnerFn, /isWakeRelayOwner\(\)===true/);
   assert.match(page, /function isWakeRelayOwner\(\)[\s\S]*?master_owner[\s\S]*?master_admin/);
-  assert.match(visibilityBlock, /const stopPauseOwner=billingStopPausePolicyIsOwner\(\)/);
+  assert.match(visibilityBlock, /const policyOwner=billingStopPausePolicyIsOwner\(\)/);
+  assert.match(visibilityBlock, /!policyOwner/);
   assert.match(visibilityBlock, /!stopPauseOwner/);
+  assert.match(tabFn, /id==='pairing'&&!isWakeRelayOwner\(\)/);
+  assert.doesNotMatch(tabFn, /ctx\?\.role!=='owner'/);
 });
 
 test('Menu opening, reading and saving are restricted to Master/Owner', () => {
